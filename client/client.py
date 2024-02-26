@@ -21,13 +21,14 @@ def angle_to_vel(angle, speed=1):
 class Display:
     def __init__(self, width, height, title):
         self.width, self.height, self.title = width, height, title
+        self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height))
         self.renderer = Renderer(self.window)
 
 
 class Game:
     def __init__(self):
-        self.running = __name__ == "__main__"
+        self.running = True
         self.fps = 60
         self.sens = 200
         self.map = [
@@ -96,22 +97,23 @@ player = Player()
 game = Game()
 clock = pygame.time.Clock()
 
-while game.running:
-    clock.tick(game.fps)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            game.running = False
-        elif event.type == pygame.MOUSEMOTION:
-            player.angle += event.rel[0] / game.sens
-            player.angle %= 2 * pi
+def main():
+    while game.running:
+        clock.tick(game.fps)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game.running = False
+            elif event.type == pygame.MOUSEMOTION:
+                player.angle += event.rel[0] / game.sens
+                player.angle %= 2 * pi
 
-    display.renderer.clear()
-    fill_rect(display.renderer, (40, 40, 40, 255), (0, 0, display.width, display.height))
+        display.renderer.clear()
+        fill_rect(display.renderer, (40, 40, 40, 255), (0, 0, display.width, display.height))
 
-    game.render_map()
-    player.update()
+        game.render_map()
+        player.update()
 
-    display.renderer.present()
+        display.renderer.present()
 
-pygame.quit()
-sys.exit()
+    pygame.quit()
+    sys.exit()
