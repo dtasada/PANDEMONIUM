@@ -9,15 +9,29 @@ import socket
 from threading import Thread
 
 
-client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+class Client(socket.socket):
+    def __init__(self):
+        super().__init__(socket.AF_INET, socket.SOCK_DGRAM)
+        self.target_server = ("127.0.0.1", 6969)
 
+    def send_str(self, message):
+        self.sendto(message.encode("utf-8"), self.target_server)
 
-def recv_server_msg():
-    while True:
-        message = "idk"
-        client.sendto(message.encode("utf-8"), (socket.gethostname(), 6969))
+client = Client()
+
+def receive():
+    message = None
+
+    while not message:
         data, addr = client.recvfrom(4096)
+        if data:
+            message = data.decode()
 
+    return message
+
+
+def send():
+    client.send_str("") # boilerplate
 
 def fill_rect(renderer, color, rect):
     renderer.draw_color = color
@@ -112,7 +126,7 @@ clock = pygame.time.Clock()
 
 
 def main():
-    Thread(target=recv_server_msg, daemon=True).start()
+    Thread(target=receive, daemon=True).start()
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
