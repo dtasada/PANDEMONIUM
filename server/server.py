@@ -4,7 +4,7 @@ from threading import Thread
 ip, port = "127.0.0.1", 6969
 
 serverUDP = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-serverUDP.bind((ip, port)) 
+serverUDP.bind((ip, port))
 
 serverTCP = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serverTCP.bind((ip, port))
@@ -14,7 +14,7 @@ def receiveUDP():
     message = None
 
     while not message:
-        data, addr = serverUDP.recvfrom(4096)
+        data, addr = serverUDP.recvfrom(2 ** 12)
         if data:
             message = data.decode()
 
@@ -23,7 +23,7 @@ def receiveUDP():
 def receiveTCP(client):
     while True:
         try:
-            data = client.recv(2 ** 11).decode()
+            data = client.recv(2 ** 12).decode()
             print(data)
         except:
             break
@@ -40,6 +40,3 @@ while True:
         Thread(target=receiveTCP, args=(conn,)).start()
     except ConnectionAbortedError:
         break
-
-
-

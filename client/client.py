@@ -22,32 +22,26 @@ class Client(socket.socket):
 
     def send_str(self, message):
         if self.conn_type == "udp":
-            self.sendto(message.encode("utf-8"), self.target_server)
+            self.sendto(message.encode(), self.target_server)
         if self.conn_type == "tcp":
-            self.send(message.encode("utf-8"))
+            self.send(message.encode())
 
 
-clientUDP = Client("udp")
-clientTCP = Client("tcp")
-
-
-def receiveUDP():
+def receive_udp():
     message = None
-
     while not message:
-        data, addr = clientUDP.recvfrom(4096)
+        data, addr = client_udp.recvfrom(2 ** 12)
         if data:
             message = data.decode()
-
     return message
 
 
-def receiveTCP():
+def receive_tcp():
     pass
 
 
 def send():
-    clientTCP.send_str("")  # boilerplate
+    client_tcp.send_str("")  # boilerplate
 
 
 def fill_rect(renderer, color, rect):
@@ -167,10 +161,17 @@ display = Display(1280, 720, "PANDEMONIUM")
 player = Player()
 game = Game()
 clock = pygame.time.Clock()
+client_udp = client_tcp = None
 
 
-def main():
-    Thread(target=receiveUDP, daemon=True).start()
+def main(multiplayer):
+    global client_udp, client_tcp
+    #
+    if multiplayer:
+        client_udp = Client("udp")
+        client_tcp = Client("tcp")
+        Thread(target=receive_udp, daemon=True).start()
+    #
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
