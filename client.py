@@ -2,6 +2,18 @@ import pygame
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 import sys
 from math import sin, cos, tan, atan2, pi
+import socket
+from threading import Thread
+
+
+client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+
+def recv_server_msg():
+    while True:
+        message = "idk"
+        client.sendto(message.encode("utf-8"), (socket.gethostname(), 6969))
+        data, addr = client.recvfrom(4096)
 
 
 def fill_rect(renderer, color, rect):
@@ -96,6 +108,7 @@ player = Player()
 game = Game()
 clock = pygame.time.Clock()
 
+Thread(target=recv_server_msg, daemon=True).start()
 while game.running:
     clock.tick(game.fps)
     for event in pygame.event.get():
