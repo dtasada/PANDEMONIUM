@@ -12,7 +12,10 @@ from threading import Thread
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
-        super().__init__(socket.AF_INET, socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM)
+        super().__init__(
+            socket.AF_INET,
+            socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
+        )
         self.target_server = ("127.0.0.1", 6969)
         if self.conn_type == "tcp":
             self.connect(self.target_server)
@@ -22,7 +25,7 @@ class Client(socket.socket):
             self.sendto(message.encode("utf-8"), self.target_server)
         if self.conn_type == "tcp":
             self.send(message.encode("utf-8"))
-            
+
 
 clientUDP = Client("udp")
 clientTCP = Client("tcp")
@@ -38,12 +41,14 @@ def receiveUDP():
 
     return message
 
+
 def receiveTCP():
     pass
 
 
 def send():
-    clientTCP.send_str("") # boilerplate
+    clientTCP.send_str("")  # boilerplate
+
 
 def fill_rect(renderer, color, rect):
     renderer.draw_color = color
@@ -85,13 +90,27 @@ class Game:
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
                 if tile == 1:
-                    fill_rect(display.renderer, (255, 0, 0, 255), (x * size, y * size, size, size))
+                    fill_rect(
+                        display.renderer,
+                        (255, 0, 0, 255),
+                        (x * size, y * size, size, size),
+                    )
 
         for y, row in enumerate(self.map):
-            draw_line(display.renderer, (255, 255, 255, 255), (0, (y + 1) * size), (10 * size, (y + 1) * size))
+            draw_line(
+                display.renderer,
+                (255, 255, 255, 255),
+                (0, (y + 1) * size),
+                (10 * size, (y + 1) * size),
+            )
             for x, tile in enumerate(row):
                 if y == 0:
-                    draw_line(display.renderer, (255, 255, 255, 255), ((x + 1) * size, 0), ((x + 1) * size, 10 * size))
+                    draw_line(
+                        display.renderer,
+                        (255, 255, 255, 255),
+                        ((x + 1) * size, 0),
+                        ((x + 1) * size, 10 * size),
+                    )
 
 
 class Player:
@@ -110,12 +129,18 @@ class Player:
         vmult = 1
         keys = pygame.key.get_pressed()
         xvel = yvel = 0
-        if keys[pygame.K_w] or keys[pygame.K_UP]: xvel, yvel = angle_to_vel(self.angle, vmult)
-        if keys[pygame.K_a]: xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
-        if keys[pygame.K_s] or keys[pygame.K_DOWN]: xvel, yvel = angle_to_vel(self.angle + pi, vmult)
-        if keys[pygame.K_d]: xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
-        if keys[pygame.K_LEFT]: self.angle -= 0.05
-        if keys[pygame.K_RIGHT]: self.angle += 0.05
+        if keys[pygame.K_w] or keys[pygame.K_UP]:
+            xvel, yvel = angle_to_vel(self.angle, vmult)
+        if keys[pygame.K_a]:
+            xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+            xvel, yvel = angle_to_vel(self.angle + pi, vmult)
+        if keys[pygame.K_d]:
+            xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+        if keys[pygame.K_LEFT]:
+            self.angle -= 0.05
+        if keys[pygame.K_RIGHT]:
+            self.angle += 0.05
         vxvel, vyvel = angle_to_vel(self.angle, vmult)
         p1 = (self.x + self.w / 2, self.y + self.h / 2)
         p2 = (p1[0] + vxvel * 100, p1[1] + vyvel * 100)
@@ -131,7 +156,7 @@ class Player:
 
 
 pygame.init()
-display = Display(1280, 720, "gaem")
+display = Display(1280, 720, "PANDEMONIUM")
 player = Player()
 game = Game()
 clock = pygame.time.Clock()
@@ -149,7 +174,9 @@ def main():
                 player.angle %= 2 * pi
 
         display.renderer.clear()
-        fill_rect(display.renderer, (40, 40, 40, 255), (0, 0, display.width, display.height))
+        fill_rect(
+            display.renderer, (40, 40, 40, 255), (0, 0, display.width, display.height)
+        )
 
         game.render_map()
         player.update()
