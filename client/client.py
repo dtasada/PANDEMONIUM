@@ -39,7 +39,8 @@ class Game:
         self.running = True
         self.fps = 60
         self.sens = 200
-        self.map = load_map_from_csv(Path("assets", "map.csv"))
+        self.fov = 60
+        self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
 
     def render_map(self):
         size = 20
@@ -83,8 +84,14 @@ class Player:
 
         draw_line(display.renderer, (255, 255, 0, 255), p1, p2)
 
+        for o in range(-(game.fov // 2), game.fov // 2 + 1):
+            self.cast_ray(o)
+
         self.x += xvel
         self.y += yvel
+
+    def cast_ray(self, angle):
+        print(angle)
 
     def update(self):
         self.keys()
