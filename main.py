@@ -2,6 +2,8 @@ import pygame
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 import sys
 from math import sin, cos, tan, atan2, pi
+import csv
+from pathlib import Path
 
 
 def fill_rect(renderer, color, rect):
@@ -12,10 +14,16 @@ def fill_rect(renderer, color, rect):
 def draw_line(renderer, color, p1, p2):
     renderer.draw_color = color
     renderer.draw_line(p1, p2)
-        
+
 
 def angle_to_vel(angle, speed=1):
     return cos(angle) * speed, sin(angle) * speed
+
+
+def load_map_from_csv(path_):
+    with open(path_, "r") as f:
+        reader = csv.reader(f)
+        return [[int(x) for x in line] for line in reader]
 
 
 class Display:
@@ -30,18 +38,7 @@ class Game:
         self.running = __name__ == "__main__"
         self.fps = 60
         self.sens = 200
-        self.map = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 0, 0, 1, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 0, 1, 0, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ]
+        self.map = load_map_from_csv(Path("assets", "map.csv"))
 
     def render_map(self):
         size = 20
@@ -55,7 +52,7 @@ class Game:
             for x, tile in enumerate(row):
                 if y == 0:
                     draw_line(display.renderer, (255, 255, 255, 255), ((x + 1) * size, 0), ((x + 1) * size, 10 * size))
-               
+
 
 class Player:
     def __init__(self):
@@ -65,18 +62,20 @@ class Player:
         self.h = 10
         self.color = (160, 160, 160, 255)
         self.angle = 0
-        
+
     def draw(self):
         fill_rect(display.renderer, self.color, (self.x, self.y, self.w, self.h))
-    
+
     def keys(self):
         vmult = 1
         keys = pygame.key.get_pressed()
         xvel = yvel = 0
-        if keys[pygame.K_w]: xvel, yvel = angle_to_vel(self.angle, vmult)
+        if keys[pygame.K_w] or keys[pygame.K_UP]: xvel, yvel = angle_to_vel(self.angle, vmult)
         if keys[pygame.K_a]: xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
-        if keys[pygame.K_s]: xvel, yvel = angle_to_vel(self.angle + pi, vmult)
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]: xvel, yvel = angle_to_vel(self.angle + pi, vmult)
         if keys[pygame.K_d]: xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+        if keys[pygame.K_LEFT]: self.angle -= 0.05
+        if keys[pygame.K_RIGHT]: self.angle += 0.05
         vxvel, vyvel = angle_to_vel(self.angle, vmult)
         p1 = (self.x + self.w / 2, self.y + self.h / 2)
         p2 = (p1[0] + vxvel * 100, p1[1] + vyvel * 100)
@@ -89,6 +88,7 @@ class Player:
     def update(self):
         self.keys()
         self.draw()
+
 
 pygame.init()
 display = Display(1280, 720, "gaem")
