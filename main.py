@@ -7,7 +7,7 @@ from math import sin, cos, tan, atan2, pi
 def fill_rect(renderer, color, rect):
     renderer.draw_color = color
     renderer.fill_rect(rect)
-        
+
 
 def draw_line(renderer, color, p1, p2):
     renderer.draw_color = color
@@ -43,6 +43,19 @@ class Game:
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         ]
 
+    def render_map(self):
+        size = 20
+        for y, row in enumerate(self.map):
+            for x, tile in enumerate(row):
+                if tile == 1:
+                    fill_rect(display.renderer, (255, 0, 0, 255), (x * size, y * size, size, size))
+
+        for y, row in enumerate(self.map):
+            draw_line(display.renderer, (255, 255, 255, 255), (0, (y + 1) * size), (10 * size, (y + 1) * size))
+            for x, tile in enumerate(row):
+                if y == 0:
+                    draw_line(display.renderer, (255, 255, 255, 255), ((x + 1) * size, 0), ((x + 1) * size, 10 * size))
+               
 
 class Player:
     def __init__(self):
@@ -64,8 +77,9 @@ class Player:
         if keys[pygame.K_a]: xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
         if keys[pygame.K_s]: xvel, yvel = angle_to_vel(self.angle + pi, vmult)
         if keys[pygame.K_d]: xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+        vxvel, vyvel = angle_to_vel(self.angle, vmult)
         p1 = (self.x + self.w / 2, self.y + self.h / 2)
-        p2 = (p1[0] + xvel * 100, p1[1] + yvel * 100)
+        p2 = (p1[0] + vxvel * 100, p1[1] + vyvel * 100)
 
         draw_line(display.renderer, (255, 255, 0, 255), p1, p2)
 
@@ -75,7 +89,6 @@ class Player:
     def update(self):
         self.keys()
         self.draw()
-            
 
 pygame.init()
 display = Display(1280, 720, "gaem")
@@ -88,7 +101,6 @@ while game.running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             game.running = False
-
         elif event.type == pygame.MOUSEMOTION:
             player.angle += event.rel[0] / game.sens
             player.angle %= 2 * pi
@@ -96,6 +108,7 @@ while game.running:
     display.renderer.clear()
     fill_rect(display.renderer, (40, 40, 40, 255), (0, 0, display.width, display.height))
 
+    game.render_map()
     player.update()
 
     display.renderer.present()
