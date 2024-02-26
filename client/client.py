@@ -10,28 +10,40 @@ from threading import Thread
 
 
 class Client(socket.socket):
-    def __init__(self):
-        super().__init__(socket.AF_INET, socket.SOCK_DGRAM)
+    def __init__(self, conn):
+        self.conn_type = conn
+        super().__init__(socket.AF_INET, socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM)
         self.target_server = ("127.0.0.1", 6969)
+        if self.conn_type == "tcp":
+            self.connect(self.target_server)
 
     def send_str(self, message):
-        self.sendto(message.encode("utf-8"), self.target_server)
+        if self.conn_type == "udp":
+            self.sendto(message.encode("utf-8"), self.target_server)
+        if self.conn_type == "tcp":
+            self.send(message.encode("utf-8"))
+            
 
-client = Client()
+clientUDP = Client("udp")
+clientTCP = Client("tcp")
 
-def receive():
+
+def receiveUDP():
     message = None
 
     while not message:
-        data, addr = client.recvfrom(4096)
+        data, addr = clientUDP.recvfrom(4096)
         if data:
             message = data.decode()
 
     return message
 
+def receiveTCP():
+    pass
+
 
 def send():
-    client.send_str("") # boilerplate
+    clientTCP.send_str("") # boilerplate
 
 def fill_rect(renderer, color, rect):
     renderer.draw_color = color
@@ -126,7 +138,7 @@ clock = pygame.time.Clock()
 
 
 def main():
-    Thread(target=receive, daemon=True).start()
+    Thread(target=receiveUDP, daemon=True).start()
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
