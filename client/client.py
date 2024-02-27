@@ -1,12 +1,13 @@
 import pygame
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 import sys
-from math import sin, cos, tan, atan2, pi
+from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 import csv
 from pathlib import Path
 
 import socket
 from threading import Thread
+from .constants import *
 
 
 class Client(socket.socket):
@@ -49,6 +50,11 @@ def fill_rect(renderer, color, rect):
     renderer.fill_rect(rect)
 
 
+def draw_rect(renderer, color, rect):
+    renderer.draw_color = color
+    renderer.draw_rect(rect)
+
+
 def draw_line(renderer, color, p1, p2):
     renderer.draw_color = color
     renderer.draw_line(p1, p2)
@@ -79,46 +85,44 @@ class Game:
         self.sens = 200
         self.fov = 60
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
+        self.rects = []
+        self.tile_size = 40
+        for y, row in enumerate(self.map):
+            for x, block in enumerate(row):
+                if block != 0:
+                    rect = pygame.Rect((x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size))
+                    self.rects.append(rect)
+        self.map_height = len(self.map)
+        self.map_width = len(self.map[0])
 
     def render_map(self):
-        size = 20
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
                 if tile == 1:
                     fill_rect(
                         display.renderer,
-                        (255, 0, 0, 255),
-                        (x * size, y * size, size, size),
+                        RED,
+                        (x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size),
                     )
 
-        for y, row in enumerate(self.map):
-            draw_line(
-                display.renderer,
-                (255, 255, 255, 255),
-                (0, (y + 1) * size),
-                (10 * size, (y + 1) * size),
-            )
-            for x, tile in enumerate(row):
-                if y == 0:
-                    draw_line(
-                        display.renderer,
-                        (255, 255, 255, 255),
-                        ((x + 1) * size, 0),
-                        ((x + 1) * size, 10 * size),
-                    )
+        for y in range(self.map_height):
+            draw_line(display.renderer, WHITE, (0, y * self.tile_size), (self.map_width * self.tile_size, y * self.tile_size))
+        for x in range(self.map_width):
+            draw_line(display.renderer, WHITE, (x * self.tile_size, 0), (x * self.tile_size, self.map_height * self.tile_size))
 
 
 class Player:
     def __init__(self):
-        self.x = 10
-        self.y = 10
+        self.x = game.tile_size * 6
+        self.y = game.tile_size * 3
         self.w = 10
         self.h = 10
-        self.color = (160, 160, 160, 255)
-        self.angle = 0
+        self.color = WHITE
+        self.angle = 0.38
+        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
     def draw(self):
-        fill_rect(display.renderer, self.color, (self.x, self.y, self.w, self.h))
+        draw_rect(display.renderer, self.color, (self.rect.x - self.w / 2, self.rect.y - self.h / 2, self.w, self.h))
 
     def keys(self):
         vmult = 1
@@ -136,20 +140,70 @@ class Player:
             self.angle -= 0.05
         if keys[pygame.K_RIGHT]:
             self.angle += 0.05
-        vxvel, vyvel = angle_to_vel(self.angle, vmult)
-        p1 = (self.x + self.w / 2, self.y + self.h / 2)
+        vxvel, vyvel = angle_to_vel(self.angle, vmult * 4)
+        p1 = (self.rect.x, self.rect.y)
         p2 = (p1[0] + vxvel * 100, p1[1] + vyvel * 100)
 
-        draw_line(display.renderer, (255, 255, 0, 255), p1, p2)
+        # draw_line(display.renderer, YELLOW, p1, p2)
 
         for o in range(-(game.fov // 2), game.fov // 2 + 1):
             self.cast_ray(o)
 
-        self.x += xvel
-        self.y += yvel
+        # x-col
+        self.rect.x += xvel
+        for rect in game.rects:
+            if self.rect.colliderect(rect):
+                if xvel >= 0:
+                    self.rect.right = rect.left
+                else:
+                    self.rect.left = rect.right
+        self.rect.y += yvel
+        for rect in game.rects:
+            if self.rect.colliderect(rect):
+                if yvel >= 0:
+                    self.rect.bottom = rect.top
+                else:
+                    self.rect.top = rect.bottom
 
-    def cast_ray(self, angle):
-        print(angle)
+    def cast_ray(self, offset):
+        offset = radians(offset)
+        offset = 0
+        angle = self.angle + offset
+        dx = cos(angle)
+        dy = sin(angle)
+        #
+        tot_length = 0
+        y_length = x_length = 0
+        #
+        cur_tile = [int(self.rect.x / game.tile_size), int(self.rect.y / game.tile_size)]
+        cur_pos = list(self.rect.topleft)
+        cur_tile_pos = (cur_tile[0] * game.tile_size, cur_tile[1] * game.tile_size)
+        # first_dx = cur_tile_pos[0] - 
+
+        x_length_pos = list(self.rect.topleft)
+        y_length_pos = list(self.rect.topleft)
+        y_length += sqrt(1 + (dx / dy) ** 2)
+        x_length += sqrt(1 + (dy / dx) ** 2)
+        for _ in range(30):
+            if x_length <= y_length:
+                cur_tile[0] += 1
+                x_length_pos[0] += game.tile_size
+                x_length_pos[1] += game.tile_size * (dy / dx)
+                x_length += sqrt(1 + (dy / dx) ** 2)
+                if game.map[cur_tile[1]][cur_tile[0]] != 0:
+                    final_pos = x_length_pos
+                    break
+            else:
+                cur_tile[1] += 1
+                y_length_pos[1] += game.tile_size
+                y_length_pos[0] += game.tile_size * (dx / dy)
+                y_length += sqrt(1 + (dx / dy) ** 2)
+                if game.map[cur_tile[1]][cur_tile[0]] != 0:
+                    final_pos = y_length_pos
+                    break
+        p1 = self.rect.topleft
+        p2 = final_pos
+        draw_line(display.renderer, GREEN, p1, p2)
 
     def update(self):
         self.keys()
@@ -158,8 +212,8 @@ class Player:
 
 pygame.init()
 display = Display(1280, 720, "PANDEMONIUM")
-player = Player()
 game = Game()
+player = Player()
 clock = pygame.time.Clock()
 client_udp = client_tcp = None
 
@@ -178,8 +232,9 @@ def main(multiplayer):
             if event.type == pygame.QUIT:
                 game.running = False
             elif event.type == pygame.MOUSEMOTION:
-                player.angle += event.rel[0] / game.sens
-                player.angle %= 2 * pi
+                pass
+                # player.angle += event.rel[0] / game.sens
+                # player.angle %= 2 * pi
 
         display.renderer.clear()
         fill_rect(
