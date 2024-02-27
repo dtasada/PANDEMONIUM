@@ -171,6 +171,7 @@ def main(multiplayer):
         client_udp = Client("udp")
         client_tcp = Client("tcp")
         Thread(target=receive_udp, daemon=True).start()
+        Thread(target=receive_tcp, daemon=True).start()
     #
     while game.running:
         clock.tick(game.fps)
