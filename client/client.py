@@ -12,7 +12,27 @@ from .constants import *
 
 def disable_mouse():
     pygame.mouse.set_visible(False)
-    pygame.event.set_grab(True)
+    display.window.grab_mouse = True
+
+
+def write(surf, anchor, text, font, color, x, y, alpha=255, blit=True, border=None, special_flags=0, tex=True):
+    if border is not None:
+        bc, bw = border, 1
+        write(surf, anchor, text, font, bc, x - bw, y - bw),
+        write(surf, anchor, text, font, bc, x + bw, y - bw),
+        write(surf, anchor, text, font, bc, x - bw, y + bw),
+        write(surf, anchor, text, font, bc, x + bw, y + bw)
+    text = font.render(str(text), True, color)
+    if tex:
+        text = Texture.from_surface(surf, text)
+        text.alpha = alpha
+    else:
+        text.set_alpha(alpha)
+    text_rect = text.get_rect()
+    setattr(text_rect, anchor, (int(x), int(y)))
+    if blit:
+        surf.blit(text, text_rect, special_flags=special_flags)
+    return text, text_rect
 
 
 class Client(socket.socket):
@@ -75,6 +95,12 @@ def load_map_from_csv(path_):
         return [[int(x) for x in line] for line in reader]
 
 
+class Button:
+    def __init__(self):
+        pass
+        # todo fucking button
+
+
 class Display:
     def __init__(self, width, height, title, fullscreen=False):
         self.title = width, height, title
@@ -91,6 +117,7 @@ class Display:
 class Game:
     def __init__(self):
         self.running = True
+        self.stage = "play"
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
@@ -163,22 +190,39 @@ class Player:
         )
 
     def keys(self):
-        vmult = 2
-        keys = pygame.key.get_pressed()
-        xvel = yvel = 0
-        if keys[pygame.K_w] or keys[pygame.K_UP]:
-            xvel, yvel = angle_to_vel(self.angle, vmult)
-        if keys[pygame.K_a]:
-            xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
-        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
-            xvel, yvel = angle_to_vel(self.angle + pi, vmult)
-        if keys[pygame.K_d]:
-            xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
-        amult = 0.03
-        if keys[pygame.K_LEFT]:
-            self.angle -= amult
-        if keys[pygame.K_RIGHT]:
-            self.angle += amult
+        if game.stage == "play":
+            vmult = 2
+            keys = pygame.key.get_pressed()
+            xvel = yvel = 0
+            if keys[pygame.K_w] or keys[pygame.K_UP]:
+                xvel, yvel = angle_to_vel(self.angle, vmult)
+            if keys[pygame.K_a]:
+                xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
+            if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+                xvel, yvel = angle_to_vel(self.angle + pi, vmult)
+            if keys[pygame.K_d]:
+                xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+            amult = 0.03
+            if keys[pygame.K_LEFT]:
+                self.angle -= amult
+            if keys[pygame.K_RIGHT]:
+                self.angle += amult
+
+            # x-col
+            self.rect.x += xvel
+            for rect in game.rects:
+                if self.rect.colliderect(rect):
+                    if xvel >= 0:
+                        self.rect.right = rect.left
+                    else:
+                        self.rect.left = rect.right
+            self.rect.y += yvel
+            for rect in game.rects:
+                if self.rect.colliderect(rect):
+                    if yvel >= 0:
+                        self.rect.bottom = rect.top
+                    else:
+                        self.rect.top = rect.bottom
 
         for o in range(-(game.fov // 2), game.fov // 2 + 1):
             self.cast_ray(o)
@@ -188,22 +232,6 @@ class Player:
         p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
         if self.should_render:
             draw_line(display.renderer, BLACK, p1, p2)
-
-        # x-col
-        self.rect.x += xvel
-        for rect in game.rects:
-            if self.rect.colliderect(rect):
-                if xvel >= 0:
-                    self.rect.right = rect.left
-                else:
-                    self.rect.left = rect.right
-        self.rect.y += yvel
-        for rect in game.rects:
-            if self.rect.colliderect(rect):
-                if yvel >= 0:
-                    self.rect.bottom = rect.top
-                else:
-                    self.rect.top = rect.bottom
 
     def cast_ray(self, deg_offset):
         offset = radians(deg_offset)
@@ -279,12 +307,16 @@ class Player:
             self.draw()
 
 
-pygame.init()
 display = Display(1280, 720, "PANDEMONIUM", True)
 game = Game()
 player = Player()
 clock = pygame.time.Clock()
 client_udp = client_tcp = None
+black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
+black_square.fill(BLACK)
+black_square.set_alpha(40)
+black_square = Texture.from_surface(display.renderer, black_square)
+black_square_rect = black_square.get_rect()
 disable_mouse()
 
 
@@ -304,12 +336,13 @@ def main(multiplayer):
                 game.running = False
             elif event.type == pygame.MOUSEMOTION:
                 # pass
-                player.angle += event.rel[0] * game.sens
-                player.angle %= 2 * pi
+                if game.stage == "play":
+                    player.angle += event.rel[0] * game.sens
+                    player.angle %= 2 * pi
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    game.stage = {"play": "settings", "settings": "play"}[game.stage]
 
         display.renderer.clear()
         fill_rect(
@@ -324,6 +357,9 @@ def main(multiplayer):
         if player.should_render:
             game.render_map()
         player.update()
+        if game.stage == "settings":
+            display.renderer.blit(black_square, black_square_rect)
+            write(display.renderer, "center", "PANDEMONIUM", v_fonts[100], WHITE, display.width / 2, 150)
 
         display.renderer.present()
 
