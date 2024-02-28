@@ -36,7 +36,7 @@ class Client(socket.socket):
 def receive_udp():
     message = None
     while not message:
-        data, addr = client_udp.recvfrom(2 ** 12)
+        data, addr = client_udp.recvfrom(2**12)
         if data:
             message = data.decode()
     return message
@@ -76,8 +76,13 @@ def load_map_from_csv(path_):
 
 
 class Display:
-    def __init__(self, width, height, title):
-        self.width, self.height, self.title = width, height, title
+    def __init__(self, width, height, title, fullscreen=False):
+        self.title = width, height, title
+        if fullscreen:
+            self.width = pygame.display.Info().current_w
+            self.height = pygame.display.Info().current_h
+        else:
+            self.width, self.height = width, height
         self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height))
         self.renderer = Renderer(self.window)
@@ -95,7 +100,14 @@ class Game:
         for y, row in enumerate(self.map):
             for x, block in enumerate(row):
                 if block != 0:
-                    rect = pygame.Rect((x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size))
+                    rect = pygame.Rect(
+                        (
+                            x * self.tile_size,
+                            y * self.tile_size,
+                            self.tile_size,
+                            self.tile_size,
+                        )
+                    )
                     self.rects.append(rect)
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
@@ -110,13 +122,28 @@ class Game:
                 fill_rect(
                     display.renderer,
                     color,
-                    (x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size),
+                    (
+                        x * self.tile_size,
+                        y * self.tile_size,
+                        self.tile_size,
+                        self.tile_size,
+                    ),
                 )
 
         for y in range(self.map_height):
-            draw_line(display.renderer, WHITE, (0, y * self.tile_size), (self.map_width * self.tile_size, y * self.tile_size))
+            draw_line(
+                display.renderer,
+                WHITE,
+                (0, y * self.tile_size),
+                (self.map_width * self.tile_size, y * self.tile_size),
+            )
         for x in range(self.map_width):
-            draw_line(display.renderer, WHITE, (x * self.tile_size, 0), (x * self.tile_size, self.map_height * self.tile_size))
+            draw_line(
+                display.renderer,
+                WHITE,
+                (x * self.tile_size, 0),
+                (x * self.tile_size, self.map_height * self.tile_size),
+            )
 
 
 class Player:
@@ -128,9 +155,12 @@ class Player:
         self.color = WHITE
         self.angle = 0.38
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
+        self.should_render = False
 
     def draw(self):
-        draw_rect(display.renderer, self.color, (self.rect.x, self.rect.y, self.w, self.h))
+        draw_rect(
+            display.renderer, self.color, (self.rect.x, self.rect.y, self.w, self.h)
+        )
 
     def keys(self):
         vmult = 2
@@ -156,7 +186,8 @@ class Player:
         m = 20
         p1 = self.rect.center
         p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
-        draw_line(display.renderer, BLACK, p1, p2)
+        if self.should_render:
+            draw_line(display.renderer, BLACK, p1, p2)
 
         # x-col
         self.rect.x += xvel
@@ -182,7 +213,10 @@ class Player:
         #
         tot_length = 0
         y_length = x_length = 0
-        start_x, start_y = [self.rect.centerx / game.tile_size, self.rect.centery / game.tile_size]
+        start_x, start_y = [
+            self.rect.centerx / game.tile_size,
+            self.rect.centery / game.tile_size,
+        ]
         cur_x, cur_y = [int(start_x), int(start_y)]
         hypot_x, hypot_y = sqrt(1 + (dy / dx) ** 2), sqrt(1 + (dx / dy) ** 2)
         direc = (dx, dy)
@@ -217,7 +251,10 @@ class Player:
         if col:
             # calculations
             p1 = (start_x * game.tile_size, start_y * game.tile_size)
-            p2 = (p1[0] + dist * dx * game.tile_size, p1[1] + dist * dy * game.tile_size)
+            p2 = (
+                p1[0] + dist * dx * game.tile_size,
+                p1[1] + dist * dy * game.tile_size,
+            )
             ray_mult = 1
             # 3D
             dist *= ray_mult
@@ -226,19 +263,24 @@ class Player:
             ww = display.width / game.fov
             wx = (deg_offset + game.fov / 2) / game.fov * display.width
             wy = display.height / 2 - wh / 2
-            fill_rect(display.renderer, [wh / display.height * 255] * 3 + [255], (wx, wy, ww, wh))
-            # raying the 2D rays
-            draw_line(display.renderer, GREEN, p1, p2)
             m = 0.1
-
+            fill_rect(
+                display.renderer,
+                [wh / display.height * 255] * 3 + [255],
+                (wx, wy, ww, wh),
+            )
+            if self.should_render:
+                # raying the 2D rays
+                draw_line(display.renderer, GREEN, p1, p2)
 
     def update(self):
         self.keys()
-        self.draw()
+        if self.should_render:
+            self.draw()
 
 
 pygame.init()
-display = Display(1280, 720, "PANDEMONIUM")
+display = Display(1280, 720, "PANDEMONIUM", True)
 game = Game()
 player = Player()
 clock = pygame.time.Clock()
@@ -271,10 +313,16 @@ def main(multiplayer):
 
         display.renderer.clear()
         fill_rect(
-            display.renderer, DARK_GRAY, (0, 0, display.width, display.height)
+            display.renderer, DARK_GRAY, (0, 0, display.width, display.height / 2)
+        )
+        fill_rect(
+            display.renderer,
+            BROWN,
+            (0, display.height / 2, display.width, display.height / 2),
         )
 
-        game.render_map()
+        if player.should_render:
+            game.render_map()
         player.update()
 
         display.renderer.present()
