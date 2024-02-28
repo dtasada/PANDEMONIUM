@@ -47,6 +47,7 @@ def send():
 def fill_rect(color, rect):
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
+    display.renderer.draw_color = BLACK
 
 
 def draw_rect(color, rect):
@@ -135,40 +136,48 @@ class Cursor:
         self.img = pygame.image.load(Path("client", "assets", "images", "cursor.png"))
         self.tex = Texture.from_surface(display.renderer, self.img)
         self.rect = self.img.get_rect()
+        pygame.mouse.set_visible(False)
 
     def enable(self):
         self.mouse_should_wrap = False
         display.window.grab_mouse = False
-        pygame.mouse.set_visible(True)
 
     def disable(self):
         display.window.grab_mouse = True
         self.mouse_should_wrap = True
-        pygame.mouse.set_visible(False)
 
     def update(self):
-        self.rect.x, self.rect.y = pygame.mouse.get_pos()
+        self.rect.topleft = pygame.mouse.get_pos()
         display.renderer.blit(self.tex, self.rect)
 
 
 class Button:
-    def __init__(self, x, y, width, height, content, color=WHITE):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
+    def __init__(
+        self,
+        x,
+        y,
+        width,
+        height,
+        content,
+        action,
+        font_size=32,
+        color=WHITE,
+    ):
         self.content = content
         self.color = color
+        self.rect = pygame.Rect(x, y, width, height)
+        self.font_size = font_size
+        self.action = action
 
     def update(self):
-        fill_rect(GRAY, (self.x, self.y, self.width, self.height))
+        fill_rect(GRAY, self.rect)
         write(
             "topleft",
-            "Unleash PANDEMONIUM",
-            v_fonts[24],
-            WHITE,
-            self.x,
-            self.y,
+            self.content,
+            v_fonts[self.font_size],
+            self.color,
+            self.rect.x,
+            self.rect.y,
             tex=False,
         )
 

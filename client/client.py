@@ -36,6 +36,14 @@ class Game:
         self.map_width = len(self.map[0])
         self.should_render_map = True
 
+    def set_stage(self, stage):
+        self.stage = stage
+
+        if stage == Stages.PLAY:
+            cursor.disable()
+        else:
+            cursor.enable()
+
     def render_map(self):
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
@@ -197,12 +205,21 @@ class Player:
             self.draw()
 
 
-cursor.disable()
+cursor.enable()
 game = Game()
 player = Player()
 clock = pygame.time.Clock()
 
-buttons = [Button(150, 150, 300, 50, "Unleash PANDEMONIUM")]
+buttons = [
+    Button(
+        48,
+        display.height / 2,
+        300,
+        50,
+        "Unleash PANDEMONIUM",
+        lambda: game.set_stage(Stages.PLAY),
+    )
+]
 
 black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
 black_square.fill(BLACK)
@@ -236,6 +253,10 @@ def main(multiplayer):
                     else:
                         player.angle += event.rel[0] * game.sens
                         player.angle %= 2 * pi
+                case pygame.MOUSEBUTTONDOWN:
+                    for button in buttons:
+                        if button.rect.colliderect(cursor.rect):
+                            button.action()
                 case pygame.KEYDOWN:
                     match event.key:
                         case pygame.K_ESCAPE:
