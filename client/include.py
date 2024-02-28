@@ -101,7 +101,7 @@ def write(
         write(anchor, content, font, bc, x + bw, y - bw)
         write(anchor, content, font, bc, x - bw, y + bw)
         write(anchor, content, font, bc, x + bw, y + bw)
-    tex = font.render(content, True, color)
+    tex = font.render(str(content), True, color)
     if tex:
         tex = Texture.from_surface(display.renderer, tex)
         tex.alpha = alpha
