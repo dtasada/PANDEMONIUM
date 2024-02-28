@@ -34,7 +34,7 @@ class Game:
                     self.rects.append(rect)
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
-        self.should_render_map = True
+        self.should_render_map = False
 
     def set_state(self, state):
         self.previous_state = self.state
@@ -263,6 +263,12 @@ button_lists = {
         Button(
             48,
             display.height / 2 + 48 * 2,
+            "Resolution",
+            lambda: None,
+        ),
+        Button(
+            48,
+            display.height / 2 + 48 * 1,
             "Back",
             lambda: game.set_state(game.previous_state),
         ),
@@ -294,27 +300,32 @@ def main(multiplayer):
             match event.type:
                 case pygame.QUIT:
                     game.running = False
+
                 case pygame.MOUSEMOTION:
-                    if pygame.mouse.get_pos()[0] > display.width - 20:
-                        pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
-                    elif pygame.mouse.get_pos()[0] < 20:
-                        pygame.mouse.set_pos(
-                            display.width - 20, pygame.mouse.get_pos()[1]
-                        )
-                    else:
-                        player.angle += event.rel[0] * game.sens
-                        player.angle %= 2 * pi
+                    if cursor.should_wrap:
+                        if pygame.mouse.get_pos()[0] > display.width - 20:
+                            pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
+                        elif pygame.mouse.get_pos()[0] < 20:
+                            pygame.mouse.set_pos(
+                                display.width - 20, pygame.mouse.get_pos()[1]
+                            )
+                        else:
+                            player.angle += event.rel[0] * game.sens
+                            player.angle %= 2 * pi
+
                 case pygame.MOUSEBUTTONDOWN:
                     for button in buttons:
                         if button.rect.colliderect(cursor.rect):
                             button.action()
+
                 case pygame.KEYDOWN:
                     match event.key:
                         case pygame.K_ESCAPE:
-                            if game.state == States.SETTINGS:
-                                game.set_state(States.PLAY)
-                            elif game.state == States.PLAY:
-                                game.set_state(States.SETTINGS)
+                            match game.state:
+                                case States.SETTINGS:
+                                    game.set_state(States.PLAY)
+                                case States.PLAY:
+                                    game.set_state(States.SETTINGS)
 
         display.renderer.clear()
 

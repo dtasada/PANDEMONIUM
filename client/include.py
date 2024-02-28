@@ -57,19 +57,16 @@ def send():
 def fill_rect(color, rect):
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
-    display.renderer.draw_color = Colors.BLACK
 
 
 def draw_rect(color, rect):
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
-    display.renderer.draw_color = Colors.BLACK
 
 
 def draw_line(color, p1, p2):
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
-    display.renderer.draw_color = Colors.BLACK
 
 
 def angle_to_vel(angle, speed=1):
@@ -109,20 +106,7 @@ def write(
         tex.set_alpha(alpha)
     rect = tex.get_rect()
 
-    if anchor in (
-        "topleft",
-        "bottomleft",
-        "topright",
-        "bottomright",
-        "midtop",
-        "midleft",
-        "midbottom",
-        "midright",
-        "center",
-    ):
-        setattr(rect, anchor, (int(x), int(y)))
-    else:
-        sys.exit("write: anchor point is not valid")
+    setattr(rect, anchor, (int(x), int(y)))
 
     if blit:
         display.renderer.blit(tex, rect, special_flags=special_flags)
@@ -153,13 +137,13 @@ class Cursor:
 
     def enable(self):
         self.enabled = True
-        self.mouse_should_wrap = False
+        self.should_wrap = False
         display.window.grab_mouse = False
 
     def disable(self):
         self.enabled = False
         display.window.grab_mouse = True
-        self.mouse_should_wrap = True
+        self.should_wrap = True
 
     def update(self):
         self.rect.topleft = pygame.mouse.get_pos()
