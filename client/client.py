@@ -10,11 +10,6 @@ from threading import Thread
 from .constants import *
 
 
-def disable_mouse():
-    pygame.mouse.set_visible(False)
-    pygame.event.set_grab(True)
-
-
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
@@ -86,6 +81,16 @@ class Display:
         self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height))
         self.renderer = Renderer(self.window)
+
+    def disallow_mouse(self):
+        self.window.grab_mouse = False
+        self.mouse_should_wrap = False
+        pygame.mouse.set_visible(False)
+
+    def allow_mouse(self):
+        self.mouse_should_wrap = True
+        self.window.grab_mouse = True
+        pygame.mouse.set_visible(True)
 
 
 class Game:
@@ -281,11 +286,11 @@ class Player:
 
 pygame.init()
 display = Display(1280, 720, "PANDEMONIUM", True)
+display.disallow_mouse()
 game = Game()
 player = Player()
 clock = pygame.time.Clock()
 client_udp = client_tcp = None
-disable_mouse()
 
 
 def main(multiplayer):
@@ -303,9 +308,13 @@ def main(multiplayer):
             if event.type == pygame.QUIT:
                 game.running = False
             elif event.type == pygame.MOUSEMOTION:
-                # pass
-                player.angle += event.rel[0] * game.sens
-                player.angle %= 2 * pi
+                if pygame.mouse.get_pos()[0] > display.width - 20:
+                    pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
+                elif pygame.mouse.get_pos()[0] < 20:
+                    pygame.mouse.set_pos(display.width - 20, pygame.mouse.get_pos()[1])
+                else:
+                    player.angle += event.rel[0] * game.sens
+                    player.angle %= 2 * pi
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
