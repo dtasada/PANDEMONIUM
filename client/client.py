@@ -1,143 +1,19 @@
-from enum import Enum
-from os import walk
 import pygame
-from pygame._sdl2.video import Window, Renderer, Texture, Image
 import sys
+
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
-import csv
+from os import walk
 from pathlib import Path
-
-import socket
+from pygame._sdl2.video import Window, Renderer, Texture, Image
 from threading import Thread
-from .constants import *
 
-
-def write(
-    surf,
-    anchor,
-    text,
-    font,
-    color,
-    x,
-    y,
-    alpha=255,
-    blit=True,
-    border=None,
-    special_flags=0,
-    tex=True,
-):
-    if border is not None:
-        bc, bw = border, 1
-        write(surf, anchor, text, font, bc, x - bw, y - bw)
-        write(surf, anchor, text, font, bc, x + bw, y - bw)
-        write(surf, anchor, text, font, bc, x - bw, y + bw)
-        write(surf, anchor, text, font, bc, x + bw, y + bw)
-    text = font.render(str(text), True, color)
-    if tex:
-        text = Texture.from_surface(surf, text)
-        text.alpha = alpha
-    else:
-        text.set_alpha(alpha)
-    text_rect = text.get_rect()
-    setattr(text_rect, anchor, (int(x), int(y)))
-    if blit:
-        surf.blit(text, text_rect, special_flags=special_flags)
-    return text, text_rect
-
-
-class Client(socket.socket):
-    def __init__(self, conn):
-        self.conn_type = conn
-        super().__init__(
-            socket.AF_INET,
-            socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
-        )
-        self.target_server = ("127.0.0.1", 6969)
-        if self.conn_type == "tcp":
-            self.connect(self.target_server)
-
-    def send_str(self, message):
-        if self.conn_type == "udp":
-            self.sendto(message.encode(), self.target_server)
-        if self.conn_type == "tcp":
-            self.send(message.encode())
-
-
-def receive_udp():
-    message = None
-    while not message:
-        data, addr = client_udp.recvfrom(2**12)
-        if data:
-            message = data.decode()
-    return message
-
-
-def receive_tcp():
-    pass
-
-
-def send():
-    client_tcp.send_str("")  # boilerplate
-
-
-def fill_rect(renderer, color, rect):
-    renderer.draw_color = color
-    renderer.fill_rect(rect)
-
-
-def draw_rect(renderer, color, rect):
-    renderer.draw_color = color
-    renderer.draw_rect(rect)
-
-
-def draw_line(renderer, color, p1, p2):
-    renderer.draw_color = color
-    renderer.draw_line(p1, p2)
-
-
-def angle_to_vel(angle, speed=1):
-    return cos(angle) * speed, sin(angle) * speed
-
-
-def load_map_from_csv(path_):
-    with open(path_, "r") as f:
-        reader = csv.reader(f)
-        return [[int(x) for x in line] for line in reader]
-
-
-class Button:
-    def __init__(self):
-        pass
-        # todo fucking button
-
-
-class Display:
-    def __init__(self, width, height, title, fullscreen=False):
-        self.title = width, height, title
-        if fullscreen:
-            self.width = pygame.display.Info().current_w
-            self.height = pygame.display.Info().current_h
-        else:
-            self.width, self.height = width, height
-        self.center = (self.width / 2, self.height / 2)
-        self.window = Window(size=(self.width, self.height))
-        self.renderer = Renderer(self.window)
-
-    def disallow_mouse(self):
-        self.window.grab_mouse = False
-        self.mouse_should_wrap = False
-        pygame.mouse.set_visible(False)
-
-    def allow_mouse(self):
-        self.mouse_should_wrap = True
-        self.window.grab_mouse = True
-        pygame.mouse.set_visible(True)
+from .include import *
 
 
 class Game:
     def __init__(self):
         self.running = True
-        self.stage = Stages.PLAY
+        self.stage = Stages.MAIN_MENU
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
@@ -158,6 +34,7 @@ class Game:
                     self.rects.append(rect)
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
+        self.should_render_map = True
 
     def render_map(self):
         for y, row in enumerate(self.map):
@@ -167,7 +44,6 @@ class Game:
                 elif tile == 1:
                     color = RED
                 fill_rect(
-                    display.renderer,
                     color,
                     (
                         x * self.tile_size,
@@ -179,14 +55,12 @@ class Game:
 
         for y in range(self.map_height):
             draw_line(
-                display.renderer,
                 WHITE,
                 (0, y * self.tile_size),
                 (self.map_width * self.tile_size, y * self.tile_size),
             )
         for x in range(self.map_width):
             draw_line(
-                display.renderer,
                 WHITE,
                 (x * self.tile_size, 0),
                 (x * self.tile_size, self.map_height * self.tile_size),
@@ -202,12 +76,9 @@ class Player:
         self.color = WHITE
         self.angle = 0.38
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.should_render = False
 
     def draw(self):
-        draw_rect(
-            display.renderer, self.color, (self.rect.x, self.rect.y, self.w, self.h)
-        )
+        draw_rect(self.color, (self.rect.x, self.rect.y, self.w, self.h))
 
     def keys(self):
         if game.stage == Stages.PLAY:
@@ -250,8 +121,8 @@ class Player:
         m = 20
         p1 = self.rect.center
         p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
-        if self.should_render:
-            draw_line(display.renderer, BLACK, p1, p2)
+        if game.should_render_map:
+            draw_line(BLACK, p1, p2)
 
     def cast_ray(self, deg_offset):
         offset = radians(deg_offset)
@@ -313,31 +184,25 @@ class Player:
             wy = display.height / 2 - wh / 2
             m = 0.1
             fill_rect(
-                display.renderer,
                 [wh / display.height * 255] * 3 + [255],
                 (wx, wy, ww, wh),
             )
-            if self.should_render:
+            if game.should_render_map:
                 # raying the 2D rays
-                draw_line(display.renderer, GREEN, p1, p2)
+                draw_line(GREEN, p1, p2)
 
     def update(self):
         self.keys()
-        if self.should_render:
+        if game.should_render_map:
             self.draw()
 
 
-class Stages:
-    PLAY = 0
-    SETTINGS = 1
-
-
-display = Display(1280, 720, "PANDEMONIUM", True)
-display.disallow_mouse()
+cursor.disable()
 game = Game()
 player = Player()
 clock = pygame.time.Clock()
-client_udp = client_tcp = None
+
+buttons = [Button(150, 150, 300, 50, "Unleash PANDEMONIUM")]
 
 black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
 black_square.fill(BLACK)
@@ -374,36 +239,44 @@ def main(multiplayer):
                 case pygame.KEYDOWN:
                     match event.key:
                         case pygame.K_ESCAPE:
-                            game.stage = (
-                                Stages.PLAY
-                                if game.stage == Stages.SETTINGS
-                                else Stages.SETTINGS
-                            )
+                            if game.stage == Stages.SETTINGS:
+                                game.stage = Stages.PLAY
+                            elif game.stage == Stages.PLAY:
+                                game.stage = Stages.SETTINGS
 
         display.renderer.clear()
-        fill_rect(
-            display.renderer, DARK_GRAY, (0, 0, display.width, display.height / 2)
-        )
-        fill_rect(
-            display.renderer,
-            BROWN,
-            (0, display.height / 2, display.width, display.height / 2),
-        )
 
-        if player.should_render:
-            game.render_map()
-        player.update()
-        if game.stage == Stages.SETTINGS:
-            display.renderer.blit(black_square, black_square_rect)
-            write(
-                display.renderer,
-                "center",
-                "PANDEMONIUM",
-                v_fonts[100],
-                WHITE,
-                display.width / 2,
-                150,
-            )
+        if game.stage in (Stages.MAIN_MENU, Stages.SETTINGS):
+            for button in buttons:
+                button.update()
+
+            cursor.update()
+
+        match game.stage:
+            case Stages.MAIN_MENU:
+                display.renderer.blit(black_square, black_square_rect)
+                write(
+                    "center",
+                    "PANDEMONIUM",
+                    v_fonts[100],
+                    WHITE,
+                    int(display.width / 2),
+                    150,
+                )
+            case Stages.PLAY:
+                fill_rect(
+                    DARK_GRAY,
+                    (0, 0, display.width, display.height / 2),
+                )
+                fill_rect(
+                    BROWN,
+                    (0, display.height / 2, display.width, display.height / 2),
+                )
+                if game.should_render_map:
+                    game.render_map()
+                player.update()
+            case Stages.SETTINGS:
+                pass
 
         display.renderer.present()
 
