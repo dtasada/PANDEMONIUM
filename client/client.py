@@ -1,3 +1,5 @@
+from enum import Enum
+from os import walk
 import pygame
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 import sys
@@ -10,18 +12,25 @@ from threading import Thread
 from .constants import *
 
 
-<<<<<<< HEAD
-def disable_mouse():
-    pygame.mouse.set_visible(False)
-    display.window.grab_mouse = True
-
-
-def write(surf, anchor, text, font, color, x, y, alpha=255, blit=True, border=None, special_flags=0, tex=True):
+def write(
+    surf,
+    anchor,
+    text,
+    font,
+    color,
+    x,
+    y,
+    alpha=255,
+    blit=True,
+    border=None,
+    special_flags=0,
+    tex=True,
+):
     if border is not None:
         bc, bw = border, 1
-        write(surf, anchor, text, font, bc, x - bw, y - bw),
-        write(surf, anchor, text, font, bc, x + bw, y - bw),
-        write(surf, anchor, text, font, bc, x - bw, y + bw),
+        write(surf, anchor, text, font, bc, x - bw, y - bw)
+        write(surf, anchor, text, font, bc, x + bw, y - bw)
+        write(surf, anchor, text, font, bc, x - bw, y + bw)
         write(surf, anchor, text, font, bc, x + bw, y + bw)
     text = font.render(str(text), True, color)
     if tex:
@@ -36,8 +45,6 @@ def write(surf, anchor, text, font, color, x, y, alpha=255, blit=True, border=No
     return text, text_rect
 
 
-=======
->>>>>>> d12db3b06051ff16bf472d55e8618b0602d97171
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
@@ -130,7 +137,7 @@ class Display:
 class Game:
     def __init__(self):
         self.running = True
-        self.stage = "play"
+        self.stage = Stages.PLAY
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
@@ -203,7 +210,7 @@ class Player:
         )
 
     def keys(self):
-        if game.stage == "play":
+        if game.stage == Stages.PLAY:
             vmult = 2
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
@@ -320,18 +327,23 @@ class Player:
             self.draw()
 
 
+class Stages:
+    PLAY = 0
+    SETTINGS = 1
+
+
 display = Display(1280, 720, "PANDEMONIUM", True)
 display.disallow_mouse()
 game = Game()
 player = Player()
 clock = pygame.time.Clock()
 client_udp = client_tcp = None
+
 black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
 black_square.fill(BLACK)
 black_square.set_alpha(40)
 black_square = Texture.from_surface(display.renderer, black_square)
 black_square_rect = black_square.get_rect()
-disable_mouse()
 
 
 def main(multiplayer):
@@ -346,20 +358,27 @@ def main(multiplayer):
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                game.running = False
-            elif event.type == pygame.MOUSEMOTION:
-                if pygame.mouse.get_pos()[0] > display.width - 20:
-                    pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
-                elif pygame.mouse.get_pos()[0] < 20:
-                    pygame.mouse.set_pos(display.width - 20, pygame.mouse.get_pos()[1])
-                else:
-                    player.angle += event.rel[0] * game.sens
-                    player.angle %= 2 * pi
-
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    game.stage = {"play": "settings", "settings": "play"}[game.stage]
+            match event.type:
+                case pygame.QUIT:
+                    game.running = False
+                case pygame.MOUSEMOTION:
+                    if pygame.mouse.get_pos()[0] > display.width - 20:
+                        pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
+                    elif pygame.mouse.get_pos()[0] < 20:
+                        pygame.mouse.set_pos(
+                            display.width - 20, pygame.mouse.get_pos()[1]
+                        )
+                    else:
+                        player.angle += event.rel[0] * game.sens
+                        player.angle %= 2 * pi
+                case pygame.KEYDOWN:
+                    match event.key:
+                        case pygame.K_ESCAPE:
+                            game.stage = (
+                                Stages.PLAY
+                                if game.stage == Stages.SETTINGS
+                                else Stages.SETTINGS
+                            )
 
         display.renderer.clear()
         fill_rect(
@@ -374,9 +393,17 @@ def main(multiplayer):
         if player.should_render:
             game.render_map()
         player.update()
-        if game.stage == "settings":
+        if game.stage == Stages.SETTINGS:
             display.renderer.blit(black_square, black_square_rect)
-            write(display.renderer, "center", "PANDEMONIUM", v_fonts[100], WHITE, display.width / 2, 150)
+            write(
+                display.renderer,
+                "center",
+                "PANDEMONIUM",
+                v_fonts[100],
+                WHITE,
+                display.width / 2,
+                150,
+            )
 
         display.renderer.present()
 
