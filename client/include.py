@@ -10,16 +10,26 @@ import sys
 
 
 pygame.init()
-BLACK = (0, 0, 0, 255)
-BLUE = (0, 0, 255, 255)
-DARK_GRAY = (40, 40, 40, 255)
-GRAY = (150, 150, 150, 255)
-GREEN = (0, 255, 0, 255)
-BROWN = (97, 54, 19)
-ORANGE = (255, 140, 0, 255)
-RED = (255, 0, 0, 255)
-WHITE = (255, 255, 255, 255)
-YELLOW = (255, 255, 0, 255)
+
+
+class Colors:
+    BLACK = (0, 0, 0, 255)
+    BLUE = (0, 0, 255, 255)
+    DARK_GRAY = (40, 40, 40, 255)
+    GRAY = (150, 150, 150, 255)
+    GREEN = (0, 255, 0, 255)
+    BROWN = (97, 54, 19)
+    ORANGE = (255, 140, 0, 255)
+    RED = (255, 0, 0, 255)
+    WHITE = (255, 255, 255, 255)
+    YELLOW = (255, 255, 0, 255)
+
+
+class States(Enum):
+    MAIN_MENU = 0
+    SETTINGS = 1
+    PLAY = 2
+
 
 v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
@@ -47,17 +57,19 @@ def send():
 def fill_rect(color, rect):
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
-    display.renderer.draw_color = BLACK
+    display.renderer.draw_color = Colors.BLACK
 
 
 def draw_rect(color, rect):
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
+    display.renderer.draw_color = Colors.BLACK
 
 
 def draw_line(color, p1, p2):
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
+    display.renderer.draw_color = Colors.BLACK
 
 
 def angle_to_vel(angle, speed=1):
@@ -136,13 +148,16 @@ class Cursor:
         self.img = pygame.image.load(Path("client", "assets", "images", "cursor.png"))
         self.tex = Texture.from_surface(display.renderer, self.img)
         self.rect = self.img.get_rect()
+        self.enabled = True
         pygame.mouse.set_visible(False)
 
     def enable(self):
+        self.enabled = True
         self.mouse_should_wrap = False
         display.window.grab_mouse = False
 
     def disable(self):
+        self.enabled = False
         display.window.grab_mouse = True
         self.mouse_should_wrap = True
 
@@ -156,23 +171,32 @@ class Button:
         self,
         x,
         y,
-        width,
-        height,
         content,
         action,
+        width=None,
+        height=None,
         font_size=32,
-        color=WHITE,
+        color=Colors.WHITE,
+        should_background=False,
+        anchor="topleft",
     ):
         self.content = content
         self.color = color
-        self.rect = pygame.Rect(x, y, width, height)
         self.font_size = font_size
         self.action = action
+        self.should_background = should_background
+        self.anchor = anchor
+
+        self.font = v_fonts[self.font_size]
+        self.width = width or self.font.size(content)[0]
+        self.height = height or self.font.size(content)[1]
+        self.rect = pygame.Rect(x, y, self.width, self.height)
 
     def update(self):
-        fill_rect(GRAY, self.rect)
+        if self.should_background:
+            fill_rect(Colors.GRAY, self.rect)
         write(
-            "topleft",
+            self.anchor,
             self.content,
             v_fonts[self.font_size],
             self.color,
@@ -180,12 +204,6 @@ class Button:
             self.rect.y,
             tex=False,
         )
-
-
-class Stages(Enum):
-    MAIN_MENU = 0
-    SETTINGS = 1
-    PLAY = 2
 
 
 class Client(socket.socket):

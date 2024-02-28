@@ -13,7 +13,7 @@ from .include import *
 class Game:
     def __init__(self):
         self.running = True
-        self.stage = Stages.MAIN_MENU
+        self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
@@ -36,10 +36,14 @@ class Game:
         self.map_width = len(self.map[0])
         self.should_render_map = True
 
-    def set_stage(self, stage):
-        self.stage = stage
+    def set_state(self, state):
+        self.previous_state = self.state
+        self.state = state
 
-        if stage == Stages.PLAY:
+        global buttons
+        buttons = button_lists[self.state]
+
+        if state == States.PLAY:
             cursor.disable()
         else:
             cursor.enable()
@@ -48,9 +52,9 @@ class Game:
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
                 if tile == 0:
-                    color = DARK_GRAY
+                    color = Colors.DARK_GRAY
                 elif tile == 1:
-                    color = RED
+                    color = Colors.RED
                 fill_rect(
                     color,
                     (
@@ -63,13 +67,13 @@ class Game:
 
         for y in range(self.map_height):
             draw_line(
-                WHITE,
+                Colors.WHITE,
                 (0, y * self.tile_size),
                 (self.map_width * self.tile_size, y * self.tile_size),
             )
         for x in range(self.map_width):
             draw_line(
-                WHITE,
+                Colors.WHITE,
                 (x * self.tile_size, 0),
                 (x * self.tile_size, self.map_height * self.tile_size),
             )
@@ -81,7 +85,7 @@ class Player:
         self.y = game.tile_size * 3
         self.w = 10
         self.h = 10
-        self.color = WHITE
+        self.color = Colors.WHITE
         self.angle = 0.38
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
@@ -89,7 +93,7 @@ class Player:
         draw_rect(self.color, (self.rect.x, self.rect.y, self.w, self.h))
 
     def keys(self):
-        if game.stage == Stages.PLAY:
+        if game.state == States.PLAY:
             vmult = 2
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
@@ -130,14 +134,14 @@ class Player:
         p1 = self.rect.center
         p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
         if game.should_render_map:
-            draw_line(BLACK, p1, p2)
+            draw_line(Colors.BLACK, p1, p2)
 
     def cast_ray(self, deg_offset):
         offset = radians(deg_offset)
         angle = self.angle + offset
         dx = cos(angle)
         dy = sin(angle)
-        #
+
         tot_length = 0
         y_length = x_length = 0
         start_x, start_y = [
@@ -147,7 +151,7 @@ class Player:
         cur_x, cur_y = [int(start_x), int(start_y)]
         hypot_x, hypot_y = sqrt(1 + (dy / dx) ** 2), sqrt(1 + (dx / dy) ** 2)
         direc = (dx, dy)
-        #
+
         if dx < 0:
             step_x = -1
             x_length = (start_x - cur_x) * hypot_x
@@ -197,7 +201,7 @@ class Player:
             )
             if game.should_render_map:
                 # raying the 2D rays
-                draw_line(GREEN, p1, p2)
+                draw_line(Colors.GREEN, p1, p2)
 
     def update(self):
         self.keys()
@@ -210,19 +214,66 @@ game = Game()
 player = Player()
 clock = pygame.time.Clock()
 
-buttons = [
-    Button(
-        48,
-        display.height / 2,
-        300,
-        50,
-        "Unleash PANDEMONIUM",
-        lambda: game.set_stage(Stages.PLAY),
-    )
-]
+button_lists = {
+    States.MAIN_MENU: [
+        Button(
+            int(display.width / 2),
+            150,
+            "PANDEMONIUM",
+            lambda: None,
+            font_size=64,
+            anchor="center",
+        ),
+        Button(
+            48,
+            display.height / 2 + 48 * 0,
+            "Unleash PANDEMONIUM",
+            lambda: game.set_state(States.PLAY),
+            font_size=40,
+            color=Colors.RED,
+        ),
+        Button(
+            48,
+            display.height / 2 + 48 * 1,
+            "Settings",
+            lambda: game.set_state(States.SETTINGS),
+        ),
+    ],
+    States.SETTINGS: [
+        Button(
+            int(display.width / 2),
+            150,
+            "PANDEMONIUM",
+            lambda: None,
+            font_size=64,
+            anchor="center",
+        ),
+        Button(
+            48,
+            display.height / 2 + 48 * 0,
+            "Field of view",
+            lambda: None,
+        ),
+        Button(
+            48,
+            display.height / 2 + 48 * 1,
+            "Sensitivity",
+            lambda: None,
+        ),
+        Button(
+            48,
+            display.height / 2 + 48 * 2,
+            "Back",
+            lambda: game.set_state(game.previous_state),
+        ),
+    ],
+    States.PLAY: [],
+}
+
+buttons = button_lists[States.MAIN_MENU]
 
 black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
-black_square.fill(BLACK)
+black_square.fill(Colors.BLACK)
 black_square.set_alpha(40)
 black_square = Texture.from_surface(display.renderer, black_square)
 black_square_rect = black_square.get_rect()
@@ -230,13 +281,13 @@ black_square_rect = black_square.get_rect()
 
 def main(multiplayer):
     global client_udp, client_tcp
-    #
+
     if multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
         Thread(target=receive_udp, daemon=True).start()
         Thread(target=receive_tcp, daemon=True).start()
-    #
+
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
@@ -260,44 +311,38 @@ def main(multiplayer):
                 case pygame.KEYDOWN:
                     match event.key:
                         case pygame.K_ESCAPE:
-                            if game.stage == Stages.SETTINGS:
-                                game.stage = Stages.PLAY
-                            elif game.stage == Stages.PLAY:
-                                game.stage = Stages.SETTINGS
+                            if game.state == States.SETTINGS:
+                                game.set_state(States.PLAY)
+                            elif game.state == States.PLAY:
+                                game.set_state(States.SETTINGS)
 
         display.renderer.clear()
 
-        if game.stage in (Stages.MAIN_MENU, Stages.SETTINGS):
-            for button in buttons:
-                button.update()
-
-            cursor.update()
-
-        match game.stage:
-            case Stages.MAIN_MENU:
+        match game.state:
+            case States.MAIN_MENU:
                 display.renderer.blit(black_square, black_square_rect)
-                write(
-                    "center",
-                    "PANDEMONIUM",
-                    v_fonts[100],
-                    WHITE,
-                    int(display.width / 2),
-                    150,
-                )
-            case Stages.PLAY:
+                pass
+            case States.PLAY:
                 fill_rect(
-                    DARK_GRAY,
+                    Colors.DARK_GRAY,
                     (0, 0, display.width, display.height / 2),
                 )
                 fill_rect(
-                    BROWN,
+                    Colors.BROWN,
                     (0, display.height / 2, display.width, display.height / 2),
                 )
                 if game.should_render_map:
                     game.render_map()
+
                 player.update()
-            case Stages.SETTINGS:
+            case States.SETTINGS:
                 pass
+
+        for button in buttons:
+            button.update()
+
+        if cursor.enabled:
+            cursor.update()
 
         display.renderer.present()
 
