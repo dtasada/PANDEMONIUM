@@ -10,6 +10,7 @@ server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_tcp.bind((ip, port))
 server_tcp.listen(10)
 
+
 def receive_udp():
     message = None
 
@@ -20,6 +21,7 @@ def receive_udp():
 
     return message
 
+
 def receive_tcp(client):
     while True:
         try:
@@ -28,6 +30,7 @@ def receive_tcp(client):
         except:
             break
     client.close()
+
 
 #UDP
 Thread(target=receive_udp, daemon=True).start()

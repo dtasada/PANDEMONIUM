@@ -295,7 +295,7 @@ def main(multiplayer):
         Thread(target=receive_tcp, daemon=True).start()
 
     while game.running:
-        clock.tick(game.fps)
+        clock.tick()
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
@@ -329,25 +329,27 @@ def main(multiplayer):
 
         display.renderer.clear()
 
-        match game.state:
-            case States.MAIN_MENU:
-                display.renderer.blit(black_square, black_square_rect)
-                pass
-            case States.PLAY:
-                fill_rect(
-                    Colors.DARK_GRAY,
-                    (0, 0, display.width, display.height / 2),
-                )
-                fill_rect(
-                    Colors.BROWN,
-                    (0, display.height / 2, display.width, display.height / 2),
-                )
-                if game.should_render_map:
-                    game.render_map()
+        # blit
+        write("topleft", int(clock.get_fps()), v_fonts[20], Colors.WHITE, 5, 5)
+        if game.state == States.MAIN_MENU:
+            display.renderer.blit(black_square, black_square_rect)
+            pass
+        if game.state in (States.PLAY, States.SETTINGS):
+            fill_rect(
+                Colors.DARK_GRAY,
+                (0, 0, display.width, display.height / 2),
+            )
+            fill_rect(
+                Colors.BROWN,
+                (0, display.height / 2, display.width, display.height / 2),
+            )
+            if game.should_render_map:
+                game.render_map()
 
-                player.update()
-            case States.SETTINGS:
-                pass
+            player.update()
+
+        if game.state == States.SETTINGS:
+            display.renderer.blit(black_square, black_square_rect)
 
         for button in buttons:
             button.update()
