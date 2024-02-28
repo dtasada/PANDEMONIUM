@@ -268,7 +268,7 @@ button_lists = {
         ),
         Button(
             48,
-            display.height / 2 + 48 * 1,
+            display.height / 2 + 48 * 3,
             "Back",
             lambda: game.set_state(game.previous_state),
         ),
@@ -295,7 +295,7 @@ def main(multiplayer):
         Thread(target=receive_tcp, daemon=True).start()
 
     while game.running:
-        clock.tick()
+        clock.tick(game.fps)
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
@@ -330,10 +330,8 @@ def main(multiplayer):
         display.renderer.clear()
 
         # blit
-        write("topleft", int(clock.get_fps()), v_fonts[20], Colors.WHITE, 5, 5)
         if game.state == States.MAIN_MENU:
-            display.renderer.blit(black_square, black_square_rect)
-            pass
+            fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
         if game.state in (States.PLAY, States.SETTINGS):
             fill_rect(
                 Colors.DARK_GRAY,
@@ -356,6 +354,8 @@ def main(multiplayer):
 
         if cursor.enabled:
             cursor.update()
+
+        write("topleft", int(clock.get_fps()), v_fonts[20], Colors.WHITE, 5, 5)
 
         display.renderer.present()
 
