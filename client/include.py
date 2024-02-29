@@ -174,13 +174,16 @@ class Button:
         self.font = v_fonts[self.font_size]
         self.width = width or self.font.size(content)[0]
         self.height = height or self.font.size(content)[1]
-        self.rect = pygame.Rect(x, y, self.width, self.height)
+        self.rect = pygame.Rect(0, 0, self.width, self.height)
+        setattr(self.rect, self.anchor, (x, y))
 
     def update(self):
+        if self.rect.collidepoint(pygame.mouse.get_pos()):
+            pass
         if self.should_background:
             fill_rect(Colors.GRAY, self.rect)
         write(
-            self.anchor,
+            "topleft",
             self.content,
             v_fonts[self.font_size],
             self.color,
