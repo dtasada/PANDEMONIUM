@@ -62,12 +62,12 @@ class Game:
     def render_map(self):
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
-                img = self.tiles[tile]
-                tex = Texture.from_surface(display.renderer, img)
+                surf = self.tiles[tile]
+                tex = Texture.from_surface(display.renderer, surf)
 
                 display.renderer.blit(
                     tex,
-                    img.get_rect(
+                    surf.get_rect(
                         topleft=(
                             (x + 1) * self.tile_size,
                             (y + 1) * self.tile_size,
@@ -100,12 +100,12 @@ class Player:
         self.angle = -1.5708
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
-        self.img = pygame.image.load(Path("client", "assets", "images", "arrow.png"))
+        self.surf = pygame.image.load(Path("client", "assets", "images", "arrow.png"))
 
     def draw(self):
         self.tex = Texture.from_surface(
             display.renderer,
-            pygame.transform.rotate(self.img, -degrees(self.angle)),
+            pygame.transform.rotate(self.surf, -degrees(self.angle)),
         )
         display.renderer.blit(self.tex, pygame.Rect(self.rect))
 
@@ -226,18 +226,20 @@ game = Game()
 player = Player()
 clock = pygame.time.Clock()
 
+title = Button(
+    int(display.width / 2),
+    150,
+    "PANDEMONIUM",
+    lambda: None,
+    font_size=96,
+    anchor="center",
+)
+
 button_lists = {
     States.MAIN_MENU: [
+        title,
         Button(
-            int(display.width / 2),
-            150,
-            "PANDEMONIUM",
-            lambda: None,
-            font_size=96,
-            anchor="center",
-        ),
-        Button(
-            48,
+            80,
             display.height / 2 + 48 * 0,
             "Unleash PANDEMONIUM",
             lambda: game.set_state(States.PLAY),
@@ -245,41 +247,34 @@ button_lists = {
             color=Colors.RED,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 1,
             "Settings",
             lambda: game.set_state(States.SETTINGS),
         ),
     ],
     States.SETTINGS: [
+        title,
         Button(
-            int(display.width / 2),
-            150,
-            "PANDEMONIUM",
-            lambda: None,
-            font_size=64,
-            anchor="center",
-        ),
-        Button(
-            48,
+            80,
             display.height / 2 + 48 * 0,
             "Field of view",
             lambda: None,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
             lambda: None,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 2,
             "Resolution",
             lambda: None,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 3,
             "Back",
             lambda: game.set_state(game.previous_state),
@@ -291,11 +286,17 @@ button_lists = {
 
 buttons = button_lists[States.MAIN_MENU]
 
-black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
-black_square.fill(Colors.BLACK)
-black_square.set_alpha(40)
-black_square = Texture.from_surface(display.renderer, black_square)
-black_square_rect = black_square.get_rect()
+
+class DarkenGame:
+    def __init__(self):
+        self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
+        self.surf.fill(Colors.BLACK)
+        self.surf.set_alpha(40)
+        self.tex = Texture.from_surface(display.renderer, self.surf)
+        self.rect = self.surf.get_rect()
+
+
+darken_game = DarkenGame()
 
 
 def main(multiplayer):
@@ -327,9 +328,7 @@ def main(multiplayer):
                             player.angle %= 2 * pi
 
                 case pygame.MOUSEBUTTONDOWN:
-                    for button in buttons:
-                        if button.rect.colliderect(cursor.rect):
-                            button.action()
+                    pass
 
                 case pygame.KEYDOWN:
                     match event.key:
@@ -363,7 +362,7 @@ def main(multiplayer):
                 player.draw()
 
         if game.state == States.SETTINGS:
-            display.renderer.blit(black_square, black_square_rect)
+            display.renderer.blit(darken_game.tex, darken_game.rect)
 
         for button in buttons:
             button.update()
@@ -371,7 +370,7 @@ def main(multiplayer):
         if cursor.enabled:
             cursor.update()
 
-        write("topleft", int(clock.get_fps()), v_fonts[20], Colors.WHITE, 5, 5)
+        write("topleft", str(int(clock.get_fps())), v_fonts[20], Colors.WHITE, 5, 5)
 
         display.renderer.present()
 
