@@ -91,20 +91,18 @@ class Player:
     def __init__(self):
         self.x = game.tile_size * 8
         self.y = game.tile_size * 8
-        self.w = 16
-        self.h = 16
+        self.w = 24
+        self.h = 24
         self.color = Colors.WHITE
         self.angle = -1.5708
-        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
-        self.surf = pygame.image.load(Path("client", "assets", "images", "arrow.png"))
+        self.arrow_surf = pygame.image.load(Path("client", "assets", "images", "arrow.png"))
+        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
+        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
 
     def draw(self):
-        self.tex = Texture.from_surface(
-            display.renderer,
-            pygame.transform.rotate(self.surf, -degrees(self.angle)),
-        )
-        display.renderer.blit(self.tex, pygame.Rect(self.rect))
+        self.arrow_img.angle = degrees(self.angle)
+        display.renderer.blit(self.arrow_img, pygame.Rect(self.rect))
 
     def keys(self):
         if game.state == States.PLAY:
@@ -227,7 +225,7 @@ title = Button(
     int(display.width / 2),
     150,
     "PANDEMONIUM",
-    lambda: None,
+    None,
     font_size=96,
     anchor="center",
 )
@@ -256,19 +254,19 @@ button_lists = {
             80,
             display.height / 2 + 48 * 0,
             "Field of view",
-            lambda: None,
+            None,
         ),
         Button(
             80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
-            lambda: None,
+            None,
         ),
         Button(
             80,
             display.height / 2 + 48 * 2,
             "Resolution",
-            lambda: None,
+            None,
         ),
         Button(
             80,
@@ -308,6 +306,9 @@ def main(multiplayer):
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
+            for button_list in button_lists.values():
+                for button in button_list:
+                    button.process_event(event)
             match event.type:
                 case pygame.QUIT:
                     game.running = False

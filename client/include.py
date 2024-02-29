@@ -179,9 +179,21 @@ class Button:
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         setattr(self.rect, self.anchor, (x, y))
 
+        if action is not None:
+            self.hover_tex = Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "hover_32.png")))
+            self.hover_rect = self.hover_tex.get_rect(midright=(self.rect.x - 16, self.rect.centery))
+
+    def process_event(self, event):
+        if self.action is not None:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    if self.rect.collidepoint(pygame.mouse.get_pos()):
+                        self.action()
+
     def update(self):
-        if self.rect.collidepoint(pygame.mouse.get_pos()):
-            pass
+        if self.action is not None:
+            if self.rect.collidepoint(pygame.mouse.get_pos()):
+                display.renderer.blit(self.hover_tex, self.hover_rect)
         if self.should_background:
             fill_rect(Colors.GRAY, self.rect)
         write(
@@ -196,23 +208,6 @@ class Button:
 
 
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
-
-
-class ButtonHover:
-    def __init__(self) -> None:
-        self.surf = pygame.image.load(
-            Path("client", "assets", "images", "hover_32.png")
-        )
-        self.tex = Texture.from_surface(display.renderer, self.surf)
-        self.rect = self.surf.get_rect()
-
-    # pos should be midleft of target button. offset is set here
-    def update(self, pos):
-        self.rect.midleft = pos[0] - 48, pos[1]
-        display.renderer.blit(self.tex, self.rect)
-
-
-button_hover = ButtonHover()
 
 
 class Client(socket.socket):
