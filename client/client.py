@@ -19,7 +19,7 @@ class Game:
         self.fov = 60
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
         self.rects = []
-        self.tile_size = 40
+        self.tile_size = 16
         for y, row in enumerate(self.map):
             for x, block in enumerate(row):
                 if block != 0:
@@ -34,7 +34,19 @@ class Game:
                     self.rects.append(rect)
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
-        self.should_render_map = False
+        self.should_render_map = True
+        self.debug_map = False
+
+        self.tiles = [
+            Texture.from_surface(
+                display.renderer,
+                pygame.transform.scale_by(
+                    pygame.image.load(Path("client", "assets", "images", file_name)),
+                    self.tile_size / 16,
+                ),
+            )
+            for file_name in ["stone.png", "wall.png"]
+        ]
 
     def set_state(self, state):
         self.previous_state = self.state
@@ -49,48 +61,50 @@ class Game:
             cursor.enable()
 
     def render_map(self):
+        rect = pygame.Rect(0, 0, game.tile_size, game.tile_size)
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
-                if tile == 0:
-                    color = Colors.DARK_GRAY
-                elif tile == 1:
-                    color = Colors.RED
-                fill_rect(
-                    color,
-                    (
-                        x * self.tile_size,
-                        y * self.tile_size,
-                        self.tile_size,
-                        self.tile_size,
-                    ),
+                tex = self.tiles[tile]
+                rect.topleft= (
+                    (x + 1) * self.tile_size,
+                    (y + 1) * self.tile_size,
                 )
 
-        for y in range(self.map_height):
-            draw_line(
-                Colors.WHITE,
-                (0, y * self.tile_size),
-                (self.map_width * self.tile_size, y * self.tile_size),
-            )
-        for x in range(self.map_width):
-            draw_line(
-                Colors.WHITE,
-                (x * self.tile_size, 0),
-                (x * self.tile_size, self.map_height * self.tile_size),
-            )
+                display.renderer.blit(tex,rect)
+
+        if self.debug_map:
+            for y in range(self.map_height):
+                draw_line(
+                    Colors.WHITE,
+                    (self.tile_size, (y + 1) * self.tile_size),
+                    ((self.map_width + 1) * self.tile_size, (y + 1) * self.tile_size),
+                )
+            for x in range(self.map_width):
+                draw_line(
+                    Colors.WHITE,
+                    ((x + 1) * self.tile_size, self.tile_size),
+                    ((x + 1) * self.tile_size, (self.map_height + 1) * self.tile_size),
+                )
 
 
 class Player:
     def __init__(self):
-        self.x = game.tile_size * 6
-        self.y = game.tile_size * 3
-        self.w = 10
-        self.h = 10
+        self.x = game.tile_size * 8
+        self.y = game.tile_size * 8
+        self.w = 16
+        self.h = 16
         self.color = Colors.WHITE
-        self.angle = 0.38
+        self.angle = -1.5708
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
+        self.surf = pygame.image.load(Path("client", "assets", "images", "arrow.png"))
+
     def draw(self):
-        draw_rect(self.color, (self.rect.x, self.rect.y, self.w, self.h))
+        self.tex = Texture.from_surface(
+            display.renderer,
+            pygame.transform.rotate(self.surf, -degrees(self.angle)),
+        )
+        display.renderer.blit(self.tex, pygame.Rect(self.rect))
 
     def keys(self):
         if game.state == States.PLAY:
@@ -133,10 +147,8 @@ class Player:
         m = 20
         p1 = self.rect.center
         p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
-        if game.should_render_map:
-            draw_line(Colors.BLACK, p1, p2)
 
-    def cast_ray(self, deg_offset):
+    def cast_ray(self, deg_offset):  # add comments here pls
         offset = radians(deg_offset)
         angle = self.angle + offset
         dx = cos(angle)
@@ -199,14 +211,11 @@ class Player:
                 [wh / display.height * 255] * 3 + [255],
                 (wx, wy, ww, wh),
             )
-            if game.should_render_map:
-                # raying the 2D rays
+            if game.debug_map:
                 draw_line(Colors.GREEN, p1, p2)
 
     def update(self):
         self.keys()
-        if game.should_render_map:
-            self.draw()
 
 
 cursor.enable()
@@ -214,63 +223,59 @@ game = Game()
 player = Player()
 clock = pygame.time.Clock()
 
+title = Button(
+    int(display.width / 2),
+    150,
+    "PANDEMONIUM",
+    lambda: None,
+    font_size=96,
+    anchor="center",
+)
+
 button_lists = {
     States.MAIN_MENU: [
+        title,
         Button(
-            int(display.width / 2),
-            150,
-            "PANDEMONIUM",
-            lambda: None,
-            font_size=64,
-            anchor="center",
-        ),
-        Button(
-            48,
+            80,
             display.height / 2 + 48 * 0,
             "Unleash PANDEMONIUM",
             lambda: game.set_state(States.PLAY),
-            font_size=40,
+            font_size=48,
             color=Colors.RED,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 1,
             "Settings",
             lambda: game.set_state(States.SETTINGS),
         ),
     ],
     States.SETTINGS: [
+        title,
         Button(
-            int(display.width / 2),
-            150,
-            "PANDEMONIUM",
-            lambda: None,
-            font_size=64,
-            anchor="center",
-        ),
-        Button(
-            48,
+            80,
             display.height / 2 + 48 * 0,
             "Field of view",
             lambda: None,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
             lambda: None,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 2,
             "Resolution",
             lambda: None,
         ),
         Button(
-            48,
+            80,
             display.height / 2 + 48 * 3,
             "Back",
             lambda: game.set_state(game.previous_state),
+            font_size=48,
         ),
     ],
     States.PLAY: [],
@@ -278,11 +283,17 @@ button_lists = {
 
 buttons = button_lists[States.MAIN_MENU]
 
-black_square = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
-black_square.fill(Colors.BLACK)
-black_square.set_alpha(40)
-black_square = Texture.from_surface(display.renderer, black_square)
-black_square_rect = black_square.get_rect()
+
+class DarkenGame:
+    def __init__(self):
+        self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
+        self.surf.fill(Colors.BLACK)
+        self.surf.set_alpha(40)
+        self.tex = Texture.from_surface(display.renderer, self.surf)
+        self.rect = self.surf.get_rect()
+
+
+darken_game = DarkenGame()
 
 
 def main(multiplayer):
@@ -314,9 +325,7 @@ def main(multiplayer):
                             player.angle %= 2 * pi
 
                 case pygame.MOUSEBUTTONDOWN:
-                    for button in buttons:
-                        if button.rect.colliderect(cursor.rect):
-                            button.action()
+                    pass
 
                 case pygame.KEYDOWN:
                     match event.key:
@@ -332,7 +341,8 @@ def main(multiplayer):
         # blit
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
-        if game.state in (States.PLAY, States.SETTINGS):
+
+        if game.state == States.PLAY:
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2),
@@ -341,13 +351,15 @@ def main(multiplayer):
                 Colors.BROWN,
                 (0, display.height / 2, display.width, display.height / 2),
             )
-            if game.should_render_map:
-                game.render_map()
 
             player.update()
 
+            if game.should_render_map:
+                game.render_map()
+                player.draw()
+
         if game.state == States.SETTINGS:
-            display.renderer.blit(black_square, black_square_rect)
+            display.renderer.blit(darken_game.tex, darken_game.rect)
 
         for button in buttons:
             button.update()
@@ -355,7 +367,7 @@ def main(multiplayer):
         if cursor.enabled:
             cursor.update()
 
-        write("topleft", int(clock.get_fps()), v_fonts[20], Colors.WHITE, 5, 5)
+        write("topleft", str(int(clock.get_fps())), v_fonts[20], Colors.WHITE, 5, 5)
 
         display.renderer.present()
 

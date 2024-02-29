@@ -17,6 +17,7 @@ class Colors:
     BLUE = (0, 0, 255, 255)
     DARK_GRAY = (40, 40, 40, 255)
     GRAY = (150, 150, 150, 255)
+    LIGHT_GRAY = (220, 220, 220, 255)
     GREEN = (0, 255, 0, 255)
     BROWN = (97, 54, 19)
     ORANGE = (255, 140, 0, 255)
@@ -111,7 +112,7 @@ def write(
     if blit:
         display.renderer.blit(tex, rect, special_flags=special_flags)
 
-    return content, rect
+    return rect
 
 
 class Display:
@@ -129,9 +130,10 @@ class Display:
 
 class Cursor:
     def __init__(self):
-        self.img = pygame.image.load(Path("client", "assets", "images", "cursor.png"))
-        self.tex = Texture.from_surface(display.renderer, self.img)
-        self.rect = self.img.get_rect()
+        self.surf = pygame.image.load(Path("client", "assets", "images", "cursor.png"))
+        self.tex = Texture.from_surface(display.renderer, self.surf)
+        self.rect = self.surf.get_rect()
+        self.topleft = pygame.Rect(self.rect.topleft, (1, 1))
         self.enabled = True
         pygame.mouse.set_visible(False)
 
@@ -146,7 +148,7 @@ class Cursor:
         self.should_wrap = True
 
     def update(self):
-        self.rect.topleft = pygame.mouse.get_pos()
+        self.rect.topleft = self.topleft.topleft = pygame.mouse.get_pos()
         display.renderer.blit(self.tex, self.rect)
 
 
@@ -160,12 +162,12 @@ class Button:
         width=None,
         height=None,
         font_size=32,
-        color=Colors.WHITE,
+        color=Colors.LIGHT_GRAY,
         should_background=False,
         anchor="topleft",
     ):
         self.content = content
-        self.color = color
+        self.color = self.initial_color = color
         self.font_size = font_size
         self.action = action
         self.should_background = should_background
@@ -193,6 +195,26 @@ class Button:
         )
 
 
+display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
+
+
+class ButtonHover:
+    def __init__(self) -> None:
+        self.surf = pygame.image.load(
+            Path("client", "assets", "images", "hover_32.png")
+        )
+        self.tex = Texture.from_surface(display.renderer, self.surf)
+        self.rect = self.surf.get_rect()
+
+    # pos should be midleft of target button. offset is set here
+    def update(self, pos):
+        self.rect.midleft = pos[0] - 48, pos[1]
+        display.renderer.blit(self.tex, self.rect)
+
+
+button_hover = ButtonHover()
+
+
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
@@ -214,5 +236,4 @@ class Client(socket.socket):
 client_udp: Client = None
 client_tcp: Client = None
 
-display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
 cursor = Cursor()
