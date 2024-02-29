@@ -180,7 +180,7 @@ class Button:
         setattr(self.rect, self.anchor, (x, y))
 
         if action is not None:
-            self.hover_tex = Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "hover_32.png")))
+            self.hover_tex = Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "hover.png")))
             self.hover_rect = self.hover_tex.get_rect(midright=(self.rect.x - 16, self.rect.centery))
 
     def process_event(self, event):

@@ -6,37 +6,44 @@ from os import walk
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from threading import Thread
+from pprint import pprint
 
 from .include import *
 
 
 class Game:
     def __init__(self):
+        # misc.
         self.running = True
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
+        # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
-        self.rects = []
         self.tile_size = 16
-        for y, row in enumerate(self.map):
-            for x, block in enumerate(row):
-                if block != 0:
-                    rect = pygame.Rect(
-                        (
-                            x * self.tile_size,
-                            y * self.tile_size,
-                            self.tile_size,
-                            self.tile_size,
-                        )
-                    )
-                    self.rects.append(rect)
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
+        self.rects = [
+            [
+                pygame.Rect(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
+                if self.map[y][x] != 0
+                else None
+                for x in range(self.map_width)
+            ]
+            for y in range(self.map_height)
+        ]
+        self.draw_rects = [
+            [
+                pygame.Rect(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
+                for x in range(self.map_width)
+            ]
+            for y in range(self.map_height)
+        ]
+
+        # misc.
         self.should_render_map = True
         self.debug_map = False
-
         self.tiles = [
             Texture.from_surface(
                 display.renderer,
@@ -47,6 +54,10 @@ class Game:
             )
             for file_name in ["stone.png", "wall.png"]
         ]
+
+    @property
+    def rect_list(self):
+        return sum(self.rects, [])
 
     def set_state(self, state):
         self.previous_state = self.state
@@ -61,16 +72,12 @@ class Game:
             cursor.enable()
 
     def render_map(self):
-        rect = pygame.Rect(0, 0, game.tile_size, game.tile_size)
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
                 tex = self.tiles[tile]
-                rect.topleft= (
-                    (x + 1) * self.tile_size,
-                    (y + 1) * self.tile_size,
-                )
-
-                display.renderer.blit(tex,rect)
+                rect = self.draw_rects[y][x]
+                # draw_rect((255, 255, 255, 255), rect)
+                display.renderer.blit(tex, rect)
 
         if self.debug_map:
             for y in range(self.map_height):
@@ -91,8 +98,8 @@ class Player:
     def __init__(self):
         self.x = game.tile_size * 8
         self.y = game.tile_size * 8
-        self.w = 24
-        self.h = 24
+        self.w = 8
+        self.h = 8
         self.color = Colors.WHITE
         self.angle = -1.5708
 
@@ -102,7 +109,10 @@ class Player:
 
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
-        display.renderer.blit(self.arrow_img, pygame.Rect(self.rect))
+        arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
+        arrow_rect.center = self.rect.center
+        display.renderer.blit(self.arrow_img, arrow_rect)
+        # draw_rect(Colors.GREEN, self.rect)
 
     def keys(self):
         if game.state == States.PLAY:
@@ -125,15 +135,15 @@ class Player:
 
             # x-col
             self.rect.x += xvel
-            for rect in game.rects:
-                if self.rect.colliderect(rect):
+            for rect in game.rect_list:
+                if rect is not None and self.rect.colliderect(rect):
                     if xvel >= 0:
                         self.rect.right = rect.left
                     else:
                         self.rect.left = rect.right
             self.rect.y += yvel
-            for rect in game.rects:
-                if self.rect.colliderect(rect):
+            for rect in game.rect_list:
+                if rect is not None and self.rect.colliderect(rect):
                     if yvel >= 0:
                         self.rect.bottom = rect.top
                     else:
