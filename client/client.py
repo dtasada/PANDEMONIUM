@@ -38,11 +38,12 @@ class Game:
         self.debug_map = False
 
         self.tiles = [
-            pygame.transform.scale_by(
-                pygame.image.load(
-                    Path("client", "assets", "images", file_name),
+            Texture.from_surface(
+                display.renderer,
+                pygame.transform.scale_by(
+                    pygame.image.load(Path("client", "assets", "images", file_name)),
+                    self.tile_size / 16,
                 ),
-                self.tile_size / 16,
             )
             for file_name in ["stone.png", "wall.png"]
         ]
@@ -60,20 +61,16 @@ class Game:
             cursor.enable()
 
     def render_map(self):
+        rect = pygame.Rect(0, 0, game.tile_size, game.tile_size)
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
-                surf = self.tiles[tile]
-                tex = Texture.from_surface(display.renderer, surf)
-
-                display.renderer.blit(
-                    tex,
-                    surf.get_rect(
-                        topleft=(
-                            (x + 1) * self.tile_size,
-                            (y + 1) * self.tile_size,
-                        ),
-                    ),
+                tex = self.tiles[tile]
+                rect.topleft= (
+                    (x + 1) * self.tile_size,
+                    (y + 1) * self.tile_size,
                 )
+
+                display.renderer.blit(tex,rect)
 
         if self.debug_map:
             for y in range(self.map_height):
@@ -92,8 +89,8 @@ class Game:
 
 class Player:
     def __init__(self):
-        self.x = game.tile_size * 6
-        self.y = game.tile_size * 3
+        self.x = game.tile_size * 8
+        self.y = game.tile_size * 8
         self.w = 16
         self.h = 16
         self.color = Colors.WHITE
