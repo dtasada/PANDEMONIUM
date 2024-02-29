@@ -26,16 +26,28 @@ class Game:
         self.map_width = len(self.map[0])
         self.rects = [
             [
-                pygame.Rect(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
-                if self.map[y][x] != 0
-                else None
+                (
+                    pygame.Rect(
+                        x * self.tile_size,
+                        y * self.tile_size,
+                        self.tile_size,
+                        self.tile_size,
+                    )
+                    if self.map[y][x] != 0
+                    else None
+                )
                 for x in range(self.map_width)
             ]
             for y in range(self.map_height)
         ]
         self.draw_rects = [
             [
-                pygame.Rect(x * self.tile_size, y * self.tile_size, self.tile_size, self.tile_size)
+                pygame.Rect(
+                    x * self.tile_size,
+                    y * self.tile_size,
+                    self.tile_size,
+                    self.tile_size,
+                )
                 for x in range(self.map_width)
             ]
             for y in range(self.map_height)
@@ -52,7 +64,7 @@ class Game:
                     self.tile_size / 16,
                 ),
             )
-            for file_name in ["stone.png", "wall.png"]
+            for file_name in ["floor.png", "floor_wall.png"]
         ]
 
     @property
@@ -103,9 +115,20 @@ class Player:
         self.color = Colors.WHITE
         self.angle = -1.5708
 
-        self.arrow_surf = pygame.image.load(Path("client", "assets", "images", "arrow.png"))
+        self.arrow_surf = pygame.image.load(
+            Path("client", "assets", "images", "arrow.png")
+        )
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
+
+        self.wall_textures = [
+            Texture.from_surface(
+                display.renderer,
+                pygame.image.load(Path("client", "assets", "images", file_name))
+            )
+            for file_name in ["wall.png"]
+        ]
+        self.prev_x = 0
 
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
@@ -116,7 +139,7 @@ class Player:
 
     def keys(self):
         if game.state == States.PLAY:
-            vmult = 2
+            vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
             if keys[pygame.K_w] or keys[pygame.K_UP]:
@@ -215,10 +238,15 @@ class Player:
             wx = (deg_offset + game.fov / 2) / game.fov * display.width
             wy = display.height / 2 - wh / 2
             m = 0.1
-            fill_rect(
-                [wh / display.height * 255] * 3 + [255],
-                (wx, wy, ww, wh),
-            )
+            # fill_rect(
+            #     [wh / display.height * 255] * 3 + [255],
+            #     (wx, wy, ww, wh),
+            # )
+
+            rect = pygame.Rect(wx, wy, ww, wh)
+            self.wall_textures[0].color = [int(wh / display.height * 255)] * 3 
+            display.renderer.blit(self.wall_textures[0], rect)
+
             if game.debug_map:
                 draw_line(Colors.GREEN, p1, p2)
 
@@ -370,7 +398,11 @@ def main(multiplayer):
                 player.draw()
 
         if game.state == States.SETTINGS:
-            display.renderer.blit(darken_game.tex, darken_game.rect)
+            if game.previous_state == States.MAIN_MENU:
+                fill_rect((0,0,0,255), (0,0,display.width, display.height))
+            else:
+                display.renderer.blit(darken_game.tex, darken_game.rect)
+
 
         for button in buttons:
             button.update()
