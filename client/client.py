@@ -191,6 +191,7 @@ class Player:
 
         for i, o in enumerate(range(-(game.fov // 2), game.fov // 2 + 1)):
             self.cast_ray(o, i)
+        # self.cast_ray(0, 0)
         _xvel, _yvel = angle_to_vel(self.angle)
         m = 20
         p1 = self.rect.center
@@ -241,41 +242,62 @@ class Player:
             if tile_value != 0:
                 col = True
         if col:
-            # calculations
+            # general ray calculations
             p1 = (start_x * game.tile_size, start_y * game.tile_size)
             p2 = (
                 p1[0] + dist * dx * game.tile_size,
                 p1[1] + dist * dy * game.tile_size,
             )
-            draw_line(Colors.GREEN, p1, p2)
+            self.rays.append((p1, p2))
             ray_mult = 1
-            # 3D
+            # init vars for wallss
             dist *= ray_mult
             dist_px = dist * game.tile_size
             wh = display.height * game.tile_size / dist_px
             ww = display.width / game.fov
             wx = (deg_offset + game.fov / 2) / game.fov * display.width
             wy = display.height / 2 - wh / 2
-            m = 0.1
+            # texture calculations
+            cur_pix_x = cur_x * game.tile_size
+            cur_pix_y = cur_y * game.tile_size
+            tex_dx = round(p2[0] - cur_pix_x, 2)
+            tex_dy = round(p2[1] - cur_pix_y, 2)
+            if tex_dx == 0:
+                # col left, so hit - tile
+                tex_d = p2[1] - cur_pix_y
+            elif tex_dx == game.tile_size:
+                # col right, so tile - hit
+                tex_d = p2[1] - cur_pix_y
+            elif tex_dy == 0:
+                # col top, so size - (hit - tile)
+                tex_d = game.tile_size - (p2[0] - cur_pix_x)
+            elif tex_dy == game.tile_size:
+                # col bottom, so hit - tile
+                tex_d = p2[0] - cur_pix_x
             # fill_rect(
             #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
             #     pygame.FRect(wx, wy, ww, wh),
             # )
-
+            # print(tex_d)
             tex = self.wall_textures[tile_value]
+            axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
             ww += 1
             display.renderer.blit(
                 tex,
                 pygame.Rect(wx, wy, ww, wh),
-                # pygame.Rect(0, 0, ww, wh),
+                pygame.Rect(axo, 0, ww, wh),
             )
 
             self.render_map()
 
             # draw_line(Colors.GREEN, p1, p2)
 
+    def send_coords(self):
+        client_udp.req(f"{self.rect.x}, {self.rect.y}")
+
     def update(self):
+        self.rays = []
         self.keys()
         hud.health_update(*self.get_health())
         hud.ammo_update(*self.get_ammo_count())
@@ -414,6 +436,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state == States.PLAY:
+            if multiplayer:
+                player.send_coords()
+
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2),

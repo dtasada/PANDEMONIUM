@@ -227,10 +227,10 @@ class Client(socket.socket):
 
     def receive(self):
         if self.conn_type == "udp":
-            while not self.current_message:
+            while True:
                 data, addr = self.recvfrom(2**12)
-                if data:
-                    self.current_message = data.decode()
+                self.current_message = data.decode()
+                print(self.current_message)
 
         elif self.conn_type == "tcp":
             pass
