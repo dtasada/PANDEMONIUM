@@ -32,16 +32,19 @@ try:
 except:
     sys.exit(f"{Colors.ANSI_RED}TCP server failed to initialize!{Colors.ANSI_RESET}")
 
-
+addresses = []
 def receive_udp():
-    message = None
-
-    while not message:
+    while True:
         data, addr = server_udp.recvfrom(2**12)
-        if data:
-            message = data.decode()
 
-    return message
+        if addr not in addresses:
+            addresses.append(addr)
+
+        message = data.decode()
+        for address in addresses:
+            if address == addr:
+                continue
+            server_udp.sendto(message.encode(), address)
 
 
 def receive_tcp(client):

@@ -266,6 +266,9 @@ class Player:
 
             # draw_line(Colors.GREEN, p1, p2)
 
+    def send_coords(self):
+        client_udp.send_msg(f"{self.rect.x}, {self.rect.y}")
+
     def update(self):
         self.keys()
         hud.health_update(self.health, False)
@@ -405,6 +408,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state == States.PLAY:
+            if multiplayer:
+                player.send_coords()
+
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2),
