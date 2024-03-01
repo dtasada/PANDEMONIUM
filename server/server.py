@@ -25,7 +25,7 @@ except:
 try:
     server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_tcp.bind((ip, port))
-    server_tcp.listen(1)
+    server_tcp.listen(10)
     print(
         f"{Colors.ANSI_GREEN}TCP server is listening at {ip}:{port}{Colors.ANSI_RESET}"
     )
@@ -75,4 +75,4 @@ while True:
         break
 
 server_tcp.close()
-server_udp.close()
+

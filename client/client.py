@@ -267,13 +267,13 @@ class Player:
             # draw_line(Colors.GREEN, p1, p2)
 
     def send_coords(self):
-        client_udp.send_msg(f"{self.rect.x}, {self.rect.y}")
+        client_udp.req(f"{self.rect.x}, {self.rect.y}")
 
     def update(self):
         self.keys()
         hud.health_update(self.health, False)
         hud.ammo_update(self.health, False)
-        # Thread(client_tcp.req, args=(self.health,)).start()
+        # client_udp.req_res()
 
 
 cursor.enable()
