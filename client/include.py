@@ -1,6 +1,7 @@
 from enum import Enum
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
+from typing import List
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 
 import csv
@@ -269,12 +270,21 @@ class Client(socket.socket):
                     f"{Colors.ANSI_RED}Could not connect to the server!{Colors.ANSI_RESET}"
                 )
 
-    def req_res(self, *messages):
+    def req(self, *messages):
         for message in messages:
             if self.conn_type == "udp":
-                self.sendto(message.encode(), self.target_server)
+                self.sendto(str(message).encode(), self.target_server)
+
             if self.conn_type == "tcp":
-                self.send(message.encode())
+                self.send(str(message).encode())
+
+    def req_res(self, messages):
+        for message in messages:
+            if self.conn_type == "udp":
+                self.sendto(str(message).encode(), self.target_server)
+
+            if self.conn_type == "tcp":
+                self.send(str(message).encode())
 
             response = None
             while not response:

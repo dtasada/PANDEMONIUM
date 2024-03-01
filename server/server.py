@@ -61,7 +61,7 @@ def receive_tcp(client):
 
 
 # UDP
-Thread(target=receive_udp, daemon=True).start()
+Thread(target=receive_udp).start()
 
 while True:
     # TCP
