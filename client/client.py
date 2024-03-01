@@ -11,6 +11,7 @@ from pprint import pprint
 from .include import *
 
 
+
 class Game:
     def __init__(self):
         # misc.
@@ -83,28 +84,6 @@ class Game:
         else:
             cursor.enable()
 
-    def render_map(self):
-        for y, row in enumerate(self.map):
-            for x, tile in enumerate(row):
-                tex = self.tiles[tile]
-                rect = self.draw_rects[y][x]
-                # draw_rect((255, 255, 255, 255), rect)
-                display.renderer.blit(tex, rect)
-
-        if self.debug_map:
-            for y in range(self.map_height):
-                draw_line(
-                    Colors.WHITE,
-                    (self.tile_size, (y + 1) * self.tile_size),
-                    ((self.map_width + 1) * self.tile_size, (y + 1) * self.tile_size),
-                )
-            for x in range(self.map_width):
-                draw_line(
-                    Colors.WHITE,
-                    ((x + 1) * self.tile_size, self.tile_size),
-                    ((x + 1) * self.tile_size, (self.map_height + 1) * self.tile_size),
-                )
-
 
 class Player:
     def __init__(self):
@@ -122,11 +101,10 @@ class Player:
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
 
         self.wall_textures = [
-            # Texture.from_surface(
-            #     display.renderer,
-            pygame.image.load(Path("client", "assets", "images", file_name))  # ,
-            # )
-            for file_name in ["wall.png"]
+            Texture.from_surface(
+                display.renderer, pygame.image.load(Path("client", "assets", "images", file_name))
+            ) if file_name is not None else None
+            for file_name in [None, "wall.png"]
         ]
 
     @property
@@ -140,6 +118,28 @@ class Player:
         arrow_rect.center = self.rect.center
         display.renderer.blit(self.arrow_img, arrow_rect)
         # draw_rect(Colors.GREEN, self.rect)
+
+    def render_map(self):
+        for y, row in enumerate(game.map):
+            for x, tile in enumerate(row):
+                tex = game.tiles[tile]
+                rect = game.draw_rects[y][x]
+                # draw_rect((255, 255, 255, 255), rect)
+                display.renderer.blit(tex, rect)
+
+        if game.debug_map:
+            for y in range(game.map_height):
+                draw_line(
+                    Colors.WHITE,
+                    (game.tile_size, (y + 1) * self.tile_size),
+                    ((game.map_width + 1) * game.tile_size, (y + 1) * self.tile_size),
+                )
+            for x in range(game.map_width):
+                draw_line(
+                    Colors.WHITE,
+                    ((x + 1) * game.tile_size, game.tile_size),
+                    ((x + 1) * game.tile_size, (game.map_height + 1) * game.tile_size),
+                )
 
     def keys(self):
         if game.state == States.PLAY:
@@ -224,7 +224,8 @@ class Player:
                 cur_y += step_y
                 dist = y_length
                 y_length += hypot_y
-            if game.map[cur_y][cur_x] != 0:
+            tile_value = game.map[cur_y][cur_x]
+            if tile_value != 0:
                 col = True
         if col:
             # calculations
@@ -233,6 +234,7 @@ class Player:
                 p1[0] + dist * dx * game.tile_size,
                 p1[1] + dist * dy * game.tile_size,
             )
+            draw_line(Colors.GREEN, p1, p2)
             ray_mult = 1
             # 3D
             dist *= ray_mult
@@ -244,22 +246,21 @@ class Player:
             m = 0.1
             # fill_rect(
             #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
-            #     (wx, wy, ww, wh),
+            #     pygame.FRect(wx, wy, ww, wh),
             # )
 
-            tex = Texture.from_surface(
-                display.renderer,
-                pygame.transform.scale(self.wall_textures[0], (256, wh)),
-            )  # need to remove this later from here. texture gen in a loop is bad
+            tex = self.wall_textures[tile_value]
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
+            ww += 1
             display.renderer.blit(
                 tex,
                 pygame.Rect(wx, wy, ww, wh),
-                pygame.Rect(0, 0, ww, wh),
+                # pygame.Rect(0, 0, ww, wh),
             )
 
-            if game.debug_map:
-                draw_line(Colors.GREEN, p1, p2)
+            self.render_map()
+
+            # draw_line(Colors.GREEN, p1, p2)
 
     def update(self):
         self.keys()
@@ -273,6 +274,9 @@ game = Game()
 player = Player()
 hud = HUD()
 clock = pygame.time.Clock()
+
+crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
+crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
 title = Button(
     int(display.width / 2),
@@ -407,9 +411,9 @@ def main(multiplayer):
             )
 
             player.update()
+            display.renderer.blit(crosshair_tex, crosshair_rect)
 
             if game.should_render_map:
-                game.render_map()
                 player.draw()
 
         if game.state == States.SETTINGS:

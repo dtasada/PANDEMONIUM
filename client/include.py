@@ -7,6 +7,7 @@ import csv
 import pygame
 import socket
 import sys
+from random import randint as rand
 
 
 pygame.init()
@@ -43,6 +44,16 @@ v_fonts = [
 
 
 current_message = None
+
+
+def timgload3(*path, return_rect=False):
+    tex = Texture.from_surface(
+        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
+    )
+    if return_rect:
+        rect = tex.get_rect(topleft=return_rect)
+        return tex, rect
+    return tex
 
 
 def receive_udp():
