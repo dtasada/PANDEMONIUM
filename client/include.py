@@ -32,27 +32,30 @@ class States(Enum):
     PLAY = 2
 
 
+class Signal(Enum):
+    DECREASE_HEALTH = 0
+
+
 v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
     for i in range(101)
 ]
 
 
+current_message = None
+
+
 def receive_udp():
-    message = None
-    while not message:
+    global current_message
+
+    while not current_message:
         data, addr = client_udp.recvfrom(2**12)
         if data:
-            message = data.decode()
-    return message
+            current_message = data.decode()
 
 
 def receive_tcp():
     pass
-
-
-def send():
-    client_tcp.send_str("")  # boilerplate
 
 
 def fill_rect(color, rect):
@@ -112,7 +115,7 @@ def write(
     if blit:
         display.renderer.blit(tex, rect, special_flags=special_flags)
 
-    return rect
+    return tex, rect
 
 
 class Display:
@@ -180,8 +183,13 @@ class Button:
         setattr(self.rect, self.anchor, (x, y))
 
         if action is not None:
-            self.hover_tex = Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "hover.png")))
-            self.hover_rect = self.hover_tex.get_rect(midright=(self.rect.x - 16, self.rect.centery))
+            self.hover_tex = Texture.from_surface(
+                display.renderer,
+                pygame.image.load(Path("client", "assets", "images", "hover.png")),
+            )
+            self.hover_rect = self.hover_tex.get_rect(
+                midright=(self.rect.x - 16, self.rect.centery)
+            )
 
     def process_event(self, event):
         if self.action is not None:
@@ -210,6 +218,37 @@ class Button:
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
 
 
+class HUD:
+    def __init__(self):
+        self.health_font_size = 64
+
+    def health(self, health, has_changed):
+        return write(
+            "bottomleft",
+            "HP: " + str(health),
+            v_fonts[self.health_font_size],
+            Colors.WHITE,
+            16,
+            display.height - 4,
+        )
+
+    def ammo(self, ammo_count, has_changed):
+        return write(
+            "bottomright",
+            ammo_count,
+            v_fonts[self.health_font_size],
+            Colors.WHITE,
+            display.width - 16,
+            display.height - 4,
+        )
+
+    def ammo_update(self, ammo_count, has_changed):
+        display.renderer.blit(*self.ammo(ammo_count, has_changed))
+
+    def health_update(self, health, has_changed):
+        display.renderer.blit(*self.health(health, has_changed))
+
+
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
@@ -221,11 +260,20 @@ class Client(socket.socket):
         if self.conn_type == "tcp":
             self.connect(self.target_server)
 
-    def send_str(self, message):
-        if self.conn_type == "udp":
-            self.sendto(message.encode(), self.target_server)
-        if self.conn_type == "tcp":
-            self.send(message.encode())
+    def req_res(self, *messages):
+        for message in messages:
+            if self.conn_type == "udp":
+                self.sendto(message.encode(), self.target_server)
+            if self.conn_type == "tcp":
+                self.send(message.encode())
+
+            message = None
+            while not message:
+                data, addr = client_udp.recvfrom(2**12)
+                if data:
+                    message = data.decode()
+
+            return message
 
 
 client_udp: Client = None

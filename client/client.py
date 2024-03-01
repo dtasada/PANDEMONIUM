@@ -129,6 +129,11 @@ class Player:
             for file_name in ["wall.png"]
         ]
 
+    @property
+    def health(self):
+        # TODO: Server call
+        return 100
+
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
@@ -258,11 +263,15 @@ class Player:
 
     def update(self):
         self.keys()
+        hud.health_update(self.health, False)
+        hud.ammo_update(self.health, False)
+        client_udp.send_str()
 
 
 cursor.enable()
 game = Game()
 player = Player()
+hud = HUD()
 clock = pygame.time.Clock()
 
 title = Button(
