@@ -270,7 +270,7 @@ class Player:
         self.keys()
         hud.health_update(self.health, False)
         hud.ammo_update(self.health, False)
-        # client_udp.req_res()
+        # Thread(client_tcp.req, args=(self.health,)).start()
 
 
 cursor.enable()
