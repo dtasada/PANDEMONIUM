@@ -45,11 +45,8 @@ def receive_udp():
 
 
 def receive_tcp(client):
-    print("started new thread")
     while True:
-        data = client.recv(2**12)
-        print("data:", data)
-        data = data.decode()
+        data = client.recv(2**12).decode()
         if not data:
             break
 
@@ -69,7 +66,6 @@ while True:
         client, addr = server_tcp.accept()  # This is blocking
         print(f"New connection from {addr[0]}")
         Thread(target=receive_tcp, args=(client,)).start()
-        client.close()
     except ConnectionAbortedError:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
     finally:
