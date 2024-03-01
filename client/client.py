@@ -11,7 +11,6 @@ from pprint import pprint
 from .include import *
 
 
-
 class Game:
     def __init__(self):
         # misc.
@@ -101,11 +100,21 @@ class Player:
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
 
         self.wall_textures = [
-            Texture.from_surface(
-                display.renderer, pygame.image.load(Path("client", "assets", "images", file_name))
-            ) if file_name is not None else None
+            (
+                Texture.from_surface(
+                    display.renderer,
+                    pygame.image.load(Path("client", "assets", "images", file_name)),
+                )
+                if file_name is not None
+                else None
+            )
             for file_name in [None, "wall.png"]
         ]
+
+    @property
+    def health(self):
+        # TODO: Server call
+        return 100
 
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
@@ -278,13 +287,16 @@ class Player:
     def update(self):
         self.rays = []
         self.keys()
+        hud.health_update(self.health, False)
+        hud.ammo_update(self.health, False)
+        # Thread(client_tcp.req, args=(self.health,)).start()
         for ray in self.rays:
             draw_line(Colors.GREEN, *ray)
-
-
+            
 cursor.enable()
 game = Game()
 player = Player()
+hud = HUD()
 clock = pygame.time.Clock()
 
 crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
@@ -369,8 +381,8 @@ def main(multiplayer):
     if multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
-        Thread(target=receive_udp, daemon=True).start()
-        Thread(target=receive_tcp, daemon=True).start()
+        Thread(target=client_udp.receive, daemon=True).start()
+        Thread(target=client_tcp.receive, daemon=True).start()
 
     while game.running:
         clock.tick(game.fps)

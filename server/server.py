@@ -1,21 +1,43 @@
+#!/usr/bin/env python3
+import sys
 import socket
 from threading import Thread
 
+
+class Colors:
+    ANSI_GREEN = "\033[1;32m"
+    ANSI_RED = "\033[1;31;31m"
+    ANSI_RESET = "\033[0m"
+
+
 ip, port = "127.0.0.1", 6969
 
-server_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server_udp.bind((ip, port))
+try:
+    server_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_udp.bind((ip, port))
+    print(
+        f"{Colors.ANSI_GREEN}UDP server is listening at {ip}:{port}{Colors.ANSI_RESET}"
+    )
+except:
+    sys.exit(f"{Colors.ANSI_RED}UDP server failed to initialize!{Colors.ANSI_RESET}")
 
-server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_tcp.bind((ip, port))
-server_tcp.listen(10)
+
+try:
+    server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_tcp.bind((ip, port))
+    server_tcp.listen(1)
+    print(
+        f"{Colors.ANSI_GREEN}TCP server is listening at {ip}:{port}{Colors.ANSI_RESET}"
+    )
+except:
+    sys.exit(f"{Colors.ANSI_RED}TCP server failed to initialize!{Colors.ANSI_RESET}")
 
 
 def receive_udp():
     message = None
 
     while not message:
-        data, addr = server_udp.recvfrom(2 ** 12)
+        data, addr = server_udp.recvfrom(2**12)
         if data:
             message = data.decode()
 
@@ -24,23 +46,30 @@ def receive_udp():
 
 def receive_tcp(client):
     while True:
-        try:
-            data = client.recv(2 ** 12).decode()
-            print(data)
-        except:
+        data = client.recv(2**12).decode()
+        if not data:
             break
+
+        # concoct response
+        response = "example response"
+        client.send(response.encode("utf-8"))
+
     client.close()
 
 
-#UDP
-Thread(target=receive_udp, daemon=True).start()
+# UDP
+Thread(target=receive_udp).start()
 
-#TCP
 while True:
+    # TCP
     try:
-        conn, addr = server_tcp.accept()
-        ip = addr[0]
-        print(f"Connected to {ip}")
-        Thread(target=receive_tcp, args=(conn,)).start()
+        client, addr = server_tcp.accept()  # This is blocking
+        print(f"New connection from {addr[0]}")
+        Thread(target=receive_tcp, args=(client,)).start()
     except ConnectionAbortedError:
+        print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
+    finally:
         break
+
+server_tcp.close()
+server_udp.close()

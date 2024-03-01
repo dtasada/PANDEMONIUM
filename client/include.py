@@ -1,6 +1,7 @@
 from enum import Enum
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
+from typing import List
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 
 import csv
@@ -26,11 +27,19 @@ class Colors:
     WHITE = (255, 255, 255, 255)
     YELLOW = (255, 255, 0, 255)
 
+    ANSI_GREEN = "\033[1;32m"
+    ANSI_RED = "\033[1;31;31m"
+    ANSI_RESET = "\033[0m"
+
 
 class States(Enum):
     MAIN_MENU = 0
     SETTINGS = 1
     PLAY = 2
+
+
+class Signal(Enum):
+    DECREASE_HEALTH = 0
 
 
 v_fonts = [
@@ -39,30 +48,17 @@ v_fonts = [
 ]
 
 
+current_message = None
+
+
 def timgload3(*path, return_rect=False):
-    tex = Texture.from_surface(display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3))
+    tex = Texture.from_surface(
+        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
+    )
     if return_rect:
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect
     return tex
-
-
-
-def receive_udp():
-    message = None
-    while not message:
-        data, addr = client_udp.recvfrom(2**12)
-        if data:
-            message = data.decode()
-    return message
-
-
-def receive_tcp():
-    pass
-
-
-def send():
-    client_tcp.send_str("")  # boilerplate
 
 
 def fill_rect(color, rect):
@@ -122,7 +118,7 @@ def write(
     if blit:
         display.renderer.blit(tex, rect, special_flags=special_flags)
 
-    return rect
+    return tex, rect
 
 
 class Display:
@@ -190,8 +186,13 @@ class Button:
         setattr(self.rect, self.anchor, (x, y))
 
         if action is not None:
-            self.hover_tex = Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "hover.png")))
-            self.hover_rect = self.hover_tex.get_rect(midright=(self.rect.x - 16, self.rect.centery))
+            self.hover_tex = Texture.from_surface(
+                display.renderer,
+                pygame.image.load(Path("client", "assets", "images", "hover.png")),
+            )
+            self.hover_rect = self.hover_tex.get_rect(
+                midright=(self.rect.x - 16, self.rect.centery)
+            )
 
     def process_event(self, event):
         if self.action is not None:
@@ -220,6 +221,37 @@ class Button:
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
 
 
+class HUD:
+    def __init__(self):
+        self.health_font_size = 64
+
+    def health(self, health, has_changed):
+        return write(
+            "bottomleft",
+            "HP: " + str(health),
+            v_fonts[self.health_font_size],
+            Colors.WHITE,
+            16,
+            display.height - 4,
+        )
+
+    def ammo(self, ammo_count, has_changed):
+        return write(
+            "bottomright",
+            ammo_count,
+            v_fonts[self.health_font_size],
+            Colors.WHITE,
+            display.width - 16,
+            display.height - 4,
+        )
+
+    def ammo_update(self, ammo_count, has_changed):
+        display.renderer.blit(*self.ammo(ammo_count, has_changed))
+
+    def health_update(self, health, has_changed):
+        display.renderer.blit(*self.health(health, has_changed))
+
+
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
@@ -228,17 +260,52 @@ class Client(socket.socket):
             socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
         )
         self.target_server = ("127.0.0.1", 6969)
+        self.current_message = None
         if self.conn_type == "tcp":
-            self.connect(self.target_server)
+            try:
+                self.connect(self.target_server)
+                print(f"{Colors.ANSI_GREEN}Connected to the server!{Colors.ANSI_RESET}")
+            except ConnectionRefusedError:
+                sys.exit(
+                    f"{Colors.ANSI_RED}Could not connect to the server!{Colors.ANSI_RESET}"
+                )
 
-    def send_str(self, message):
+    def req(self, *messages):
+        for message in messages:
+            if self.conn_type == "udp":
+                self.sendto(str(message).encode(), self.target_server)
+
+            if self.conn_type == "tcp":
+                self.send(str(message).encode())
+
+    def req_res(self, messages):
+        for message in messages:
+            if self.conn_type == "udp":
+                self.sendto(str(message).encode(), self.target_server)
+
+            if self.conn_type == "tcp":
+                self.send(str(message).encode())
+
+            response = None
+            while not response:
+                data, addr = self.recvfrom(2**12)
+                if data:
+                    response = data.decode()
+
+            return response
+
+    def receive(self):
         if self.conn_type == "udp":
-            self.sendto(message.encode(), self.target_server)
-        if self.conn_type == "tcp":
-            self.send(message.encode())
+            while not self.current_message:
+                data, addr = self.recvfrom(2**12)
+                if data:
+                    self.current_message = data.decode()
+
+        elif self.conn_type == "tcp":
+            pass
 
 
-client_udp: Client = None
-client_tcp: Client = None
+client_udp = None
+client_tcp = None
 
 cursor = Cursor()
