@@ -1,14 +1,14 @@
 from enum import Enum
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
-from typing import List
 from pygame._sdl2.video import Window, Renderer, Texture, Image
+from random import randint as rand
+from typing import List
 
 import csv
 import pygame
 import socket
 import sys
-from random import randint as rand
 
 
 pygame.init()
@@ -46,79 +46,6 @@ v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
     for i in range(101)
 ]
-
-
-current_message = None
-
-
-def timgload3(*path, return_rect=False):
-    tex = Texture.from_surface(
-        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
-    )
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-    return tex
-
-
-def fill_rect(color, rect):
-    display.renderer.draw_color = color
-    display.renderer.fill_rect(rect)
-
-
-def draw_rect(color, rect):
-    display.renderer.draw_color = color
-    display.renderer.draw_rect(rect)
-
-
-def draw_line(color, p1, p2):
-    display.renderer.draw_color = color
-    display.renderer.draw_line(p1, p2)
-
-
-def angle_to_vel(angle, speed=1):
-    return cos(angle) * speed, sin(angle) * speed
-
-
-def load_map_from_csv(path_):
-    with open(path_, "r") as f:
-        reader = csv.reader(f)
-        return [[int(x) for x in line] for line in reader]
-
-
-def write(
-    anchor: str,
-    content: str,
-    font: pygame.Font,
-    color: tuple,
-    x: int,
-    y: int,
-    alpha=255,
-    blit=True,
-    border=None,
-    special_flags=0,
-    tex=True,
-):
-    if border is not None:
-        bc, bw = border, 1
-        write(anchor, content, font, bc, x - bw, y - bw)
-        write(anchor, content, font, bc, x + bw, y - bw)
-        write(anchor, content, font, bc, x - bw, y + bw)
-        write(anchor, content, font, bc, x + bw, y + bw)
-    tex = font.render(str(content), True, color)
-    if tex:
-        tex = Texture.from_surface(display.renderer, tex)
-        tex.alpha = alpha
-    else:
-        tex.set_alpha(alpha)
-    rect = tex.get_rect()
-
-    setattr(rect, anchor, (int(x), int(y)))
-
-    if blit:
-        display.renderer.blit(tex, rect, special_flags=special_flags)
-
-    return tex, rect
 
 
 class Display:
@@ -218,38 +145,42 @@ class Button:
         )
 
 
-display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
-
-
 class HUD:
     def __init__(self):
         self.health_font_size = 64
+        self.health_tex_rect = None
+        self.ammo_tex_rect = None
 
     def health(self, health, has_changed):
-        return write(
-            "bottomleft",
-            "HP: " + str(health),
-            v_fonts[self.health_font_size],
-            Colors.WHITE,
-            16,
-            display.height - 4,
-        )
+        if has_changed or self.health_tex_rect is None:
+            return write(
+                "bottomleft",
+                "HP: " + str(health),
+                v_fonts[self.health_font_size],
+                Colors.WHITE,
+                16,
+                display.height - 4,
+            )
 
     def ammo(self, ammo_count, has_changed):
-        return write(
-            "bottomright",
-            ammo_count,
-            v_fonts[self.health_font_size],
-            Colors.WHITE,
-            display.width - 16,
-            display.height - 4,
-        )
+        if has_changed or self.ammo_tex_rect is None:
+            return write(
+                "bottomright",
+                ammo_count,
+                v_fonts[self.health_font_size],
+                Colors.WHITE,
+                display.width - 16,
+                display.height - 4,
+            )
 
     def ammo_update(self, ammo_count, has_changed):
         display.renderer.blit(*self.ammo(ammo_count, has_changed))
 
     def health_update(self, health, has_changed):
         display.renderer.blit(*self.health(health, has_changed))
+
+
+display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
 
 
 class Client(socket.socket):
@@ -278,7 +209,7 @@ class Client(socket.socket):
             if self.conn_type == "tcp":
                 self.send(str(message).encode())
 
-    def req_res(self, messages):
+    def req_res(self, *messages):
         for message in messages:
             if self.conn_type == "udp":
                 self.sendto(str(message).encode(), self.target_server)
@@ -296,16 +227,86 @@ class Client(socket.socket):
 
     def receive(self):
         if self.conn_type == "udp":
-            while not self.current_message:
+            while True:
                 data, addr = self.recvfrom(2**12)
-                if data:
-                    self.current_message = data.decode()
+                self.current_message = data.decode()
+                print(self.current_message)
 
         elif self.conn_type == "tcp":
             pass
 
 
-client_udp = None
-client_tcp = None
+def timgload3(*path, return_rect=False):
+    tex = Texture.from_surface(
+        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
+    )
+    if return_rect:
+        rect = tex.get_rect(topleft=return_rect)
+        return tex, rect
+    return tex
+
+
+def fill_rect(color, rect):
+    display.renderer.draw_color = color
+    display.renderer.fill_rect(rect)
+
+
+def draw_rect(color, rect):
+    display.renderer.draw_color = color
+    display.renderer.draw_rect(rect)
+
+
+def draw_line(color, p1, p2):
+    display.renderer.draw_color = color
+    display.renderer.draw_line(p1, p2)
+
+
+def angle_to_vel(angle, speed=1):
+    return cos(angle) * speed, sin(angle) * speed
+
+
+def load_map_from_csv(path_):
+    with open(path_, "r") as f:
+        reader = csv.reader(f)
+        return [[int(x) for x in line] for line in reader]
+
+
+def write(
+    anchor: str,
+    content: str,
+    font: pygame.Font,
+    color: tuple,
+    x: int,
+    y: int,
+    alpha=255,
+    blit=True,
+    border=None,
+    special_flags=0,
+    tex=True,
+):
+    if border is not None:
+        bc, bw = border, 1
+        write(anchor, content, font, bc, x - bw, y - bw)
+        write(anchor, content, font, bc, x + bw, y - bw)
+        write(anchor, content, font, bc, x - bw, y + bw)
+        write(anchor, content, font, bc, x + bw, y + bw)
+    tex = font.render(str(content), True, color)
+    if tex:
+        tex = Texture.from_surface(display.renderer, tex)
+        tex.alpha = alpha
+    else:
+        tex.set_alpha(alpha)
+    rect = tex.get_rect()
+
+    setattr(rect, anchor, (int(x), int(y)))
+
+    if blit:
+        display.renderer.blit(tex, rect, special_flags=special_flags)
+
+    return tex, rect
+
 
 cursor = Cursor()
+
+client_udp = None
+client_tcp = None

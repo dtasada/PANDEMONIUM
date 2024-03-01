@@ -6,7 +6,6 @@ from os import walk
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from threading import Thread
-from pprint import pprint
 
 from .include import *
 
@@ -17,7 +16,7 @@ class Game:
         self.running = True
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
-        self.sens = 0.0005
+        self.sens = 0.00065
         self.fov = 60
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
@@ -111,10 +110,20 @@ class Player:
             for file_name in [None, "wall.png"]
         ]
 
-    @property
-    def health(self):
-        # TODO: Server call
-        return 100
+        self.health = 100
+        self.ammo_count = 16
+
+    def get_health(self):
+        new_health = 90  # TODO: Server call
+        ret = [new_health, False if new_health == self.health else True]
+        self.health = ret[0]
+        return ret
+
+    def get_ammo_count(self):
+        new_ammo_count = 14  # TODO: Server call
+        ret = [new_ammo_count, False if new_ammo_count == self.ammo_count else True]
+        self.ammo_count = ret[0]
+        return ret
 
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
@@ -182,6 +191,7 @@ class Player:
 
         for i, o in enumerate(range(-(game.fov // 2), game.fov // 2 + 1)):
             self.cast_ray(o, i)
+        # self.cast_ray(0, 0)
         _xvel, _yvel = angle_to_vel(self.angle)
         m = 20
         p1 = self.rect.center
@@ -232,44 +242,65 @@ class Player:
             if tile_value != 0:
                 col = True
         if col:
-            # calculations
+            # general ray calculations
             p1 = (start_x * game.tile_size, start_y * game.tile_size)
             p2 = (
                 p1[0] + dist * dx * game.tile_size,
                 p1[1] + dist * dy * game.tile_size,
             )
-            draw_line(Colors.GREEN, p1, p2)
+            self.rays.append((p1, p2))
             ray_mult = 1
-            # 3D
+            # init vars for wallss
             dist *= ray_mult
             dist_px = dist * game.tile_size
             wh = display.height * game.tile_size / dist_px
             ww = display.width / game.fov
             wx = (deg_offset + game.fov / 2) / game.fov * display.width
             wy = display.height / 2 - wh / 2
-            m = 0.1
+            # texture calculations
+            cur_pix_x = cur_x * game.tile_size
+            cur_pix_y = cur_y * game.tile_size
+            tex_dx = round(p2[0] - cur_pix_x, 2)
+            tex_dy = round(p2[1] - cur_pix_y, 2)
+            if tex_dx == 0:
+                # col left, so hit - tile
+                tex_d = p2[1] - cur_pix_y
+            elif tex_dx == game.tile_size:
+                # col right, so tile - hit
+                tex_d = p2[1] - cur_pix_y
+            elif tex_dy == 0:
+                # col top, so size - (hit - tile)
+                tex_d = game.tile_size - (p2[0] - cur_pix_x)
+            elif tex_dy == game.tile_size:
+                # col bottom, so hit - tile
+                tex_d = p2[0] - cur_pix_x
             # fill_rect(
             #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
             #     pygame.FRect(wx, wy, ww, wh),
             # )
-
+            # print(tex_d)
             tex = self.wall_textures[tile_value]
+            axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
             ww += 1
             display.renderer.blit(
                 tex,
                 pygame.Rect(wx, wy, ww, wh),
-                # pygame.Rect(0, 0, ww, wh),
+                pygame.Rect(axo, 0, ww, wh),
             )
 
             self.render_map()
 
             # draw_line(Colors.GREEN, p1, p2)
 
+    def send_coords(self):
+        client_udp.req(f"{self.rect.x}, {self.rect.y}")
+
     def update(self):
+        self.rays = []
         self.keys()
-        hud.health_update(self.health, False)
-        hud.ammo_update(self.health, False)
+        hud.health_update(*self.get_health())
+        hud.ammo_update(*self.get_ammo_count())
         # Thread(client_tcp.req, args=(self.health,)).start()
 
 
@@ -375,14 +406,14 @@ def main(multiplayer):
                     game.running = False
 
                 case pygame.MOUSEMOTION:
-                    if cursor.should_wrap:
+                    if cursor.should_wrap:  # TP mouse to other edge
                         if pygame.mouse.get_pos()[0] > display.width - 20:
                             pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
                         elif pygame.mouse.get_pos()[0] < 20:
                             pygame.mouse.set_pos(
                                 display.width - 20, pygame.mouse.get_pos()[1]
                             )
-                        else:
+                        else:  # Actual movement
                             player.angle += event.rel[0] * game.sens
                             player.angle %= 2 * pi
 
@@ -405,6 +436,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state == States.PLAY:
+            if multiplayer:
+                player.send_coords()
+
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2),
