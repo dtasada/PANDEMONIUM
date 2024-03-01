@@ -266,7 +266,7 @@ class Player:
         self.keys()
         hud.health_update(self.health, False)
         hud.ammo_update(self.health, False)
-        client_udp.send_str()
+        # client_udp.req_res()
 
 
 cursor.enable()
