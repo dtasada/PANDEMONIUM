@@ -122,13 +122,12 @@ class Player:
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
 
         self.wall_textures = [
-            Texture.from_surface(
-                display.renderer,
-                pygame.image.load(Path("client", "assets", "images", file_name))
-            )
+            # Texture.from_surface(
+            #     display.renderer,
+            pygame.image.load(Path("client", "assets", "images", file_name))  # ,
+            # )
             for file_name in ["wall.png"]
         ]
-        self.prev_x = 0
 
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
@@ -172,14 +171,14 @@ class Player:
                     else:
                         self.rect.top = rect.bottom
 
-        for o in range(-(game.fov // 2), game.fov // 2 + 1):
-            self.cast_ray(o)
+        for i, o in enumerate(range(-(game.fov // 2), game.fov // 2 + 1)):
+            self.cast_ray(o, i)
         _xvel, _yvel = angle_to_vel(self.angle)
         m = 20
         p1 = self.rect.center
         p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
 
-    def cast_ray(self, deg_offset):  # add comments here pls
+    def cast_ray(self, deg_offset, index):  # add comments here pls
         offset = radians(deg_offset)
         angle = self.angle + offset
         dx = cos(angle)
@@ -233,19 +232,26 @@ class Player:
             # 3D
             dist *= ray_mult
             dist_px = dist * game.tile_size
-            wh = min(display.height * game.tile_size / dist_px, display.height)
+            wh = display.height * game.tile_size / dist_px
             ww = display.width / game.fov
             wx = (deg_offset + game.fov / 2) / game.fov * display.width
             wy = display.height / 2 - wh / 2
             m = 0.1
             # fill_rect(
-            #     [wh / display.height * 255] * 3 + [255],
+            #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
             #     (wx, wy, ww, wh),
             # )
 
-            rect = pygame.Rect(wx, wy, ww, wh)
-            self.wall_textures[0].color = [int(wh / display.height * 255)] * 3 
-            display.renderer.blit(self.wall_textures[0], rect)
+            tex = Texture.from_surface(
+                display.renderer,
+                pygame.transform.scale(self.wall_textures[0], (256, wh)),
+            )  # need to remove this later from here. texture gen in a loop is bad
+            tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
+            display.renderer.blit(
+                tex,
+                pygame.Rect(wx, wy, ww, wh),
+                pygame.Rect(0, 0, ww, wh),
+            )
 
             if game.debug_map:
                 draw_line(Colors.GREEN, p1, p2)
@@ -399,10 +405,9 @@ def main(multiplayer):
 
         if game.state == States.SETTINGS:
             if game.previous_state == States.MAIN_MENU:
-                fill_rect((0,0,0,255), (0,0,display.width, display.height))
+                fill_rect((0, 0, 0, 255), (0, 0, display.width, display.height))
             else:
                 display.renderer.blit(darken_game.tex, darken_game.rect)
-
 
         for button in buttons:
             button.update()
