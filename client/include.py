@@ -26,6 +26,10 @@ class Colors:
     WHITE = (255, 255, 255, 255)
     YELLOW = (255, 255, 0, 255)
 
+    ANSI_GREEN = "\033[1;32m"
+    ANSI_RED = "\033[1;31;31m"
+    ANSI_RESET = "\033[0m"
+
 
 class States(Enum):
     MAIN_MENU = 0
@@ -54,19 +58,6 @@ def timgload3(*path, return_rect=False):
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect
     return tex
-
-
-def receive_udp():
-    global current_message
-
-    while not current_message:
-        data, addr = client_udp.recvfrom(2**12)
-        if data:
-            current_message = data.decode()
-
-
-def receive_tcp():
-    pass
 
 
 def fill_rect(color, rect):
@@ -268,8 +259,15 @@ class Client(socket.socket):
             socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
         )
         self.target_server = ("127.0.0.1", 6969)
+        self.current_message = None
         if self.conn_type == "tcp":
-            self.connect(self.target_server)
+            try:
+                self.connect(self.target_server)
+                print(f"{Colors.ANSI_GREEN}Connected to the server!{Colors.ANSI_RESET}")
+            except ConnectionRefusedError:
+                sys.exit(
+                    f"{Colors.ANSI_RED}Could not connect to the server!{Colors.ANSI_RESET}"
+                )
 
     def req_res(self, *messages):
         for message in messages:
@@ -278,16 +276,26 @@ class Client(socket.socket):
             if self.conn_type == "tcp":
                 self.send(message.encode())
 
-            message = None
-            while not message:
-                data, addr = client_udp.recvfrom(2**12)
+            response = None
+            while not response:
+                data, addr = self.recvfrom(2**12)
                 if data:
-                    message = data.decode()
+                    response = data.decode()
 
-            return message
+            return response
+
+    def receive(self):
+        if self.conn_type == "udp":
+            while not self.current_message:
+                data, addr = self.recvfrom(2**12)
+                if data:
+                    self.current_message = data.decode()
+
+        elif self.conn_type == "tcp":
+            pass
 
 
-client_udp: Client = None
-client_tcp: Client = None
+client_udp = None
+client_tcp = None
 
 cursor = Cursor()

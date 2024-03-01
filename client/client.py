@@ -11,7 +11,6 @@ from pprint import pprint
 from .include import *
 
 
-
 class Game:
     def __init__(self):
         # misc.
@@ -101,9 +100,14 @@ class Player:
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
 
         self.wall_textures = [
-            Texture.from_surface(
-                display.renderer, pygame.image.load(Path("client", "assets", "images", file_name))
-            ) if file_name is not None else None
+            (
+                Texture.from_surface(
+                    display.renderer,
+                    pygame.image.load(Path("client", "assets", "images", file_name)),
+                )
+                if file_name is not None
+                else None
+            )
             for file_name in [None, "wall.png"]
         ]
 
@@ -357,8 +361,8 @@ def main(multiplayer):
     if multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
-        Thread(target=receive_udp, daemon=True).start()
-        Thread(target=receive_tcp, daemon=True).start()
+        Thread(target=client_udp.receive, daemon=True).start()
+        Thread(target=client_tcp.receive, daemon=True).start()
 
     while game.running:
         clock.tick(game.fps)
