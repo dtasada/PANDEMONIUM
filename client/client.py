@@ -6,7 +6,6 @@ from os import walk
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from threading import Thread
-from pprint import pprint
 
 from .include import *
 
@@ -17,7 +16,7 @@ class Game:
         self.running = True
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
-        self.sens = 0.0005
+        self.sens = 0.00065
         self.fov = 60
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
@@ -111,10 +110,20 @@ class Player:
             for file_name in [None, "wall.png"]
         ]
 
-    @property
-    def health(self):
-        # TODO: Server call
-        return 100
+        self.health = 100
+        self.ammo_count = 16
+
+    def get_health(self):
+        new_health = 90  # TODO: Server call
+        ret = [new_health, False if new_health == self.health else True]
+        self.health = ret[0]
+        return ret
+
+    def get_ammo_count(self):
+        new_ammo_count = 14  # TODO: Server call
+        ret = [new_ammo_count, False if new_ammo_count == self.ammo_count else True]
+        self.ammo_count = ret[0]
+        return ret
 
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
@@ -268,8 +277,8 @@ class Player:
 
     def update(self):
         self.keys()
-        hud.health_update(self.health, False)
-        hud.ammo_update(self.health, False)
+        hud.health_update(*self.get_health())
+        hud.ammo_update(*self.get_ammo_count())
         # Thread(client_tcp.req, args=(self.health,)).start()
 
 
@@ -375,14 +384,14 @@ def main(multiplayer):
                     game.running = False
 
                 case pygame.MOUSEMOTION:
-                    if cursor.should_wrap:
+                    if cursor.should_wrap:  # TP mouse to other edge
                         if pygame.mouse.get_pos()[0] > display.width - 20:
                             pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
                         elif pygame.mouse.get_pos()[0] < 20:
                             pygame.mouse.set_pos(
                                 display.width - 20, pygame.mouse.get_pos()[1]
                             )
-                        else:
+                        else:  # Actual movement
                             player.angle += event.rel[0] * game.sens
                             player.angle %= 2 * pi
 
