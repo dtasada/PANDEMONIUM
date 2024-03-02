@@ -267,19 +267,18 @@ class Player:
             elif tex_dy == game.tile_size:
                 # col bottom, so hit - tile
                 tex_d = p2[0] - cur_pix_x
-            fill_rect(
-                [int(min(wh / display.height * 255, 255))] * 3 + [255],
-                pygame.FRect(wx, wy, ww, wh),
-            )
+            # fill_rect(
+            #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
+            #     pygame.FRect(wx, wy, ww, wh),
+            # )
             tex = self.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
-            ww += 1
-            # display.renderer.blit(
-            #     tex,
-            #     pygame.Rect(wx, wy, ww, wh),
-            #     pygame.Rect(axo, 0, ww, wh),
-            # )
+            display.renderer.blit(
+                tex,
+                pygame.Rect(wx, wy, ww, wh),
+                pygame.Rect(axo, 0, 1, tex.height),
+            )
 
             self.render_map()
 

@@ -49,7 +49,7 @@ v_fonts = [
 
 
 class Display:
-    def __init__(self, width, height, title, fullscreen=False):
+    def __init__(self, width, height, title, fullscreen=False, vsync=False):
         self.title = width, height, title
         if fullscreen:
             self.width = pygame.display.Info().current_w
@@ -58,7 +58,7 @@ class Display:
             self.width, self.height = width, height
         self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height))
-        self.renderer = Renderer(self.window)
+        self.renderer = Renderer(self.window, vsync=vsync)
 
 
 class Cursor:
@@ -180,7 +180,7 @@ class HUD:
         display.renderer.blit(*self.health(health, has_changed))
 
 
-display = Display(1280, 720, "PANDEMONIUM", fullscreen=False)
+display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=True)
 
 
 class Client(socket.socket):
