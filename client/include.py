@@ -4,11 +4,11 @@ from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
 from typing import List
-
 import csv
 import pygame
 import socket
 import sys
+from time import perf_counter
 
 
 pygame.init()
@@ -180,7 +180,7 @@ class HUD:
         display.renderer.blit(*self.health(health, has_changed))
 
 
-display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=True)
+display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
 
 
 class Client(socket.socket):

@@ -97,7 +97,6 @@ class Player:
         self.h = 8
         self.color = Colors.WHITE
         self.angle = -1.5708
-
         self.arrow_surf = pygame.image.load(
             Path("client", "assets", "images", "arrow.png")
         )
@@ -115,6 +114,7 @@ class Player:
             )
             for file_name in [None, "wall.png"]
         ]
+        self.bob = 0
 
     @property
     def health(self):
@@ -249,7 +249,7 @@ class Player:
             wh = display.height * game.tile_size / dist_px
             ww = display.width / game.num_rays
             wx = index * ww
-            wy = display.height / 2 - wh / 2
+            wy = display.height / 2 - wh / 2 + self.bob
             # texture calculations
             cur_pix_x = cur_x * game.tile_size
             cur_pix_y = cur_y * game.tile_size
@@ -403,6 +403,7 @@ def main(multiplayer):
                         else:
                             player.angle += event.rel[0] * game.sens
                             player.angle %= 2 * pi
+                    player.bob -= event.rel[1]
 
                 case pygame.MOUSEBUTTONDOWN:
                     pass
@@ -425,11 +426,11 @@ def main(multiplayer):
         if game.state == States.PLAY:
             fill_rect(
                 Colors.DARK_GRAY,
-                (0, 0, display.width, display.height / 2),
+                (0, 0, display.width, display.height / 2 + player.bob),
             )
             fill_rect(
                 Colors.BROWN,
-                (0, display.height / 2, display.width, display.height / 2),
+                (0, display.height / 2 + player.bob, display.width, display.height / 2 - player.bob),
             )
 
             player.update()
