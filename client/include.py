@@ -10,7 +10,12 @@ import pygame
 import socket
 import sys
 
-SERVER_ADDRESS, SERVER_PORT = "192.168.2.4", 6969
+SERVER_ADDRESS, SERVER_PORT = (
+    socket.gethostbyname(
+        socket.gethostname()
+    ),  # Only when developing and playing on same machine
+    6969,
+)
 
 pygame.init()
 
