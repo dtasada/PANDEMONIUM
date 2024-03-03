@@ -10,29 +10,35 @@ class Colors:
     ANSI_RESET = "\033[0m"
 
 
-ip, port = "127.0.0.1", 6969
+SERVER_ADDRESS, SERVER_PORT = "192.168.2.4", 6969
 
 try:
     server_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_udp.bind((ip, port))
+    server_udp.bind((SERVER_ADDRESS, SERVER_PORT))
     print(
-        f"{Colors.ANSI_GREEN}UDP server is listening at {ip}:{port}{Colors.ANSI_RESET}"
+        f"{Colors.ANSI_GREEN}UDP server is listening at {SERVER_ADDRESS}:{SERVER_PORT}{Colors.ANSI_RESET}"
     )
-except:
-    sys.exit(f"{Colors.ANSI_RED}UDP server failed to initialize!{Colors.ANSI_RESET}")
+except Exception as err:
+    sys.exit(
+        f"{Colors.ANSI_RED}UDP server failed to initialize: {Colors.ANSI_RESET}{err}"
+    )
 
 
 try:
     server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_tcp.bind((ip, port))
+    server_tcp.bind((SERVER_ADDRESS, SERVER_PORT))
     server_tcp.listen(10)
     print(
-        f"{Colors.ANSI_GREEN}TCP server is listening at {ip}:{port}{Colors.ANSI_RESET}"
+        f"{Colors.ANSI_GREEN}TCP server is listening at {SERVER_ADDRESS}:{SERVER_PORT}{Colors.ANSI_RESET}"
     )
-except:
-    sys.exit(f"{Colors.ANSI_RED}TCP server failed to initialize!{Colors.ANSI_RESET}")
+except Exception as err:
+    sys.exit(
+        f"{Colors.ANSI_RED}TCP server failed to initialize: {Colors.ANSI_RESET}{err}"
+    )
 
 addresses = []
+
+
 def receive_udp():
     while True:
         data, addr = server_udp.recvfrom(2**12)
@@ -71,8 +77,9 @@ while True:
         Thread(target=receive_tcp, args=(client,)).start()
     except ConnectionAbortedError:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
+    except KeyboardInterrupt:
+        break
     finally:
         break
 
 server_tcp.close()
-

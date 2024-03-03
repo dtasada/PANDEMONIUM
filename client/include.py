@@ -3,13 +3,14 @@ from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
+from time import perf_counter
 from typing import List
 import csv
 import pygame
 import socket
 import sys
-from time import perf_counter
 
+SERVER_ADDRESS, SERVER_PORT = "192.168.2.4", 6969
 
 pygame.init()
 
@@ -190,15 +191,15 @@ class Client(socket.socket):
             socket.AF_INET,
             socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
         )
-        self.target_server = ("127.0.0.1", 6969)
+        self.target_server = (SERVER_ADDRESS, SERVER_PORT)
         self.current_message = None
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
                 print(f"{Colors.ANSI_GREEN}Connected to the server!{Colors.ANSI_RESET}")
-            except ConnectionRefusedError:
+            except ConnectionRefusedError as err:
                 sys.exit(
-                    f"{Colors.ANSI_RED}Could not connect to the server!{Colors.ANSI_RESET}"
+                    f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}"
                 )
 
     def req(self, *messages):
@@ -240,6 +241,7 @@ def timgload3(*path, return_rect=False):
     tex = Texture.from_surface(
         display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
     )
+
     if return_rect:
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect

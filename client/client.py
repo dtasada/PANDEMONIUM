@@ -2,11 +2,9 @@ import pygame
 import sys
 
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
-from os import walk
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from threading import Thread
-from pprint import pprint
 
 from .include import *
 
@@ -19,7 +17,7 @@ class Game:
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
-        self.num_rays = 320
+        self.ray_density = 320
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
         self.tile_size = 16
@@ -64,7 +62,10 @@ class Game:
             )
             for file_name in ["floor.png", "floor_wall.png"]
         ]
-        self.map_surf = pygame.Surface((self.map_width * self.tile_size, self.map_height * self.tile_size), pygame.SRCALPHA)
+        self.map_surf = pygame.Surface(
+            (self.map_width * self.tile_size, self.map_height * self.tile_size),
+            pygame.SRCALPHA,
+        )
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
                 img = self.tiles[tile]
@@ -181,8 +182,8 @@ class Player:
                         self.rect.top = rect.bottom
 
         o = -game.fov // 2
-        for index in range(game.num_rays):
-            o += game.fov / game.num_rays
+        for index in range(game.ray_density):
+            o += game.fov / game.ray_density
             self.cast_ray(o, index)
         # self.cast_ray(0, 0)
         _xvel, _yvel = angle_to_vel(self.angle)
@@ -247,7 +248,7 @@ class Player:
             dist *= ray_mult
             dist_px = dist * game.tile_size
             wh = display.height * game.tile_size / dist_px
-            ww = display.width / game.num_rays
+            ww = display.width / game.ray_density
             wx = index * ww
             wy = display.height / 2 - wh / 2 + self.bob
             # texture calculations
@@ -267,10 +268,14 @@ class Player:
             elif tex_dy == game.tile_size:
                 # col bottom, so hit - tile
                 tex_d = p2[0] - cur_pix_x
+
+            # Raw rectangle rendering
             # fill_rect(
             #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
             #     pygame.FRect(wx, wy, ww, wh),
             # )
+
+            # Texture rendering
             tex = self.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
@@ -290,6 +295,7 @@ class Player:
         # Thread(client_tcp.req, args=(self.health,)).start()
         for ray in self.rays:
             draw_line(Colors.GREEN, *ray)
+
 
 cursor.enable()
 game = Game()
@@ -373,13 +379,47 @@ class DarkenGame:
 darken_game = DarkenGame()
 
 
+floor_tex = Texture.from_surface(
+    display.renderer, pygame.image.load(Path("client", "assets", "images", "floor.jpg"))
+)
+
+
+def render_floor():
+    # y = int(display.height / 2)
+    # x = 0
+    # while y < display.height:
+    #     height = 16
+    #     width = y / display.width
+    #     offset = y / floor_tex.width
+    #     floor_tex.color = [int(min(height * 2 / display.height * 255, 255))] * 3
+    #
+    #     print(x, y, width, height)
+    #     display.renderer.blit(
+    #         floor_tex,
+    #         pygame.Rect(x, y, width, height),
+    #         pygame.Rect(0, offset, floor_tex.height, 1),
+    #     )
+    #     y += height
+    #     # x += width
+
+    fill_rect(
+        Colors.BROWN,
+        (
+            0,
+            display.height / 2 + player.bob,
+            display.width,
+            display.height / 2 - player.bob,
+        ),
+    )
+
+
 def main(multiplayer):
     global client_udp, client_tcp
 
     if multiplayer:
-        client_udp = Client("udp")
+        # client_udp = Client("udp")
         client_tcp = Client("tcp")
-        Thread(target=client_udp.receive, daemon=True).start()
+        # Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
 
     while game.running:
@@ -394,16 +434,25 @@ def main(multiplayer):
 
                 case pygame.MOUSEMOTION:
                     if cursor.should_wrap:
-                        if pygame.mouse.get_pos()[0] > display.width - 20:
-                            pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
-                        elif pygame.mouse.get_pos()[0] < 20:
-                            pygame.mouse.set_pos(
-                                display.width - 20, pygame.mouse.get_pos()[1]
-                            )
+                        xpos = pygame.mouse.get_pos()[0]
+                        ypos = pygame.mouse.get_pos()[1]
+
+                        # if/elif are for horizontal mouse wrap
+                        if xpos > display.width - 20:
+                            pygame.mouse.set_pos(20, ypos)
+                        elif xpos < 20:
+                            pygame.mouse.set_pos(display.width - 21, ypos)
                         else:
                             player.angle += event.rel[0] * game.sens
                             player.angle %= 2 * pi
-                    player.bob -= event.rel[1]
+
+                        # if/elif are for vertical mouse wrap
+                        if ypos > display.height - 20:
+                            pygame.mouse.set_pos(xpos, 20)
+                        elif ypos < 20:
+                            pygame.mouse.set_pos(xpos, display.height - 21)
+                        else:
+                            player.bob -= event.rel[1]
 
                 case pygame.MOUSEBUTTONDOWN:
                     pass
@@ -428,10 +477,7 @@ def main(multiplayer):
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.bob),
             )
-            fill_rect(
-                Colors.BROWN,
-                (0, display.height / 2 + player.bob, display.width, display.height / 2 - player.bob),
-            )
+            render_floor()
 
             player.update()
             display.renderer.blit(crosshair_tex, crosshair_rect)
