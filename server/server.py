@@ -45,13 +45,11 @@ def receive_udp():
 
         if addr not in addresses:
             addresses.append(addr)
-            print(addresses)
 
         message = data.decode()
         for address in addresses:
             if address == addr:
                 continue
-            print(1)
             server_udp.sendto(message.encode(), address)
 
 

@@ -235,7 +235,6 @@ class Client(socket.socket):
             while True:
                 data, addr = self.recvfrom(2**12)
                 self.current_message = data.decode()
-                print(self.current_message)
 
         elif self.conn_type == "tcp":
             pass
