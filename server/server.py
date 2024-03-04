@@ -45,11 +45,13 @@ def receive_udp():
 
         if addr not in addresses:
             addresses.append(addr)
+            print(addresses)
 
         message = data.decode()
         for address in addresses:
             if address == addr:
                 continue
+            print(1)
             server_udp.sendto(message.encode(), address)
 
 
@@ -75,7 +77,6 @@ def receive_tcp(client, client_addr):
 # UDP
 Thread(target=receive_udp).start()
 
-
 while True:
     # TCP
     try:
@@ -85,10 +86,8 @@ while True:
 
     except ConnectionAbortedError:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
+        break
     except KeyboardInterrupt:
         break
-    finally:
-        break
-
 
 server_tcp.close()

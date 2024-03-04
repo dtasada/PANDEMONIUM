@@ -286,6 +286,9 @@ class Player:
             )
 
             self.render_map()
+    
+    def send_coords(self):
+        client_udp.req(f"{self.rect.x}, {self.rect.y}")
 
     def update(self):
         self.rays = []
@@ -417,9 +420,9 @@ def main(multiplayer):
     global client_udp, client_tcp
 
     if multiplayer:
-        # client_udp = Client("udp")
+        client_udp = Client("udp")
         client_tcp = Client("tcp")
-        # Thread(target=client_udp.receive, daemon=True).start()
+        Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
 
     while game.running:
@@ -473,6 +476,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state == States.PLAY:
+            if multiplayer:
+                player.send_coords()
+
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.bob),

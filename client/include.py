@@ -207,13 +207,12 @@ class Client(socket.socket):
                     f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}"
                 )
 
-    def req(self, *messages):
-        for message in messages:
-            if self.conn_type == "udp":
-                self.sendto(str(message).encode(), self.target_server)
+    def req(self, message):
+        if self.conn_type == "udp":
+            self.sendto(str(message).encode(), self.target_server)
 
-            if self.conn_type == "tcp":
-                self.send(str(message).encode())
+        if self.conn_type == "tcp":
+            self.send(str(message).encode())
 
     def req_res(self, *messages):
         for message in messages:
