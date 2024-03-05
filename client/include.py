@@ -26,6 +26,7 @@ class Colors:
     RED = (255, 0, 0, 255)
     WHITE = (255, 255, 255, 255)
     YELLOW = (255, 255, 0, 255)
+    LIGHT_BLUE = (0, 150, 255)
 
     ANSI_GREEN = "\033[1;32m"
     ANSI_RED = "\033[1;31;31m"
@@ -246,6 +247,16 @@ def timgload3(*path, return_rect=False):
     return tex
 
 
+def timgload(*path, return_rect=False):
+    tex = Texture.from_surface(
+        display.renderer, pygame.image.load(Path(*path))
+    )
+    if return_rect:
+        rect = tex.get_rect(topleft=return_rect)
+        return tex, rect
+    return tex
+
+
 def fill_rect(color, rect):
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
@@ -265,10 +276,10 @@ def angle_to_vel(angle, speed=1):
     return cos(angle) * speed, sin(angle) * speed
 
 
-def load_map_from_csv(path_):
+def load_map_from_csv(path_, int_=True):
     with open(path_, "r") as f:
         reader = csv.reader(f)
-        return [[int(x) for x in line] for line in reader]
+        return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
 def write(
@@ -306,7 +317,23 @@ def write(
     return tex, rect
 
 
+def borderize(img, color, thickness=1):
+    mask = pygame.mask.from_surface(img)
+    mask_surf = mask.to_surface(setcolor=color)
+    mask_surf.set_colorkey(Colors.BLACK)
+    surf = pygame.Surface([s + thickness * 2 for s in mask_surf.get_size()], pygame.SRCALPHA)
+    poss = [[c * thickness for c in p] for p in [[1, 0], [2, 1], [1, 2], [0, 1]]]
+    for pos in poss:
+        surf.blit(mask_surf, pos)
+    surf.blit(img, (thickness, thickness))
+    return surf
+
+
 cursor = Cursor()
 
 client_udp = None
 client_tcp = None
+
+weapon_costs = {
+    "1": 1200,
+}

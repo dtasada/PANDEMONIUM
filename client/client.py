@@ -22,6 +22,7 @@ class Game:
         self.num_rays = 320
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
+        self.object_map = load_map_from_csv(Path("client", "assets", "object_map.csv"), int_=False)
         self.tile_size = 16
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
@@ -70,7 +71,8 @@ class Game:
                 img = self.tiles[tile]
                 self.map_surf.blit(img, (x * self.tile_size, y * self.tile_size))
         self.map_tex = Texture.from_surface(display.renderer, self.map_surf)
-        self.map_rect = self.map_tex.get_rect()
+        self.mo = self.tile_size * 1  # map offset!!!!!!!!!!
+        self.map_rect = self.map_tex.get_rect(topleft=(self.mo, self.mo))
 
     @property
     def rect_list(self):
@@ -102,17 +104,37 @@ class Player:
         )
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
+        self.arrow_img.color = (0, 0, 200, 255)
 
         self.wall_textures = [
             (
                 Texture.from_surface(
                     display.renderer,
-                    pygame.image.load(Path("client", "assets", "images", file_name)),
+                    pygame.transform.scale_by(pygame.image.load(Path("client", "assets", "images", file_name + ".png")), 0.25),
                 )
                 if file_name is not None
                 else None
             )
-            for file_name in [None, "wall.png"]
+            for file_name in [None, "wall"]
+        ]
+        self.object_textures = [
+            (
+                timgload("client", "assets", "images", file_name + ".png")
+                if file_name is not None
+                else None
+            )
+            for file_name in [None, "ak"]
+        ]
+        self.highlighted_object_textures = [
+            (
+                Texture.from_surface(
+                    display.renderer,
+                    borderize(pygame.image.load(Path("client", "assets", "images", file_name + ".png")), Colors.YELLOW)
+                )
+                if file_name is not None
+                else None
+            )
+            for file_name in [None, "ak"]
         ]
         self.bob = 0
 
@@ -125,12 +147,14 @@ class Player:
         self.arrow_img.angle = degrees(self.angle)
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         arrow_rect.center = self.rect.center
-        display.renderer.blit(self.arrow_img, arrow_rect)
+        display.renderer.blit(self.arrow_img, pygame.Rect(arrow_rect.x + game.mo, arrow_rect.y + game.mo, *arrow_rect.size))
         # draw_rect(Colors.GREEN, self.rect)
+        if self.to_equip is not None:
+            cost = weapon_costs[self.to_equip]
+            write("midbottom", f"Press <e> to buy for {cost}", v_fonts[52], Colors.WHITE, display.width / 2, display.height - 50)
 
     def render_map(self):
         display.renderer.blit(game.map_tex, game.map_rect)
-
         if game.debug_map:
             for y in range(game.map_height):
                 draw_line(
@@ -146,6 +170,8 @@ class Player:
                 )
 
     def keys(self):
+        self.to_equip = None
+        self.surround = []
         if game.state == States.PLAY:
             vmult = 0.8
             keys = pygame.key.get_pressed()
@@ -180,15 +206,23 @@ class Player:
                     else:
                         self.rect.top = rect.bottom
 
+        # surroundings
+        tile_x = int(self.rect.x / game.tile_size)
+        tile_y = int(self.rect.y / game.tile_size)
+        o = 1
+        for yo in range(-o, o + 1):
+            for xo in range(-o, o + 1):
+                x = tile_x + xo
+                y = tile_y + yo
+                self.surround.append((x, y))
+
+        # cast the rayss
         o = -game.fov // 2
         for index in range(game.num_rays):
             o += game.fov / game.num_rays
             self.cast_ray(o, index)
         # self.cast_ray(0, 0)
         _xvel, _yvel = angle_to_vel(self.angle)
-        m = 20
-        p1 = self.rect.center
-        p2 = (self.rect.centerx + _xvel * m, self.rect.centery + _yvel * m)
 
     def cast_ray(self, deg_offset, index):  # add comments here pls
         offset = radians(deg_offset)
@@ -235,7 +269,9 @@ class Player:
             if tile_value != 0:
                 col = True
         if col:
-            # general ray calculations
+            # object (wall weapon)
+            obj = game.object_map[cur_y][cur_x]
+            # general ray calculations (big branin)
             p1 = (start_x * game.tile_size, start_y * game.tile_size)
             p2 = (
                 p1[0] + dist * dx * game.tile_size,
@@ -243,11 +279,11 @@ class Player:
             )
             self.rays.append((p1, p2))
             ray_mult = 1
-            # init vars for wallss
+            # init vars for walls
             dist *= ray_mult
             dist_px = dist * game.tile_size
-            wh = display.height * game.tile_size / dist_px
             ww = display.width / game.num_rays
+            wh = display.height * game.tile_size / dist_px * 1.7
             wx = index * ww
             wy = display.height / 2 - wh / 2 + self.bob
             # texture calculations
@@ -258,15 +294,19 @@ class Player:
             if tex_dx == 0:
                 # col left, so hit - tile
                 tex_d = p2[1] - cur_pix_y
+                orien = 3  # left
             elif tex_dx == game.tile_size:
                 # col right, so tile - hit
                 tex_d = p2[1] - cur_pix_y
+                orien = 1  # right
             elif tex_dy == 0:
                 # col top, so size - (hit - tile)
                 tex_d = game.tile_size - (p2[0] - cur_pix_x)
+                orien = 0  # top
             elif tex_dy == game.tile_size:
                 # col bottom, so hit - tile
                 tex_d = p2[0] - cur_pix_x
+                orien = 2  # bottom
             # fill_rect(
             #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
             #     pygame.FRect(wx, wy, ww, wh),
@@ -279,7 +319,20 @@ class Player:
                 pygame.Rect(wx, wy, ww, wh),
                 pygame.Rect(axo, 0, 1, tex.height),
             )
-
+            # check whether the wall weapon is in the correct orientation
+            if len(obj) > 1:
+                if int(obj[1]) == orien:
+                    if (cur_x, cur_y) in self.surround:
+                        lookup = self.highlighted_object_textures
+                        self.to_equip = obj[0]
+                    else:
+                        lookup = self.object_textures
+                    tex = lookup[int(obj[0])]
+                    display.renderer.blit(
+                        tex,
+                        pygame.Rect(wx, wy, ww, wh),
+                        pygame.Rect(axo, 0, 1, tex.height),
+                    )
             self.render_map()
 
     def update(self):
@@ -289,7 +342,9 @@ class Player:
         hud.ammo_update(self.health, False)
         # Thread(client_tcp.req, args=(self.health,)).start()
         for ray in self.rays:
-            draw_line(Colors.GREEN, *ray)
+            p1 = (ray[0][0] + game.mo, ray[0][1] + game.mo)
+            p2 = (ray[1][0] + game.mo, ray[1][1] + game.mo)
+            draw_line(Colors.GREEN, p1, p2)
 
 cursor.enable()
 game = Game()
@@ -365,7 +420,7 @@ class DarkenGame:
     def __init__(self):
         self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
         self.surf.fill(Colors.BLACK)
-        self.surf.set_alpha(40)
+        self.surf.set_alpha(80)
         self.tex = Texture.from_surface(display.renderer, self.surf)
         self.rect = self.surf.get_rect()
 
@@ -393,17 +448,18 @@ def main(multiplayer):
                     game.running = False
 
                 case pygame.MOUSEMOTION:
-                    if cursor.should_wrap:
-                        if pygame.mouse.get_pos()[0] > display.width - 20:
-                            pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
-                        elif pygame.mouse.get_pos()[0] < 20:
-                            pygame.mouse.set_pos(
-                                display.width - 20, pygame.mouse.get_pos()[1]
-                            )
-                        else:
-                            player.angle += event.rel[0] * game.sens
-                            player.angle %= 2 * pi
-                    player.bob -= event.rel[1]
+                    if game.state == States.PLAY:
+                        if cursor.should_wrap:
+                            if pygame.mouse.get_pos()[0] > display.width - 20:
+                                pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
+                            elif pygame.mouse.get_pos()[0] < 20:
+                                pygame.mouse.set_pos(
+                                    display.width - 20, pygame.mouse.get_pos()[1]
+                                )
+                            else:
+                                player.angle += event.rel[0] * game.sens
+                                player.angle %= 2 * pi
+                        player.bob -= event.rel[1]
 
                 case pygame.MOUSEBUTTONDOWN:
                     pass
@@ -423,21 +479,20 @@ def main(multiplayer):
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
-        if game.state == States.PLAY:
-            fill_rect(
-                Colors.DARK_GRAY,
-                (0, 0, display.width, display.height / 2 + player.bob),
-            )
-            fill_rect(
-                Colors.BROWN,
-                (0, display.height / 2 + player.bob, display.width, display.height / 2 - player.bob),
-            )
-
-            player.update()
+        if game.state != States.MAIN_MENU:
+            if game.state == States.PLAY or (game.state == States.SETTINGS and game.previous_state == States.PLAY):
+                fill_rect(
+                    Colors.DARK_GRAY,
+                    (0, 0, display.width, display.height / 2 + player.bob),
+                )
+                fill_rect(
+                    Colors.BROWN,
+                    (0, display.height / 2 + player.bob, display.width, display.height / 2 - player.bob),
+                )
+                player.update()
+                if game.should_render_map:
+                    player.draw()
             display.renderer.blit(crosshair_tex, crosshair_rect)
-
-            if game.should_render_map:
-                player.draw()
 
         if game.state == States.SETTINGS:
             if game.previous_state == States.MAIN_MENU:
@@ -451,7 +506,7 @@ def main(multiplayer):
         if cursor.enabled:
             cursor.update()
 
-        write("topleft", str(int(clock.get_fps())), v_fonts[20], Colors.WHITE, 5, 5)
+        write("topright", str(int(clock.get_fps())), v_fonts[20], Colors.WHITE, display.width - 5, 5)
 
         display.renderer.present()
 
