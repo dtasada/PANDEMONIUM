@@ -87,8 +87,5 @@ while True:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
     except KeyboardInterrupt:
         break
-    finally:
-        break
-
 
 server_tcp.close()

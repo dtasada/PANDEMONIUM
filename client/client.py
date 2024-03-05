@@ -89,6 +89,14 @@ class Game:
         else:
             cursor.enable()
 
+    def set_fov(self, amount):
+        self.fov += amount
+
+        if self.fov > 120: self.fov = 120
+        if self.fov < 30: self.fov = 30
+
+    def set_sens(self, amount):
+        self.sens += amount
 
 class Player:
     def __init__(self):
@@ -99,7 +107,7 @@ class Player:
         self.color = Colors.WHITE
         self.angle = -1.5708
         self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "arrow.png")
+            Path("client", "assets", "images", "player_arrow.png")
         )
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
@@ -339,13 +347,17 @@ button_lists = {
             80,
             display.height / 2 + 48 * 0,
             "Field of view",
-            None,
+            game.set_fov,
+            is_slider=True,
+            slider_display=game.fov
         ),
         Button(
             80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
-            None,
+            game.set_sens,
+            is_slider=True,
+            slider_display=game.sens
         ),
         Button(
             80,
@@ -417,9 +429,9 @@ def main(multiplayer):
     global client_udp, client_tcp
 
     if multiplayer:
-        # client_udp = Client("udp")
+        client_udp = Client("udp")
         client_tcp = Client("tcp")
-        # Thread(target=client_udp.receive, daemon=True).start()
+        Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
 
     while game.running:
