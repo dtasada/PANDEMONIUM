@@ -292,7 +292,7 @@ class Player:
             # init vars for walls
             dist *= ray_mult
             dist_px = dist * game.tile_size
-            ww = display.width / game.num_rays
+            ww = display.width / game.ray_density
             wh = display.height * game.tile_size / dist_px * 1.7
             wx = index * ww
             wy = display.height / 2 - wh / 2 + self.bob
@@ -483,17 +483,12 @@ def render_floor():
         ),
     )
 
-<<<<<<< HEAD
     
 def draw_other_players_map():
-=======
-
-def draw_other_player_map():
->>>>>>> d162c69f2d5775bae293f2fe6084621f8d01067f
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for location in message.values():
-            arrow_rect = pygame.Rect(location["x"] - 4, location["y"] - 4, 16, 16)
+            arrow_rect = pygame.Rect(location["x"] + game.mo - 4, location["y"] + game.mo - 4, 16, 16)
             arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "player_arrow.png"))))
             arrow.angle = degrees(location["angle"])
             draw_rect(Colors.GREEN, arrow_rect)
@@ -563,6 +558,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state != States.MAIN_MENU:
+            if multiplayer:
+                player.send_location()
+
             if game.state == States.PLAY or (game.state == States.SETTINGS and game.previous_state == States.PLAY):
                 fill_rect(
                     Colors.DARK_GRAY,
@@ -575,16 +573,10 @@ def main(multiplayer):
                 player.update()
                 if game.should_render_map:
                     player.draw()
+                    if multiplayer:
+                        draw_other_players_map()
             display.renderer.blit(crosshair_tex, crosshair_rect)
 
-<<<<<<< HEAD
-            if game.should_render_map:
-                player.draw()
-                if multiplayer:
-                    draw_other_players_map()
-
-=======
->>>>>>> d162c69f2d5775bae293f2fe6084621f8d01067f
         if game.state == States.SETTINGS:
             if game.previous_state == States.MAIN_MENU:
                 fill_rect((0, 0, 0, 255), (0, 0, display.width, display.height))

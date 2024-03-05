@@ -42,16 +42,16 @@ addresses = {}
 def receive_udp():
     while True:
         data, addr = server_udp.recvfrom(2**12)
-        if data.encode() != "quit":
+        if data.decode() != "quit":
             addresses[str(addr)] = json.loads(data)
 
-            response = json.dumps(addresses)
             for address in addresses:
-                if address == addr:
-                    continue
+                response = json.dumps({k: v for k, v in addresses.items() if k != address})
                 server_udp.sendto(response.encode(), eval(address))
         else:
+            print(addresses)
             del addresses[str(addr)]
+            print(addresses)
 
 
 def receive_tcp(client, client_addr):
