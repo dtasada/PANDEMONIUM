@@ -1,12 +1,11 @@
 import pygame
 import sys
+import json
 
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
-from os import walk
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from threading import Thread
-from pprint import pprint
 
 from .include import *
 
@@ -19,7 +18,7 @@ class Game:
         self.fps = 60
         self.sens = 0.0005
         self.fov = 60
-        self.num_rays = 320
+        self.ray_density = 320
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
         self.object_map = load_map_from_csv(Path("client", "assets", "object_map.csv"), int_=False)
@@ -65,7 +64,10 @@ class Game:
             )
             for file_name in ["floor.png", "floor_wall.png"]
         ]
-        self.map_surf = pygame.Surface((self.map_width * self.tile_size, self.map_height * self.tile_size), pygame.SRCALPHA)
+        self.map_surf = pygame.Surface(
+            (self.map_width * self.tile_size, self.map_height * self.tile_size),
+            pygame.SRCALPHA,
+        )
         for y, row in enumerate(self.map):
             for x, tile in enumerate(row):
                 img = self.tiles[tile]
@@ -90,6 +92,14 @@ class Game:
         else:
             cursor.enable()
 
+    def set_fov(self, amount):
+        self.fov += amount
+
+        if self.fov > 120: self.fov = 120
+        if self.fov < 30: self.fov = 30
+
+    def set_sens(self, amount):
+        self.sens += amount
 
 class Player:
     def __init__(self):
@@ -100,7 +110,7 @@ class Player:
         self.color = Colors.WHITE
         self.angle = -1.5708
         self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "arrow.png")
+            Path("client", "assets", "images", "player_arrow.png")
         )
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
@@ -160,7 +170,7 @@ class Player:
                 draw_line(
                     Colors.WHITE,
                     (game.tile_size, (y + 1) * self.tile_size),
-                    ((game.map_width + 1) * game.tile_size, (y + 1) * self.tile_size),
+                    ((game.map_width + 1) *game.tile_size, (y + 1) * self.tile_size),
                 )
             for x in range(game.map_width):
                 draw_line(
@@ -218,8 +228,8 @@ class Player:
 
         # cast the rayss
         o = -game.fov // 2
-        for index in range(game.num_rays):
-            o += game.fov / game.num_rays
+        for index in range(game.ray_density):
+            o += game.fov / game.ray_density
             self.cast_ray(o, index)
         # self.cast_ray(0, 0)
         _xvel, _yvel = angle_to_vel(self.angle)
@@ -311,6 +321,8 @@ class Player:
             #     [int(min(wh / display.height * 255, 255))] * 3 + [255],
             #     pygame.FRect(wx, wy, ww, wh),
             # )
+
+            # Texture rendering
             tex = self.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
@@ -335,6 +347,11 @@ class Player:
                     )
             self.render_map()
 
+    def send_location(self):
+        data = {"x": self.rect.x, "y": self.rect.y, "angle": self.angle}
+        data = json.dumps(data)
+        client_udp.req(data)
+
     def update(self):
         self.rays = []
         self.keys()
@@ -345,6 +362,7 @@ class Player:
             p1 = (ray[0][0] + game.mo, ray[0][1] + game.mo)
             p2 = (ray[1][0] + game.mo, ray[1][1] + game.mo)
             draw_line(Colors.GREEN, p1, p2)
+
 
 cursor.enable()
 game = Game()
@@ -388,13 +406,17 @@ button_lists = {
             80,
             display.height / 2 + 48 * 0,
             "Field of view",
-            None,
+            game.set_fov,
+            is_slider=True,
+            slider_display=game.fov
         ),
         Button(
             80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
-            None,
+            game.set_sens,
+            is_slider=True,
+            slider_display=game.sens
         ),
         Button(
             80,
@@ -428,6 +450,51 @@ class DarkenGame:
 darken_game = DarkenGame()
 
 
+floor_tex = Texture.from_surface(
+    display.renderer, pygame.image.load(Path("client", "assets", "images", "floor.jpg"))
+)
+
+
+def render_floor():
+    # y = int(display.height / 2)
+    # x = 0
+    # while y < display.height:
+    #     height = 16
+    #     width = y / display.width
+    #     offset = y / floor_tex.width
+    #     floor_tex.color = [int(min(height * 2 / display.height * 255, 255))] * 3
+    #
+    #     print(x, y, width, height)
+    #     display.renderer.blit(
+    #         floor_tex,
+    #         pygame.Rect(x, y, width, height),
+    #         pygame.Rect(0, offset, floor_tex.height, 1),
+    #     )
+    #     y += height
+    #     # x += width
+
+    fill_rect(
+        Colors.BROWN,
+        (
+            0,
+            display.height / 2 + player.bob,
+            display.width,
+            display.height / 2 - player.bob,
+        ),
+    )
+
+
+def draw_other_player_map():
+    if client_udp.current_message:
+        info = json.loads(client_udp.current_message)
+        arrow_rect = pygame.Rect(info["x"] - 4, info["y"] - 4, 16, 16)
+        arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "arrow.png"))))
+        arrow.angle = degrees(info["angle"])
+        draw_rect(Colors.GREEN, arrow_rect)
+
+        display.renderer.blit(arrow, arrow_rect)
+
+
 def main(multiplayer):
     global client_udp, client_tcp
 
@@ -448,18 +515,27 @@ def main(multiplayer):
                     game.running = False
 
                 case pygame.MOUSEMOTION:
-                    if game.state == States.PLAY:
-                        if cursor.should_wrap:
-                            if pygame.mouse.get_pos()[0] > display.width - 20:
-                                pygame.mouse.set_pos(20, pygame.mouse.get_pos()[1])
-                            elif pygame.mouse.get_pos()[0] < 20:
-                                pygame.mouse.set_pos(
-                                    display.width - 20, pygame.mouse.get_pos()[1]
-                                )
+                    if cursor.should_wrap:
+                        if game.state == States.PLAY:
+                            xpos = pygame.mouse.get_pos()[0]
+                            ypos = pygame.mouse.get_pos()[1]
+
+                            # if/elif are for horizontal mouse wrap
+                            if xpos > display.width - 20:
+                                pygame.mouse.set_pos(20, ypos)
+                            elif xpos < 20:
+                                pygame.mouse.set_pos(display.width - 21, ypos)
                             else:
                                 player.angle += event.rel[0] * game.sens
                                 player.angle %= 2 * pi
-                        player.bob -= event.rel[1]
+
+                            # if/elif are for vertical mouse wrap
+                            if ypos > display.height - 20:
+                                pygame.mouse.set_pos(xpos, 20)
+                            elif ypos < 20:
+                                pygame.mouse.set_pos(xpos, display.height - 21)
+                            else:
+                                player.bob -= event.rel[1]
 
                 case pygame.MOUSEBUTTONDOWN:
                     pass

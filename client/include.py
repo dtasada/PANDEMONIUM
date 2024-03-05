@@ -3,13 +3,19 @@ from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
+from time import perf_counter
 from typing import List
 import csv
 import pygame
 import socket
 import sys
-from time import perf_counter
 
+SERVER_ADDRESS, SERVER_PORT = (
+    socket.gethostbyname(
+        socket.gethostname()
+    ),  # Only when developing and playing on same machine
+    6969,
+)
 
 pygame.init()
 
@@ -99,6 +105,8 @@ class Button:
         color=Colors.LIGHT_GRAY,
         should_background=False,
         anchor="topleft",
+        is_slider=False,
+        slider_display=None,
     ):
         self.content = content
         self.color = self.initial_color = color
@@ -106,10 +114,13 @@ class Button:
         self.action = action
         self.should_background = should_background
         self.anchor = anchor
+        self.is_slider = is_slider
+        self.slider_display = slider_display
 
         self.font = v_fonts[self.font_size]
         self.width = width or self.font.size(content)[0]
         self.height = height or self.font.size(content)[1]
+
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         setattr(self.rect, self.anchor, (x, y))
 
@@ -122,19 +133,85 @@ class Button:
                 midright=(self.rect.x - 16, self.rect.centery)
             )
 
+        if is_slider:
+            self.left_slider_tex = Texture.from_surface(
+                display.renderer,
+                pygame.image.load(
+                    Path("client", "assets", "images", "slider_arrow.png")
+                ),
+            )
+            self.left_slider_rect = self.left_slider_tex.get_rect()
+            setattr(
+                self.left_slider_rect,
+                "midleft",
+                (self.rect.right + 4, self.rect.midright[1]),
+            )
+
+            self.right_slider_tex = Texture.from_surface(
+                display.renderer,
+                pygame.transform.flip(
+                    pygame.image.load(
+                        Path("client", "assets", "images", "slider_arrow.png")
+                    ),
+                    True,
+                    False,
+                ),
+            )
+            self.right_slider_rect = self.right_slider_tex.get_rect()
+
+            self.slider_display_rect = write(
+                self.anchor,
+                self.slider_display,
+                v_fonts[self.font_size],
+                Colors.WHITE,
+                self.left_slider_rect.x + 16,
+                self.rect.y,
+            )[1]
+
+            if self.slider_display_rect:
+                setattr(
+                    self.right_slider_rect,
+                    self.anchor,
+                    (
+                        self.slider_display_rect.right,
+                        self.rect.y + 8,
+                    ),
+                )
+
     def process_event(self, event):
         if self.action is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    if self.rect.collidepoint(pygame.mouse.get_pos()):
+                    if self.is_slider:
+                        if self.left_slider_rect.collidepoint(pygame.mouse.get_pos()):
+                            self.action(-10)
+                        if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
+                            self.action(10)
+                    else:
                         self.action()
 
     def update(self):
-        if self.action is not None:
-            if self.rect.collidepoint(pygame.mouse.get_pos()):
-                display.renderer.blit(self.hover_tex, self.hover_rect)
+        if (
+            self.rect.collidepoint(pygame.mouse.get_pos())
+            and not self.is_slider
+            and self.action is not None
+        ):
+            display.renderer.blit(self.hover_tex, self.hover_rect)
         if self.should_background:
             fill_rect(Colors.GRAY, self.rect)
+        if self.is_slider:
+            display.renderer.blit(self.left_slider_tex, self.left_slider_rect)
+            display.renderer.blit(self.right_slider_tex, self.right_slider_rect)
+
+            self.slider_display_rect = write(
+                self.anchor,
+                self.slider_display,
+                v_fonts[self.font_size],
+                Colors.WHITE,
+                self.left_slider_rect.x + 16,
+                self.rect.y,
+            )[1]
+
         write(
             "topleft",
             self.content,
@@ -191,24 +268,23 @@ class Client(socket.socket):
             socket.AF_INET,
             socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
         )
-        self.target_server = ("127.0.0.1", 6969)
+        self.target_server = (SERVER_ADDRESS, SERVER_PORT)
         self.current_message = None
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
                 print(f"{Colors.ANSI_GREEN}Connected to the server!{Colors.ANSI_RESET}")
-            except ConnectionRefusedError:
+            except ConnectionRefusedError as err:
                 sys.exit(
-                    f"{Colors.ANSI_RED}Could not connect to the server!{Colors.ANSI_RESET}"
+                    f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}"
                 )
 
-    def req(self, *messages):
-        for message in messages:
-            if self.conn_type == "udp":
-                self.sendto(str(message).encode(), self.target_server)
+    def req(self, message):
+        if self.conn_type == "udp":
+            self.sendto(str(message).encode(), self.target_server)
 
-            if self.conn_type == "tcp":
-                self.send(str(message).encode())
+        if self.conn_type == "tcp":
+            self.send(str(message).encode())
 
     def req_res(self, *messages):
         for message in messages:
@@ -231,7 +307,6 @@ class Client(socket.socket):
             while True:
                 data, addr = self.recvfrom(2**12)
                 self.current_message = data.decode()
-                print(self.current_message)
 
         elif self.conn_type == "tcp":
             pass
@@ -241,6 +316,7 @@ def timgload3(*path, return_rect=False):
     tex = Texture.from_surface(
         display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
     )
+
     if return_rect:
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect
@@ -284,7 +360,7 @@ def load_map_from_csv(path_, int_=True):
 
 def write(
     anchor: str,
-    content: str,
+    content: str | int,
     font: pygame.Font,
     color: tuple,
     x: int,
