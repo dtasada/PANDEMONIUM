@@ -1,5 +1,6 @@
 import pygame
 import sys
+import json
 
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
@@ -125,19 +126,10 @@ class Player:
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
-        p2_arrow_rect = arrow_rect
         arrow_rect.center = self.rect.center
         display.renderer.blit(self.arrow_img, arrow_rect)
-        
-        if client_udp.current_message:
-            p2_arrow = Image(Texture.from_surface(display.renderer, self.arrow_surf))
-            info = list(client_udp.current_message.split(", "))
-            p2_arrow_rect.topleft = (float(info[0]), float(info[1]))
-            p2_arrow.angle = degrees(float(info[2]))
-            display.renderer.blit(p2_arrow, p2_arrow_rect)
-        
-            
-        # draw_rect(Colors.GREEN, self.rect)
+
+        draw_rect(Colors.GREEN, arrow_rect)
 
     def render_map(self):
         display.renderer.blit(game.map_tex, game.map_rect)
@@ -298,7 +290,9 @@ class Player:
             self.render_map()
     
     def send_location(self):
-        client_udp.req(f"{self.rect.x}, {self.rect.y}, {self.angle}")
+        data = {"x": self.rect.x, "y": self.rect.y, "angle": self.angle}
+        data = json.dumps(data)
+        client_udp.req(data)
 
     def update(self):
         self.rays = []
@@ -425,6 +419,17 @@ def render_floor():
         ),
     )
 
+    
+def draw_other_player_map():
+    if client_udp.current_message:
+        info = json.loads(client_udp.current_message)
+        arrow_rect = pygame.Rect(info["x"] - 4, info["y"] - 4, 16, 16)
+        arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "arrow.png"))))
+        arrow.angle = degrees(info["angle"])
+        draw_rect(Colors.GREEN, arrow_rect)
+
+        display.renderer.blit(arrow, arrow_rect)
+
 
 def main(multiplayer):
     global client_udp, client_tcp
@@ -500,6 +505,8 @@ def main(multiplayer):
 
             if game.should_render_map:
                 player.draw()
+                if multiplayer:
+                    draw_other_player_map()
 
         if game.state == States.SETTINGS:
             if game.previous_state == States.MAIN_MENU:

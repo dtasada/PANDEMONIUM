@@ -274,8 +274,8 @@ def load_map_from_csv(path_):
     with open(path_, "r") as f:
         reader = csv.reader(f)
         return [[int(x) for x in line] for line in reader]
-
-
+    
+    
 def write(
     anchor: str,
     content: str,
