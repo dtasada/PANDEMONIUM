@@ -133,8 +133,18 @@ class Player:
     def draw(self):
         self.arrow_img.angle = degrees(self.angle)
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
+        p2_arrow_rect = arrow_rect
         arrow_rect.center = self.rect.center
         display.renderer.blit(self.arrow_img, arrow_rect)
+        
+        if client_udp.current_message:
+            p2_arrow = Image(Texture.from_surface(display.renderer, self.arrow_surf))
+            info = list(client_udp.current_message.split(", "))
+            p2_arrow_rect.topleft = (float(info[0]), float(info[1]))
+            p2_arrow.angle = degrees(float(info[2]))
+            display.renderer.blit(p2_arrow, p2_arrow_rect)
+        
+            
         # draw_rect(Colors.GREEN, self.rect)
 
     def render_map(self):
@@ -145,7 +155,7 @@ class Player:
                 draw_line(
                     Colors.WHITE,
                     (game.tile_size, (y + 1) * self.tile_size),
-                    ((game.map_width + 1) * game.tile_size, (y + 1) * self.tile_size),
+                    ((game.map_width + 1) *game.tile_size, (y + 1) * self.tile_size),
                 )
             for x in range(game.map_width):
                 draw_line(
@@ -294,6 +304,9 @@ class Player:
             )
 
             self.render_map()
+    
+    def send_location(self):
+        client_udp.req(f"{self.rect.x}, {self.rect.y}, {self.angle}")
 
     def update(self):
         self.rays = []
@@ -485,6 +498,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state == States.PLAY:
+            if multiplayer:
+                player.send_location()
+
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.bob),

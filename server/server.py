@@ -75,7 +75,6 @@ def receive_tcp(client, client_addr):
 # UDP
 Thread(target=receive_udp).start()
 
-
 while True:
     # TCP
     try:
@@ -85,6 +84,7 @@ while True:
 
     except ConnectionAbortedError:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
+        break
     except KeyboardInterrupt:
         break
 
