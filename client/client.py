@@ -121,7 +121,7 @@ class Player:
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
         self.arrow_img.color = (0, 0, 200, 255)
-
+        self.weapons = {}
         self.wall_textures = [
             (
                 Texture.from_surface(
@@ -152,7 +152,19 @@ class Player:
             )
             for file_name in [None, "ak"]
         ]
+        self.mask_object_textures = []
+        for file_name in [None, "ak"]:
+            if file_name is None:
+                tex = None
+            else:
+                surf = pygame.mask.from_surface(pygame.image.load(Path("client", "assets", "images", file_name + ".png"))).to_surface(setcolor=Colors.WHITE)
+                surf.set_colorkey(Colors.BLACK)
+                tex = Texture.from_surface(display.renderer, surf)
+            self.mask_object_textures.append(tex)
         self.bob = 0
+        self.to_equip = None
+        # weapon
+        self.weapon_tex = self.weapon_rect = None
 
     @property
     def health(self):
@@ -166,8 +178,11 @@ class Player:
         display.renderer.blit(self.arrow_img, pygame.Rect(arrow_rect.x + game.mo, arrow_rect.y + game.mo, *arrow_rect.size))
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
-            cost = weapon_costs[self.to_equip]
+            coord, obj = self.to_equip
+            cost = weapon_costs[obj[0]]
             write("midbottom", f"Press <e> to buy for ${cost}", v_fonts[52], Colors.WHITE, display.width / 2, display.height - 50)
+        if self.weapon_tex is not None:
+            display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
     def render_map(self):
         display.renderer.blit(game.map_tex, game.map_rect)
@@ -186,9 +201,11 @@ class Player:
                 )
 
     def keys(self):
+        # keyboard
         self.to_equip = None
         self.surround = []
         if game.state == States.PLAY:
+            # keyboard
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
@@ -205,6 +222,34 @@ class Player:
                 self.angle -= amult
             if keys[pygame.K_RIGHT]:
                 self.angle += amult
+
+
+            # joystick
+            if joystick is not None:
+                # movement
+                thr = 0.06
+                ax0 = joystick.get_axis(0)
+                ax1 = joystick.get_axis(1)
+                if abs(ax0) <= thr:
+                    ax0 = 0
+                if abs(ax1) <= thr:
+                    ax1 = 0
+                theta = pi2pi(player.angle) + 0.5 * pi
+                ax0p = ax0 * cos(theta) - ax1 * sin(theta)
+                ax1p = ax0 * sin(theta) + ax1 * cos(theta)
+                thr = 0.06
+                xvel, yvel = ax0p * vmult, ax1p * vmult
+                # rotation
+                m = game.sens * 60
+                ax2 = joystick.get_axis(2)
+                ax3 = joystick.get_axis(3)
+                if abs(ax2) <= thr:
+                    ax2 = 0
+                if abs(ax3) <= thr:
+                    ax3 = 0
+                rot_xvel = ax2 * m
+                # rot_yvel = ax3 * m
+                self.angle += rot_xvel
 
             # x-col
             self.rect.x += xvel
@@ -343,7 +388,7 @@ class Player:
                     high = (cur_x, cur_y) in self.surround
                     if high:
                         lookup = self.highlighted_object_textures
-                        self.to_equip = obj[0]
+                        self.to_equip = ((cur_x, cur_y), obj)
                     else:
                         lookup = self.object_textures
                     tex = lookup[int(obj[0])]
@@ -358,6 +403,12 @@ class Player:
         data = {"x": self.rect.x, "y": self.rect.y, "angle": self.angle}
         data = json.dumps(data)
         client_udp.req(data)
+
+    def set_weapon(self, weapon):
+        weapon = int(weapon)
+        self.weapon_tex = self.mask_object_textures[weapon]
+        self.weapon_rect = self.weapon_tex.get_rect(bottomright=(display.width - 140, display.height - 10)).scale_by(4)
+        self.weapons[weapon] = 100
 
     def update(self):
         self.rays = []
@@ -376,6 +427,7 @@ game = Game()
 player = Player()
 hud = HUD()
 clock = pygame.time.Clock()
+joystick = None
 
 crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
@@ -497,7 +549,7 @@ def draw_other_players_map():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for location in message.values():
-            arrow_rect = pygame.Rect(location["x"] + game.mo - 4, location["y"] + game.mo - 4, 16, 16)
+            arrow_rect = pygame.Rect(location["x"] + game.mo, location["y"] + game.mo, 16, 16)
             arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "player_arrow.png"))))
             arrow.angle = degrees(location["angle"])
             draw_rect(Colors.GREEN, arrow_rect)
@@ -505,7 +557,7 @@ def draw_other_players_map():
 
 
 def main(multiplayer):
-    global client_udp, client_tcp
+    global client_udp, client_tcp, joystick
 
     if multiplayer:
         client_udp = Client("udp")
@@ -559,6 +611,17 @@ def main(multiplayer):
                                     game.set_state(States.PLAY)
                                 case States.PLAY:
                                     game.set_state(States.SETTINGS)
+
+                        case pygame.K_e:
+                            if player.to_equip is not None:
+                                (x, y), obj = player.to_equip
+                                x, y = int(x), int(y)
+                                game.object_map[y][x] = "0"
+                                weapon = obj[0]
+                                player.set_weapon(weapon)
+
+                case pygame.JOYDEVICEADDED:
+                    joystick = pygame.joystick.Joystick(event.device_index)
 
         display.renderer.clear()
 

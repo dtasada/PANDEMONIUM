@@ -9,6 +9,8 @@ import csv
 import pygame
 import socket
 import sys
+from pprint import pprint
+
 
 SERVER_ADDRESS, SERVER_PORT = (
     socket.gethostbyname(
@@ -190,7 +192,8 @@ class Button:
                         if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
                             self.action(self.action_arg)
                     else:
-                        self.action()
+                        if self.rect.collidepoint(pygame.mouse.get_pos()):
+                            self.action()
 
     def update(self):
         if (
@@ -405,6 +408,10 @@ def borderize(img, color, thickness=1):
         surf.blit(mask_surf, pos)
     surf.blit(img, (thickness, thickness))
     return surf
+
+
+def pi2pi(angle):
+    return atan2(sin(angle), cos(angle))
 
 
 cursor = Cursor()
