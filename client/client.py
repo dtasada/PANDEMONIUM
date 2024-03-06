@@ -103,7 +103,7 @@ class Game:
 
     def get_sens(self):
         return self.sens
-    
+
     def set_sens(self, amount):
         self.sens += amount
 
@@ -492,7 +492,7 @@ def render_floor():
         ),
     )
 
-    
+
 def draw_other_players_map():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
