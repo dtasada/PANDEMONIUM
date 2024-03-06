@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import socket
+import json
 from threading import Thread
 
 
@@ -36,21 +37,21 @@ except Exception as err:
         f"{Colors.ANSI_RED}TCP server failed to initialize: {Colors.ANSI_RESET}{err}"
     )
 
-addresses = []
-
+addresses = {}
 
 def receive_udp():
     while True:
         data, addr = server_udp.recvfrom(2**12)
+        if data.decode() != "quit":
+            addresses[str(addr)] = json.loads(data)
 
-        if addr not in addresses:
-            addresses.append(addr)
-
-        message = data.decode()
-        for address in addresses:
-            if address == addr:
-                continue
-            server_udp.sendto(message.encode(), address)
+            for address in addresses:
+                response = json.dumps({k: v for k, v in addresses.items() if k != address})
+                server_udp.sendto(response.encode(), eval(address))
+        else:
+            print(addresses)
+            del addresses[str(addr)]
+            print(addresses)
 
 
 def receive_tcp(client, client_addr):
@@ -67,9 +68,9 @@ def receive_tcp(client, client_addr):
         print(
             f"{Colors.ANSI_RED}Could not handle client {client_addr}:{Colors.ANSI_RESET} {err}"
         )
-    finally:
-        client.close()
-        print(f"Closed connection with {client_addr}")
+
+    client.close()
+    print(f"Closed connection with {client_addr}")
 
 
 # UDP
@@ -78,7 +79,7 @@ Thread(target=receive_udp).start()
 while True:
     # TCP
     try:
-        client, client_addr = server_tcp.accept()  # This is blocking
+        client, client_addr = server_tcp.accept() 
         print(f"New connection from {client_addr}")
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 
