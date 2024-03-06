@@ -92,12 +92,18 @@ class Game:
         else:
             cursor.enable()
 
+    def get_fov(self):
+        return self.fov
+
     def set_fov(self, amount):
         self.fov += amount
 
         if self.fov > 120: self.fov = 120
         if self.fov < 30: self.fov = 30
 
+    def get_sens(self):
+        return self.sens
+    
     def set_sens(self, amount):
         self.sens += amount
 
@@ -408,16 +414,18 @@ button_lists = {
             display.height / 2 + 48 * 0,
             "Field of view",
             game.set_fov,
+            action_arg=10,
             is_slider=True,
-            slider_display=game.fov
+            slider_display=game.get_fov
         ),
         Button(
             80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
             game.set_sens,
+            action_arg=0.0001,
             is_slider=True,
-            slider_display=game.sens
+            slider_display=game.get_sens
         ),
         Button(
             80,
@@ -484,16 +492,16 @@ def render_floor():
         ),
     )
 
-
-def draw_other_player_map():
+    
+def draw_other_players_map():
     if client_udp.current_message:
-        info = json.loads(client_udp.current_message)
-        arrow_rect = pygame.Rect(info["x"] - 4, info["y"] - 4, 16, 16)
-        arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "arrow.png"))))
-        arrow.angle = degrees(info["angle"])
-        draw_rect(Colors.GREEN, arrow_rect)
-
-        display.renderer.blit(arrow, arrow_rect)
+        message = json.loads(client_udp.current_message)
+        for location in message.values():
+            arrow_rect = pygame.Rect(location["x"] + game.mo - 4, location["y"] + game.mo - 4, 16, 16)
+            arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "player_arrow.png"))))
+            arrow.angle = degrees(location["angle"])
+            draw_rect(Colors.GREEN, arrow_rect)
+            display.renderer.blit(arrow, arrow_rect)
 
 
 def main(multiplayer):
@@ -513,6 +521,8 @@ def main(multiplayer):
                     button.process_event(event)
             match event.type:
                 case pygame.QUIT:
+                    if multiplayer:
+                        client_udp.req("quit")
                     game.running = False
 
                 case pygame.MOUSEMOTION:
@@ -557,6 +567,9 @@ def main(multiplayer):
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
 
         if game.state != States.MAIN_MENU:
+            if multiplayer:
+                player.send_location()
+
             if game.state == States.PLAY or (game.state == States.SETTINGS and game.previous_state == States.PLAY):
                 fill_rect(
                     Colors.DARK_GRAY,
@@ -569,6 +582,8 @@ def main(multiplayer):
                 player.update()
                 if game.should_render_map:
                     player.draw()
+                    if multiplayer:
+                        draw_other_players_map()
             display.renderer.blit(crosshair_tex, crosshair_rect)
 
         if game.state == States.SETTINGS:

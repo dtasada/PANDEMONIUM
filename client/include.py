@@ -99,6 +99,7 @@ class Button:
         y,
         content,
         action,
+        action_arg=None,
         width=None,
         height=None,
         font_size=32,
@@ -112,6 +113,7 @@ class Button:
         self.color = self.initial_color = color
         self.font_size = font_size
         self.action = action
+        self.action_arg = action_arg
         self.should_background = should_background
         self.anchor = anchor
         self.is_slider = is_slider
@@ -161,7 +163,7 @@ class Button:
 
             self.slider_display_rect = write(
                 self.anchor,
-                self.slider_display,
+                self.slider_display(),
                 v_fonts[self.font_size],
                 Colors.WHITE,
                 self.left_slider_rect.x + 16,
@@ -184,9 +186,9 @@ class Button:
                 if event.button == 1:
                     if self.is_slider:
                         if self.left_slider_rect.collidepoint(pygame.mouse.get_pos()):
-                            self.action(-10)
+                            self.action(-self.action_arg)
                         if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
-                            self.action(10)
+                            self.action(self.action_arg)
                     else:
                         self.action()
 
@@ -205,7 +207,7 @@ class Button:
 
             self.slider_display_rect = write(
                 self.anchor,
-                self.slider_display,
+                self.slider_display(),
                 v_fonts[self.font_size],
                 Colors.WHITE,
                 self.left_slider_rect.x + 16,
