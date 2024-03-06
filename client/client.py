@@ -89,12 +89,18 @@ class Game:
         else:
             cursor.enable()
 
+    def get_fov(self):
+        return self.fov
+
     def set_fov(self, amount):
         self.fov += amount
 
         if self.fov > 120: self.fov = 120
         if self.fov < 30: self.fov = 30
 
+    def get_sens(self):
+        return self.sens
+    
     def set_sens(self, amount):
         self.sens += amount
 
@@ -361,16 +367,18 @@ button_lists = {
             display.height / 2 + 48 * 0,
             "Field of view",
             game.set_fov,
+            action_arg=10,
             is_slider=True,
-            slider_display=game.fov
+            slider_display=game.get_fov
         ),
         Button(
             80,
             display.height / 2 + 48 * 1,
             "Sensitivity",
             game.set_sens,
+            action_arg=0.0001,
             is_slider=True,
-            slider_display=game.sens
+            slider_display=game.get_sens
         ),
         Button(
             80,
