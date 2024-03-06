@@ -161,7 +161,7 @@ class Player:
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
             cost = weapon_costs[self.to_equip]
-            write("midbottom", f"Press <e> to buy for {cost}", v_fonts[52], Colors.WHITE, display.width / 2, display.height - 50)
+            write("midbottom", f"Press <e> to buy for ${cost}", v_fonts[52], Colors.WHITE, display.width / 2, display.height - 50)
 
     def render_map(self):
         display.renderer.blit(game.map_tex, game.map_rect)
@@ -292,7 +292,7 @@ class Player:
             # init vars for walls
             dist *= ray_mult
             dist_px = dist * game.tile_size
-            ww = display.width / game.num_rays
+            ww = display.width / game.ray_density
             wh = display.height * game.tile_size / dist_px * 1.7
             wx = index * ww
             wy = display.height / 2 - wh / 2 + self.bob
@@ -334,7 +334,8 @@ class Player:
             # check whether the wall weapon is in the correct orientation
             if len(obj) > 1:
                 if int(obj[1]) == orien:
-                    if (cur_x, cur_y) in self.surround:
+                    high = (cur_x, cur_y) in self.surround
+                    if high:
                         lookup = self.highlighted_object_textures
                         self.to_equip = obj[0]
                     else:
@@ -343,7 +344,7 @@ class Player:
                     display.renderer.blit(
                         tex,
                         pygame.Rect(wx, wy, ww, wh),
-                        pygame.Rect(axo, 0, 1, tex.height),
+                        pygame.Rect(axo + high, 0, 1, tex.height),
                     )
             self.render_map()
 
