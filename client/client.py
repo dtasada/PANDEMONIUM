@@ -140,6 +140,8 @@ class Player:
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
         self.arrow_img.color = (0, 0, 200, 255)
+        self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
+        self.arrow_rect.center = self.rect.center
         self.weapons = {}
         self.wall_textures = [
             (
@@ -205,7 +207,10 @@ class Player:
         return 100
 
     def draw(self):
+        self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
+        self.arrow_rect.center = self.rect.center
         self.arrow_img.angle = degrees(self.angle)
+# <<<<<<< HEAD
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         arrow_rect.center = self.rect.center
         display.renderer.blit(
@@ -214,6 +219,9 @@ class Player:
                 arrow_rect.x + game.mo, arrow_rect.y + game.mo, *arrow_rect.size
             ),
         )
+# =======
+#         display.renderer.blit(self.arrow_img, pygame.Rect(self.arrow_rect.x + game.mo, self.arrow_rect.y + game.mo, *self.arrow_rect.size))
+# >>>>>>> 609d135348a6d85ca360b9d64ee5b43c70cd2591
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
             coord, obj = self.to_equip
@@ -445,7 +453,7 @@ class Player:
             self.render_map()
 
     def send_location(self):
-        data = {"x": self.rect.x, "y": self.rect.y, "angle": self.angle}
+        data = {"x": self.arrow_rect.x + game.mo, "y": self.arrow_rect.y + game.mo, "angle": self.angle}
         data = json.dumps(data)
         client_udp.req(data)
 
@@ -468,10 +476,43 @@ class Player:
             p2 = (ray[1][0] + game.mo, ray[1][1] + game.mo)
             draw_line(Colors.GREEN, p1, p2)
 
+class EnemyPlayer:
+    def __init__(self, id_):
+        self.id_ = id_
+        self.x = game.tile_size * 8
+        self.y = game.tile_size * 8
+        self.w = 8
+        self.h = 8
+        self.angle = -1.5708
+        self.arrow_surf = pygame.image.load(
+            Path("client", "assets", "images", "player_arrow.png")
+        )
+        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
+        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
+
+    def draw(self):
+        arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
+        arrow = self.arrow_img
+        arrow.angle = degrees(self.angle)
+        draw_rect(Colors.GREEN, arrow_rect)
+        display.renderer.blit(arrow, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
+
+    def update(self):
+        if client_udp.current_message:
+            if self.id_ not in client_udp.current_message:
+                enemy_players.remove(self)
+                return
+            message = json.loads(client_udp.current_message)
+            self.rect.x = message[self.id_]["x"]
+            self.rect.y = message[self.id_]["y"]
+            self.angle = message[self.id_]["angle"]
+        self.draw()
+
 
 cursor.enable()
 game = Game()
 player = Player()
+enemy_players = []
 hud = HUD()
 clock = pygame.time.Clock()
 joystick = None
@@ -585,6 +626,14 @@ floor_tex = Texture.from_surface(
 )
 
 
+def check_new_players():
+    if client_udp.current_message:
+        message = json.loads(client_udp.current_message)
+        for addr in message:
+            if EnemyPlayer(addr) not in enemy_players:
+                enemy_players.append(EnemyPlayer(addr))
+
+
 def render_floor():
     # y = int(display.height / 2)
     # x = 0
@@ -614,28 +663,8 @@ def render_floor():
     )
 
 
-def draw_other_players_map():
-    if client_udp.current_message:
-        message = json.loads(client_udp.current_message)
-        for location in message.values():
-            arrow_rect = pygame.Rect(
-                location["x"] + game.mo, location["y"] + game.mo, 16, 16
-            )
-            arrow = Image(
-                Texture.from_surface(
-                    display.renderer,
-                    pygame.image.load(
-                        Path("client", "assets", "images", "player_arrow.png")
-                    ),
-                )
-            )
-            arrow.angle = degrees(location["angle"])
-            draw_rect(Colors.GREEN, arrow_rect)
-            display.renderer.blit(arrow, arrow_rect)
-
-
 def main(multiplayer):
-    global client_udp, client_tcp, joystick
+    global client_udp, client_tcp
 
     if multiplayer:
         client_udp = Client("udp")
@@ -650,9 +679,11 @@ def main(multiplayer):
                 button.process_event(event)
             match event.type:
                 case pygame.QUIT:
+                    game.running = False
                     if multiplayer:
                         client_udp.req("quit")
-                    game.running = False
+                        pygame.quit()
+                        sys.exit()
 
                 case pygame.MOUSEMOTION:
                     if cursor.should_wrap:
@@ -728,7 +759,10 @@ def main(multiplayer):
                 if game.should_render_map:
                     player.draw()
                     if multiplayer:
-                        draw_other_players_map()
+                        check_new_players()
+                        for enemy in enemy_players:
+                            enemy.update()
+            display.renderer.blit(crosshair_tex, crosshair_rect)
 
                 display.renderer.blit(redden_game.tex, redden_game.rect)
 

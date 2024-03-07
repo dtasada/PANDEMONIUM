@@ -37,9 +37,8 @@ except Exception as err:
         f"{Colors.ANSI_RED}TCP server failed to initialize: {Colors.ANSI_RESET}{err}"
     )
 
+
 addresses = {}
-
-
 def receive_udp():
     while True:
         data, addr = server_udp.recvfrom(2**12)
@@ -52,9 +51,7 @@ def receive_udp():
                 )
                 server_udp.sendto(response.encode(), eval(address))
         else:
-            print(addresses)
             del addresses[str(addr)]
-            print(addresses)
 
 
 def receive_tcp(client, client_addr):
