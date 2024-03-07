@@ -16,7 +16,7 @@ class Game:
         self.running = True
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
-        self.sens = 0.0005
+        self.sens = 50
         self.fov = 60
         self.ray_density = 320
         # map
@@ -84,8 +84,8 @@ class Game:
         self.previous_state = self.state
         self.state = state
 
-        global buttons
-        buttons = button_lists[self.state]
+        global current_buttons
+        current_buttons = all_buttons[self.state]
 
         if state == States.PLAY:
             cursor.disable()
@@ -389,7 +389,7 @@ title = Button(
     anchor="center",
 )
 
-button_lists = {
+all_buttons = {
     States.MAIN_MENU: [
         title,
         Button(
@@ -423,7 +423,7 @@ button_lists = {
             display.height / 2 + 48 * 1,
             "Sensitivity",
             game.set_sens,
-            action_arg=0.0001,
+            action_arg=10,
             is_slider=True,
             slider_display=game.get_sens
         ),
@@ -444,7 +444,7 @@ button_lists = {
     States.PLAY: [],
 }
 
-buttons = button_lists[States.MAIN_MENU]
+current_buttons = all_buttons[States.MAIN_MENU]
 
 
 class DarkenGame:
@@ -516,9 +516,8 @@ def main(multiplayer):
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
-            for button_list in button_lists.values():
-                for button in button_list:
-                    button.process_event(event)
+            for button in current_buttons:
+                button.process_event(event)
             match event.type:
                 case pygame.QUIT:
                     if multiplayer:
@@ -537,7 +536,7 @@ def main(multiplayer):
                             elif xpos < 20:
                                 pygame.mouse.set_pos(display.width - 21, ypos)
                             else:
-                                player.angle += event.rel[0] * game.sens
+                                player.angle += event.rel[0] * game.sens / 100_000
                                 player.angle %= 2 * pi
 
                             # if/elif are for vertical mouse wrap
@@ -592,7 +591,7 @@ def main(multiplayer):
             else:
                 display.renderer.blit(darken_game.tex, darken_game.rect)
 
-        for button in buttons:
+        for button in current_buttons:
             button.update()
 
         if cursor.enabled:
