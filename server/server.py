@@ -39,6 +39,8 @@ except Exception as err:
 
 
 addresses = {}
+
+
 def receive_udp():
     while True:
         data, addr = server_udp.recvfrom(2**12)

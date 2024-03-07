@@ -210,18 +210,7 @@ class Player:
         self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         self.arrow_rect.center = self.rect.center
         self.arrow_img.angle = degrees(self.angle)
-# <<<<<<< HEAD
-        arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
-        arrow_rect.center = self.rect.center
-        display.renderer.blit(
-            self.arrow_img,
-            pygame.Rect(
-                arrow_rect.x + game.mo, arrow_rect.y + game.mo, *arrow_rect.size
-            ),
-        )
-# =======
-#         display.renderer.blit(self.arrow_img, pygame.Rect(self.arrow_rect.x + game.mo, self.arrow_rect.y + game.mo, *self.arrow_rect.size))
-# >>>>>>> 609d135348a6d85ca360b9d64ee5b43c70cd2591
+        display.renderer.blit(self.arrow_img, pygame.Rect(self.arrow_rect.x + game.mo, self.arrow_rect.y + game.mo, *self.arrow_rect.size))
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
             coord, obj = self.to_equip
@@ -762,9 +751,9 @@ def main(multiplayer):
                         check_new_players()
                         for enemy in enemy_players:
                             enemy.update()
-            display.renderer.blit(crosshair_tex, crosshair_rect)
 
-                display.renderer.blit(redden_game.tex, redden_game.rect)
+            display.renderer.blit(crosshair_tex, crosshair_rect)
+            display.renderer.blit(redden_game.tex, redden_game.rect)
 
             if game.state == States.PLAY:
                 display.renderer.blit(crosshair_tex, crosshair_rect)
