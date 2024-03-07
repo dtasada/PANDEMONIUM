@@ -46,7 +46,9 @@ def receive_udp():
             addresses[str(addr)] = json.loads(data)
 
             for address in addresses:
-                response = json.dumps({k: v for k, v in addresses.items() if k != address})
+                response = json.dumps(
+                    {k: v for k, v in addresses.items() if k != address}
+                )
                 server_udp.sendto(response.encode(), eval(address))
         else:
             del addresses[str(addr)]
@@ -77,7 +79,7 @@ Thread(target=receive_udp).start()
 while True:
     # TCP
     try:
-        client, client_addr = server_tcp.accept() 
+        client, client_addr = server_tcp.accept()
         print(f"New connection from {client_addr}")
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 

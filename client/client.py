@@ -16,7 +16,7 @@ class Game:
         self.running = True
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
-        self.sens = 0.0005
+        self.sens = 50
         self.fov = 60
         self.ray_density = 320
         # map
@@ -84,8 +84,8 @@ class Game:
         self.previous_state = self.state
         self.state = state
 
-        global buttons
-        buttons = button_lists[self.state]
+        global current_buttons
+        current_buttons = all_buttons[self.state]
 
         if state == States.PLAY:
             cursor.disable()
@@ -123,7 +123,7 @@ class Player:
         self.arrow_img.color = (0, 0, 200, 255)
         self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         self.arrow_rect.center = self.rect.center
-
+        self.weapons = {}
         self.wall_textures = [
             (
                 Texture.from_surface(
@@ -154,7 +154,19 @@ class Player:
             )
             for file_name in [None, "ak"]
         ]
+        self.mask_object_textures = []
+        for file_name in [None, "ak"]:
+            if file_name is None:
+                tex = None
+            else:
+                surf = pygame.mask.from_surface(pygame.image.load(Path("client", "assets", "images", file_name + ".png"))).to_surface(setcolor=Colors.WHITE)
+                surf.set_colorkey(Colors.BLACK)
+                tex = Texture.from_surface(display.renderer, surf)
+            self.mask_object_textures.append(tex)
         self.bob = 0
+        self.to_equip = None
+        # weapon
+        self.weapon_tex = self.weapon_rect = None
 
     @property
     def health(self):
@@ -168,8 +180,11 @@ class Player:
         display.renderer.blit(self.arrow_img, pygame.Rect(self.arrow_rect.x + game.mo, self.arrow_rect.y + game.mo, *self.arrow_rect.size))
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
-            cost = weapon_costs[self.to_equip]
+            coord, obj = self.to_equip
+            cost = weapon_costs[obj[0]]
             write("midbottom", f"Press <e> to buy for ${cost}", v_fonts[52], Colors.WHITE, display.width / 2, display.height - 50)
+        if self.weapon_tex is not None:
+            display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
     def render_map(self):
         display.renderer.blit(game.map_tex, game.map_rect)
@@ -188,9 +203,11 @@ class Player:
                 )
 
     def keys(self):
+        # keyboard
         self.to_equip = None
         self.surround = []
         if game.state == States.PLAY:
+            # keyboard
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
@@ -207,6 +224,34 @@ class Player:
                 self.angle -= amult
             if keys[pygame.K_RIGHT]:
                 self.angle += amult
+
+
+            # joystick
+            if joystick is not None:
+                # movement
+                thr = 0.06
+                ax0 = joystick.get_axis(0)
+                ax1 = joystick.get_axis(1)
+                if abs(ax0) <= thr:
+                    ax0 = 0
+                if abs(ax1) <= thr:
+                    ax1 = 0
+                theta = pi2pi(player.angle) + 0.5 * pi
+                ax0p = ax0 * cos(theta) - ax1 * sin(theta)
+                ax1p = ax0 * sin(theta) + ax1 * cos(theta)
+                thr = 0.06
+                xvel, yvel = ax0p * vmult, ax1p * vmult
+                # rotation
+                m = game.sens * 60
+                ax2 = joystick.get_axis(2)
+                ax3 = joystick.get_axis(3)
+                if abs(ax2) <= thr:
+                    ax2 = 0
+                if abs(ax3) <= thr:
+                    ax3 = 0
+                rot_xvel = ax2 * m
+                # rot_yvel = ax3 * m
+                self.angle += rot_xvel
 
             # x-col
             self.rect.x += xvel
@@ -345,7 +390,7 @@ class Player:
                     high = (cur_x, cur_y) in self.surround
                     if high:
                         lookup = self.highlighted_object_textures
-                        self.to_equip = obj[0]
+                        self.to_equip = ((cur_x, cur_y), obj)
                     else:
                         lookup = self.object_textures
                     tex = lookup[int(obj[0])]
@@ -360,6 +405,12 @@ class Player:
         data = {"x": self.arrow_rect.x + game.mo, "y": self.arrow_rect.y + game.mo, "angle": self.angle}
         data = json.dumps(data)
         client_udp.req(data)
+
+    def set_weapon(self, weapon):
+        weapon = int(weapon)
+        self.weapon_tex = self.mask_object_textures[weapon]
+        self.weapon_rect = self.weapon_tex.get_rect(bottomright=(display.width - 140, display.height - 10)).scale_by(4)
+        self.weapons[weapon] = 100
 
     def update(self):
         self.rays = []
@@ -411,6 +462,7 @@ player = Player()
 enemy_players = []
 hud = HUD()
 clock = pygame.time.Clock()
+joystick = None
 
 crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
@@ -424,7 +476,7 @@ title = Button(
     anchor="center",
 )
 
-button_lists = {
+all_buttons = {
     States.MAIN_MENU: [
         title,
         Button(
@@ -458,7 +510,7 @@ button_lists = {
             display.height / 2 + 48 * 1,
             "Sensitivity",
             game.set_sens,
-            action_arg=0.0001,
+            action_arg=10,
             is_slider=True,
             slider_display=game.get_sens
         ),
@@ -479,7 +531,7 @@ button_lists = {
     States.PLAY: [],
 }
 
-buttons = button_lists[States.MAIN_MENU]
+current_buttons = all_buttons[States.MAIN_MENU]
 
 
 class DarkenGame:
@@ -536,9 +588,20 @@ def render_floor():
     )
 
 
+def draw_other_players_map():
+    if client_udp.current_message:
+        message = json.loads(client_udp.current_message)
+        for location in message.values():
+            arrow_rect = pygame.Rect(location["x"] + game.mo - 4, location["y"] + game.mo - 4, 16, 16)
+            arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "player_arrow.png"))))
+            arrow.angle = degrees(location["angle"])
+            draw_rect(Colors.GREEN, arrow_rect)
+            display.renderer.blit(arrow, arrow_rect)
+
+
 def main(multiplayer):
     global client_udp, client_tcp
- 
+
     if multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
@@ -548,9 +611,8 @@ def main(multiplayer):
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
-            for button_list in button_lists.values():
-                for button in button_list:
-                    button.process_event(event)
+            for button in current_buttons:
+                button.process_event(event)
             match event.type:
                 case pygame.QUIT:
                     game.running = False
@@ -571,7 +633,7 @@ def main(multiplayer):
                             elif xpos < 20:
                                 pygame.mouse.set_pos(display.width - 21, ypos)
                             else:
-                                player.angle += event.rel[0] * game.sens
+                                player.angle += event.rel[0] * game.sens / 100_000
                                 player.angle %= 2 * pi
 
                             # if/elif are for vertical mouse wrap
@@ -593,6 +655,17 @@ def main(multiplayer):
                                     game.set_state(States.PLAY)
                                 case States.PLAY:
                                     game.set_state(States.SETTINGS)
+
+                        case pygame.K_e:
+                            if player.to_equip is not None:
+                                (x, y), obj = player.to_equip
+                                x, y = int(x), int(y)
+                                game.object_map[y][x] = "0"
+                                weapon = obj[0]
+                                player.set_weapon(weapon)
+
+                case pygame.JOYDEVICEADDED:
+                    joystick = pygame.joystick.Joystick(event.device_index)
 
         display.renderer.clear()
 
@@ -628,7 +701,7 @@ def main(multiplayer):
             else:
                 display.renderer.blit(darken_game.tex, darken_game.rect)
 
-        for button in buttons:
+        for button in current_buttons:
             button.update()
 
         if cursor.enabled:
