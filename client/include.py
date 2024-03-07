@@ -9,6 +9,8 @@ import csv
 import pygame
 import socket
 import sys
+from pprint import pprint
+
 
 SERVER_ADDRESS, SERVER_PORT = (
     socket.gethostbyname(
@@ -420,6 +422,10 @@ def borderize(img, color, thickness=1):
         surf.blit(mask_surf, pos)
     surf.blit(img, (thickness, thickness))
     return surf
+
+
+def pi2pi(angle):
+    return atan2(sin(angle), cos(angle))
 
 
 cursor = Cursor()
