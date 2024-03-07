@@ -11,7 +11,6 @@ import socket
 import sys
 from pprint import pprint
 
-
 SERVER_ADDRESS, SERVER_PORT = (
     socket.gethostbyname(
         socket.gethostname()
@@ -236,11 +235,13 @@ class Button:
 class HUD:
     def __init__(self):
         self.health_font_size = 64
-        self.health_tex_rect = None
-        self.ammo_tex_rect = None
+        self.health_tex = None
+        self.health_rect = None
+        self.ammo_tex = None
+        self.ammo_rect = None
 
-    def health(self, health, has_changed):
-        if has_changed or self.health_tex_rect is None:
+    def health(self, health, has_changed) -> tuple[Texture, pygame.Rect]:
+        if has_changed or self.health_tex is None:
             return write(
                 "bottomleft",
                 "HP: " + str(health),
@@ -249,9 +250,11 @@ class HUD:
                 16,
                 display.height - 4,
             )
+        else:
+            return self.health_tex, self.health_rect
 
     def ammo(self, ammo_count, has_changed):
-        if has_changed or self.ammo_tex_rect is None:
+        if has_changed or self.ammo_tex is None:
             return write(
                 "bottomright",
                 ammo_count,
@@ -260,12 +263,16 @@ class HUD:
                 display.width - 16,
                 display.height - 4,
             )
+        else:
+            return self.ammo_tex, self.ammo_rect
 
     def ammo_update(self, ammo_count, has_changed):
-        display.renderer.blit(*self.ammo(ammo_count, has_changed))
+        self.ammo_tex, self.ammo_rect = self.ammo(ammo_count, has_changed)
+        display.renderer.blit(self.ammo_tex, self.ammo_rect)
 
     def health_update(self, health, has_changed):
-        display.renderer.blit(*self.health(health, has_changed))
+        self.health_tex, self.health_rect = self.health(health, has_changed)
+        display.renderer.blit(self.health_tex, self.health_rect)
 
 
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
@@ -299,7 +306,7 @@ class Client(socket.socket):
         if self.conn_type == "tcp":
             self.send(str(message).encode())
 
-    def req_res(self, *messages):
+    def req_res(self, *messages) -> str:
         """
         send message to server and wait for response
         """
@@ -328,24 +335,14 @@ class Client(socket.socket):
             pass
 
 
-def timgload3(*path, return_rect=False):
+def timgload(*path, scale_factor=1) -> tuple[Texture, pygame.Rect]:
     tex = Texture.from_surface(
-        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
+        display.renderer,
+        pygame.transform.scale_by(pygame.image.load(Path(*path)), scale_factor),
     )
 
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-
-    return tex
-
-
-def timgload(*path, return_rect=False):
-    tex = Texture.from_surface(display.renderer, pygame.image.load(Path(*path)))
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-    return tex
+    rect = tex.get_rect()
+    return tex, rect
 
 
 def fill_rect(color, rect):
@@ -373,6 +370,9 @@ def load_map_from_csv(path_, int_=True):
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
+print(load_map_from_csv(Path("client", "assets", "map.csv")))
+
+
 def write(
     anchor: str,
     content: str | int,
@@ -385,7 +385,7 @@ def write(
     border=None,
     special_flags=0,
     tex=True,
-):
+) -> tuple[Texture, pygame.Rect]:
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
@@ -408,7 +408,7 @@ def write(
     return tex, rect
 
 
-def borderize(img, color, thickness=1):
+def borderize(img, color, thickness=1) -> pygame.Surface:
     mask = pygame.mask.from_surface(img)
     mask_surf = mask.to_surface(setcolor=color)
     mask_surf.set_colorkey(Colors.BLACK)

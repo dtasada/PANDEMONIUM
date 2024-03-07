@@ -161,7 +161,7 @@ class Player:
         ]
         self.object_textures = [
             (
-                timgload("client", "assets", "images", file_name + ".png")
+                timgload("client", "assets", "images", file_name + ".png")[0]
                 if file_name is not None
                 else None
             )
@@ -450,8 +450,8 @@ class Player:
         weapon = int(weapon)
         self.weapon_tex = self.mask_object_textures[weapon]
         self.weapon_rect = self.weapon_tex.get_rect(
-            bottomright=(display.width - 140, display.height - 10)
-        ).scale_by(4)
+            bottomright=hud.ammo_tex_rect[1].bottomleft
+        ).scale(self.weapon_tex.get_width(), hud.ammo_tex_rect[1].height)
         self.weapons[weapon] = 100
 
     def update(self):
@@ -506,7 +506,7 @@ hud = HUD()
 clock = pygame.time.Clock()
 joystick = None
 
-crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
+crosshair_tex = timgload("client", "assets", "images", "crosshair.png")[0]
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
 title = Button(
