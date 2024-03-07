@@ -18,10 +18,12 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-        self.ray_density = 320
+        self.ray_density, self.resolution = 1280, 5 # Don't change this pair
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
-        self.object_map = load_map_from_csv(Path("client", "assets", "object_map.csv"), int_=False)
+        self.object_map = load_map_from_csv(
+            Path("client", "assets", "object_map.csv"), int_=False
+        )
         self.tile_size = 16
         self.map_height = len(self.map)
         self.map_width = len(self.map[0])
@@ -86,11 +88,12 @@ class Game:
 
         global current_buttons
         current_buttons = all_buttons[self.state]
-
         if state == States.PLAY:
             cursor.disable()
         else:
             cursor.enable()
+
+        print(self.state)
 
     def get_fov(self):
         return self.fov
@@ -98,14 +101,30 @@ class Game:
     def set_fov(self, amount):
         self.fov += amount
 
-        if self.fov > 120: self.fov = 120
-        if self.fov < 30: self.fov = 30
+        if self.fov > 120:
+            self.fov = 120
+        if self.fov < 30:
+            self.fov = 30
 
     def get_sens(self):
         return self.sens
 
     def set_sens(self, amount):
         self.sens += amount
+
+    def get_res(self):
+        return self.resolution
+
+    def set_res(self, amount):
+        resolutions = [80, 160, 320, 640, 1280]
+        self.resolution += amount
+        if self.resolution > 5:
+            self.resolution = 5
+        elif self.resolution < 1:
+            self.resolution = 1
+
+        self.ray_density = resolutions[self.resolution - 1]
+
 
 class Player:
     def __init__(self):
@@ -126,7 +145,12 @@ class Player:
             (
                 Texture.from_surface(
                     display.renderer,
-                    pygame.transform.scale_by(pygame.image.load(Path("client", "assets", "images", file_name + ".png")), 0.25),
+                    pygame.transform.scale_by(
+                        pygame.image.load(
+                            Path("client", "assets", "images", file_name + ".png")
+                        ),
+                        0.25,
+                    ),
                 )
                 if file_name is not None
                 else None
@@ -145,7 +169,12 @@ class Player:
             (
                 Texture.from_surface(
                     display.renderer,
-                    borderize(pygame.image.load(Path("client", "assets", "images", file_name + ".png")), Colors.YELLOW)
+                    borderize(
+                        pygame.image.load(
+                            Path("client", "assets", "images", file_name + ".png")
+                        ),
+                        Colors.YELLOW,
+                    ),
                 )
                 if file_name is not None
                 else None
@@ -157,7 +186,11 @@ class Player:
             if file_name is None:
                 tex = None
             else:
-                surf = pygame.mask.from_surface(pygame.image.load(Path("client", "assets", "images", file_name + ".png"))).to_surface(setcolor=Colors.WHITE)
+                surf = pygame.mask.from_surface(
+                    pygame.image.load(
+                        Path("client", "assets", "images", file_name + ".png")
+                    )
+                ).to_surface(setcolor=Colors.WHITE)
                 surf.set_colorkey(Colors.BLACK)
                 tex = Texture.from_surface(display.renderer, surf)
             self.mask_object_textures.append(tex)
@@ -175,12 +208,24 @@ class Player:
         self.arrow_img.angle = degrees(self.angle)
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         arrow_rect.center = self.rect.center
-        display.renderer.blit(self.arrow_img, pygame.Rect(arrow_rect.x + game.mo, arrow_rect.y + game.mo, *arrow_rect.size))
+        display.renderer.blit(
+            self.arrow_img,
+            pygame.Rect(
+                arrow_rect.x + game.mo, arrow_rect.y + game.mo, *arrow_rect.size
+            ),
+        )
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
             coord, obj = self.to_equip
             cost = weapon_costs[obj[0]]
-            write("midbottom", f"Press <e> to buy for ${cost}", v_fonts[52], Colors.WHITE, display.width / 2, display.height - 50)
+            write(
+                "midbottom",
+                f"Press <e> to buy for ${cost}",
+                v_fonts[52],
+                Colors.WHITE,
+                display.width / 2,
+                display.height - 50,
+            )
         if self.weapon_tex is not None:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
@@ -191,7 +236,7 @@ class Player:
                 draw_line(
                     Colors.WHITE,
                     (game.tile_size, (y + 1) * self.tile_size),
-                    ((game.map_width + 1) *game.tile_size, (y + 1) * self.tile_size),
+                    ((game.map_width + 1) * game.tile_size, (y + 1) * self.tile_size),
                 )
             for x in range(game.map_width):
                 draw_line(
@@ -217,14 +262,14 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+
             amult = 0.03
             if keys[pygame.K_LEFT]:
                 self.angle -= amult
             if keys[pygame.K_RIGHT]:
                 self.angle += amult
 
-
-            # joystick
+            # joystick isn't actually a literal joystick, pygame input term for gamepad
             if joystick is not None:
                 # movement
                 thr = 0.06
@@ -407,7 +452,9 @@ class Player:
     def set_weapon(self, weapon):
         weapon = int(weapon)
         self.weapon_tex = self.mask_object_textures[weapon]
-        self.weapon_rect = self.weapon_tex.get_rect(bottomright=(display.width - 140, display.height - 10)).scale_by(4)
+        self.weapon_rect = self.weapon_tex.get_rect(
+            bottomright=(display.width - 140, display.height - 10)
+        ).scale_by(4)
         self.weapons[weapon] = 100
 
     def update(self):
@@ -441,6 +488,44 @@ title = Button(
     anchor="center",
 )
 
+main_settings_buttons = [
+    title,
+    Button(
+        80,
+        display.height / 2 + 48 * 0,
+        "Field of view",
+        game.set_fov,
+        action_arg=10,
+        is_slider=True,
+        slider_display=game.get_fov,
+    ),
+    Button(
+        80,
+        display.height / 2 + 48 * 1,
+        "Sensitivity",
+        game.set_sens,
+        action_arg=10,
+        is_slider=True,
+        slider_display=game.get_sens,
+    ),
+    Button(
+        80,
+        display.height / 2 + 48 * 2,
+        "Resolution",
+        game.set_res,
+        action_arg=1,
+        is_slider=True,
+        slider_display=game.get_res,
+    ),
+    Button(
+        80,
+        display.height / 2 + 48 * 3,
+        "Back",
+        lambda: game.set_state(game.previous_state),
+        font_size=48,
+    ),
+]
+
 all_buttons = {
     States.MAIN_MENU: [
         title,
@@ -456,59 +541,43 @@ all_buttons = {
             80,
             display.height / 2 + 48 * 1,
             "Settings",
-            lambda: game.set_state(States.SETTINGS),
+            lambda: game.set_state(States.MAIN_SETTINGS),
         ),
     ],
-    States.SETTINGS: [
-        title,
-        Button(
-            80,
-            display.height / 2 + 48 * 0,
-            "Field of view",
-            game.set_fov,
-            action_arg=10,
-            is_slider=True,
-            slider_display=game.get_fov
-        ),
-        Button(
-            80,
-            display.height / 2 + 48 * 1,
-            "Sensitivity",
-            game.set_sens,
-            action_arg=10,
-            is_slider=True,
-            slider_display=game.get_sens
-        ),
-        Button(
-            80,
-            display.height / 2 + 48 * 2,
-            "Resolution",
-            None,
-        ),
+    States.MAIN_SETTINGS: main_settings_buttons,
+    States.PLAY_SETTINGS: [
+        *main_settings_buttons[0:4],
         Button(
             80,
             display.height / 2 + 48 * 3,
+            "Return to main menu",
+            lambda: game.set_state(States.MAIN_MENU),
+        ),
+        Button(
+            80,
+            display.height / 2 + 48 * 4,
             "Back",
             lambda: game.set_state(game.previous_state),
             font_size=48,
         ),
     ],
-    States.PLAY: [],
+    States.PLAY: []
 }
 
-current_buttons = all_buttons[States.MAIN_MENU]
+game.set_state(States.MAIN_MENU)
 
 
-class DarkenGame:
-    def __init__(self):
+class Hue:
+    def __init__(self, color, alpha):
         self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
-        self.surf.fill(Colors.BLACK)
-        self.surf.set_alpha(80)
+        self.surf.fill(color)
+        self.surf.set_alpha(alpha)
         self.tex = Texture.from_surface(display.renderer, self.surf)
         self.rect = self.surf.get_rect()
 
 
-darken_game = DarkenGame()
+darken_game = Hue(Colors.BLACK, 80)
+redden_game = Hue(Colors.RED, 20)
 
 
 floor_tex = Texture.from_surface(
@@ -549,8 +618,17 @@ def draw_other_players_map():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for location in message.values():
-            arrow_rect = pygame.Rect(location["x"] + game.mo, location["y"] + game.mo, 16, 16)
-            arrow = Image(Texture.from_surface(display.renderer, pygame.image.load(Path("client", "assets", "images", "player_arrow.png"))))
+            arrow_rect = pygame.Rect(
+                location["x"] + game.mo, location["y"] + game.mo, 16, 16
+            )
+            arrow = Image(
+                Texture.from_surface(
+                    display.renderer,
+                    pygame.image.load(
+                        Path("client", "assets", "images", "player_arrow.png")
+                    ),
+                )
+            )
             arrow.angle = degrees(location["angle"])
             draw_rect(Colors.GREEN, arrow_rect)
             display.renderer.blit(arrow, arrow_rect)
@@ -606,10 +684,10 @@ def main(multiplayer):
                     match event.key:
                         case pygame.K_ESCAPE:
                             match game.state:
-                                case States.SETTINGS:
+                                case States.PLAY_SETTINGS:
                                     game.set_state(States.PLAY)
                                 case States.PLAY:
-                                    game.set_state(States.SETTINGS)
+                                    game.set_state(States.PLAY_SETTINGS)
 
                         case pygame.K_e:
                             if player.to_equip is not None:
@@ -627,32 +705,40 @@ def main(multiplayer):
         # blit
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
-
-        if game.state != States.MAIN_MENU:
+        else:
             if multiplayer:
                 player.send_location()
 
-            if game.state == States.PLAY or (game.state == States.SETTINGS and game.previous_state == States.PLAY):
+            if game.state in (States.PLAY, States.PLAY_SETTINGS):
                 fill_rect(
                     Colors.DARK_GRAY,
                     (0, 0, display.width, display.height / 2 + player.bob),
                 )
                 fill_rect(
                     Colors.BROWN,
-                    (0, display.height / 2 + player.bob, display.width, display.height / 2 - player.bob),
+                    (
+                        0,
+                        display.height / 2 + player.bob,
+                        display.width,
+                        display.height / 2 - player.bob,
+                    ),
                 )
+
                 player.update()
                 if game.should_render_map:
                     player.draw()
                     if multiplayer:
                         draw_other_players_map()
-            display.renderer.blit(crosshair_tex, crosshair_rect)
 
-        if game.state == States.SETTINGS:
-            if game.previous_state == States.MAIN_MENU:
-                fill_rect((0, 0, 0, 255), (0, 0, display.width, display.height))
-            else:
-                display.renderer.blit(darken_game.tex, darken_game.rect)
+                display.renderer.blit(redden_game.tex, redden_game.rect)
+
+            if game.state == States.PLAY:
+                display.renderer.blit(crosshair_tex, crosshair_rect)
+
+        if game.state == States.MAIN_SETTINGS:
+            fill_rect((0, 0, 0, 255), (0, 0, display.width, display.height))
+        elif game.state == States.PLAY_SETTINGS:
+            display.renderer.blit(darken_game.tex, darken_game.rect)
 
         for button in current_buttons:
             button.update()
@@ -660,7 +746,14 @@ def main(multiplayer):
         if cursor.enabled:
             cursor.update()
 
-        write("topright", str(int(clock.get_fps())), v_fonts[20], Colors.WHITE, display.width - 5, 5)
+        write(
+            "topright",
+            str(int(clock.get_fps())),
+            v_fonts[20],
+            Colors.WHITE,
+            display.width - 5,
+            5,
+        )
 
         display.renderer.present()
 

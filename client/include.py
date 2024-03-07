@@ -43,12 +43,9 @@ class Colors:
 
 class States(Enum):
     MAIN_MENU = 0
-    SETTINGS = 1
+    MAIN_SETTINGS = 1
     PLAY = 2
-
-
-class Signal(Enum):
-    DECREASE_HEALTH = 0
+    PLAY_SETTINGS = 3
 
 
 class Directions(Enum):
@@ -116,7 +113,7 @@ class Button:
         width=None,
         height=None,
         font_size=32,
-        color=Colors.LIGHT_GRAY,
+        color=Colors.WHITE,
         should_background=False,
         anchor="topleft",
         is_slider=False,
@@ -339,6 +336,7 @@ def timgload3(*path, return_rect=False):
     if return_rect:
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect
+
     return tex
 
 
