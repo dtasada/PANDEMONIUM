@@ -163,7 +163,7 @@ class Player:
         ]
         self.object_textures = [
             (
-                timgload("client", "assets", "images", file_name + ".png")
+                imgload("client", "assets", "images", file_name + ".png")
                 if file_name is not None
                 else None
             )
@@ -225,6 +225,9 @@ class Player:
                 display.width / 2,
                 display.height - 50,
             )
+            if joystick is not None:
+                joystick_button_rect.midbottom = (display.width / 2 - 115, display.height - 42)
+                display.renderer.blit(joystick_button_sprs[Joymap.SQUARE], joystick_button_rect)
         if self.weapon_tex is not None:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
@@ -243,6 +246,14 @@ class Player:
                     ((x + 1) * game.tile_size, game.tile_size),
                     ((x + 1) * game.tile_size, (game.map_height + 1) * game.tile_size),
                 )
+    
+    def try_to_buy_wall_weapon(self):
+        if self.to_equip is not None:
+            (x, y), obj = self.to_equip
+            x, y = int(x), int(y)
+            game.object_map[y][x] = "0"
+            weapon = obj[0]
+            self.set_weapon(weapon)
 
     def keys(self):
         # keyboard
@@ -282,11 +293,17 @@ class Player:
                 ax0p = ax0 * cos(theta) - ax1 * sin(theta)
                 ax1p = ax0 * sin(theta) + ax1 * cos(theta)
                 thr = 0.06
-                xvel, yvel = ax0p * vmult, ax1p * vmult
+                # sprint mechanics
+                if joystick.get_button(Joymap.LEFT_JOYSTICK_CLICK):
+                    sprint_m = 2
+                    ax0p *= sprint_m
+                    ax1p *= sprint_m
+                if ax0p != 0 or ax1p != 0:
+                    xvel, yvel = ax0p * vmult, ax1p * vmult
                 # rotation
-                m = game.sens * 60
-                ax2 = joystick.get_axis(2)
-                ax3 = joystick.get_axis(3)
+                m = 0.0008 * game.sens
+                ax2 = joystick.get_axis(Joymap.LEFT_JOYSTICK)
+                ax3 = joystick.get_axis(Joymap.RIGHT_JOYSTICK)
                 if abs(ax2) <= thr:
                     ax2 = 0
                 if abs(ax3) <= thr:
@@ -335,6 +352,11 @@ class Player:
                 o += game.fov / game.ray_density
                 self.cast_ray(o, index)
         _xvel, _yvel = angle_to_vel(self.angle)
+
+        # processing other important joystick input
+        if joystick is not None:
+            if joystick.get_button(Joymap.SQUARE):
+                self.try_to_buy_wall_weapon()
 
     def cast_ray(self, deg_offset, index, start_x=None, start_y=None):  # add comments here pls
         offset = radians(deg_offset)
@@ -513,7 +535,7 @@ hud = HUD()
 clock = pygame.time.Clock()
 joystick = None
 
-crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
+crosshair_tex = imgload("client", "assets", "images", "crosshair.png", scale=3)
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
 title = Button(
@@ -617,9 +639,9 @@ darken_game = Hue(Colors.BLACK, 80)
 redden_game = Hue(Colors.RED, 20)
 
 
-floor_tex = Texture.from_surface(
-    display.renderer, pygame.image.load(Path("client", "assets", "images", "floor.jpg"))
-)
+floor_tex = imgload("client", "assets", "images", "floor.jpg")
+joystick_button_sprs = imgload("client", "assets", "images", "buttons.png", scale=4, frames=4)
+joystick_button_rect = joystick_button_sprs[0].get_rect()
 
 
 def check_new_players():
@@ -643,7 +665,7 @@ def render_floor():
 
 
 def main(multiplayer):
-    global client_udp, client_tcp
+    global client_udp, client_tcp, joystick
 
     if multiplayer:
         client_udp = Client("udp")
@@ -706,17 +728,12 @@ def main(multiplayer):
                                     game.set_state(States.PLAY_SETTINGS)
 
                         case pygame.K_e:
-                            if player.to_equip is not None:
-                                (x, y), obj = player.to_equip
-                                x, y = int(x), int(y)
-                                game.object_map[y][x] = "0"
-                                weapon = obj[0]
-                                player.set_weapon(weapon)
+                            player.try_to_buy_wall_weapon()
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
 
-            for button_list in button_lists.values():
+            for button_list in all_buttons.values():
                 for button in button_list:
                     button.process_event(event)
 

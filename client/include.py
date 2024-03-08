@@ -59,6 +59,18 @@ class Directions(Enum):
     UP_LEFT = 7
 
 
+class Joymap:
+    LEFT_JOYSTICK = 2
+    RIGHT_JOYSTICK = 3
+    LEFT_TRIGGER = 4
+    RIGHT_TRIGGER = 5
+    CROSS = 0
+    CIRCLE = 1
+    SQUARE = 2
+    TRIANGLE = 3
+    LEFT_JOYSTICK_CLICK = 7
+
+
 v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
     for i in range(101)
@@ -328,24 +340,25 @@ class Client(socket.socket):
             pass
 
 
-def timgload3(*path, return_rect=False):
-    tex = Texture.from_surface(
-        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
-    )
-
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-
-    return tex
-
-
-def timgload(*path, return_rect=False):
-    tex = Texture.from_surface(display.renderer, pygame.image.load(Path(*path)))
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-    return tex
+def imgload(*path_, colorkey=None, frames=None, whitespace=0, frame_pause=0, end_frame=None, scale=1, to_tex=True):
+    if frames is None:
+        ret = pygame.image.load(Path(*path_))
+    else:
+        ret = []
+        img = pygame.image.load(Path(*path_))
+        frames = (frames, img.get_width() / frames)
+        for i in range(frames[0]):
+            ret.append(img.subsurface(i * frames[1], 0, frames[1] - whitespace, img.get_height()))
+        for i in range(frame_pause):
+            ret.append(ret[0])
+        if end_frame is not None:
+            ret.append(ret[end_frame])
+    if to_tex:
+        try:
+            return [Texture.from_surface(display.renderer, pygame.transform.scale_by(x, scale)) for x in ret]
+        except TypeError:
+            return Texture.from_surface(display.renderer, pygame.transform.scale_by(ret, scale))
+    return ret
 
 
 def fill_rect(color, rect):
