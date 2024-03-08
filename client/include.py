@@ -11,6 +11,7 @@ import socket
 import sys
 from pprint import pprint
 
+
 SERVER_ADDRESS, SERVER_PORT = (
     socket.gethostbyname(
         socket.gethostname()
@@ -42,20 +43,12 @@ class Colors:
 
 class States(Enum):
     MAIN_MENU = 0
-    MAIN_SETTINGS = 1
+    SETTINGS = 1
     PLAY = 2
-    PLAY_SETTINGS = 3
 
 
-class Directions(Enum):
-    UP = 0
-    UP_RIGHT = 1
-    RIGHT = 2
-    DOWN_RIGHT = 3
-    DOWN = 4
-    DOWN_LEFT = 5
-    LEFT = 6
-    UP_LEFT = 7
+class Signal(Enum):
+    DECREASE_HEALTH = 0
 
 
 v_fonts = [
@@ -112,7 +105,7 @@ class Button:
         width=None,
         height=None,
         font_size=32,
-        color=Colors.WHITE,
+        color=Colors.LIGHT_GRAY,
         should_background=False,
         anchor="topleft",
         is_slider=False,
@@ -179,6 +172,16 @@ class Button:
                 self.rect.y,
             )[1]
 
+            if self.slider_display_rect:
+                setattr(
+                    self.right_slider_rect,
+                    self.anchor,
+                    (
+                        self.slider_display_rect.right,
+                        self.rect.y + 8,
+                    ),
+                )
+
     def process_event(self, event):
         if self.action is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -188,8 +191,9 @@ class Button:
                             self.action(-self.action_arg)
                         if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
                             self.action(self.action_arg)
-                    elif self.rect.collidepoint(pygame.mouse.get_pos()):
-                        self.action()
+                    else:
+                        if self.rect.collidepoint(pygame.mouse.get_pos()):
+                            self.action()
 
     def update(self):
         if (
@@ -213,14 +217,6 @@ class Button:
                 self.rect.y,
             )[1]
 
-            setattr(
-                self.right_slider_rect,
-                self.anchor,
-                (
-                    self.slider_display_rect.right,
-                    self.rect.y + 8,
-                ),
-            )
         write(
             "topleft",
             self.content,
@@ -235,13 +231,11 @@ class Button:
 class HUD:
     def __init__(self):
         self.health_font_size = 64
-        self.health_tex = None
-        self.health_rect = None
-        self.ammo_tex = None
-        self.ammo_rect = None
+        self.health_tex_rect = None
+        self.ammo_tex_rect = None
 
-    def health(self, health, has_changed) -> tuple[Texture, pygame.Rect]:
-        if has_changed or self.health_tex is None:
+    def health(self, health, has_changed):
+        if has_changed or self.health_tex_rect is None:
             return write(
                 "bottomleft",
                 "HP: " + str(health),
@@ -250,11 +244,9 @@ class HUD:
                 16,
                 display.height - 4,
             )
-        else:
-            return self.health_tex, self.health_rect
 
     def ammo(self, ammo_count, has_changed):
-        if has_changed or self.ammo_tex is None:
+        if has_changed or self.ammo_tex_rect is None:
             return write(
                 "bottomright",
                 ammo_count,
@@ -263,16 +255,12 @@ class HUD:
                 display.width - 16,
                 display.height - 4,
             )
-        else:
-            return self.ammo_tex, self.ammo_rect
 
     def ammo_update(self, ammo_count, has_changed):
-        self.ammo_tex, self.ammo_rect = self.ammo(ammo_count, has_changed)
-        display.renderer.blit(self.ammo_tex, self.ammo_rect)
+        display.renderer.blit(*self.ammo(ammo_count, has_changed))
 
     def health_update(self, health, has_changed):
-        self.health_tex, self.health_rect = self.health(health, has_changed)
-        display.renderer.blit(self.health_tex, self.health_rect)
+        display.renderer.blit(*self.health(health, has_changed))
 
 
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
@@ -297,19 +285,13 @@ class Client(socket.socket):
                 )
 
     def req(self, message):
-        """
-        send message to server without waiting for response
-        """
         if self.conn_type == "udp":
             self.sendto(str(message).encode(), self.target_server)
 
         if self.conn_type == "tcp":
             self.send(str(message).encode())
 
-    def req_res(self, *messages) -> str:
-        """
-        send message to server and wait for response
-        """
+    def req_res(self, *messages):
         for message in messages:
             if self.conn_type == "udp":
                 self.sendto(str(message).encode(), self.target_server)
@@ -335,14 +317,25 @@ class Client(socket.socket):
             pass
 
 
-def timgload(*path, scale_factor=1) -> tuple[Texture, pygame.Rect]:
+def timgload3(*path, return_rect=False):
     tex = Texture.from_surface(
-        display.renderer,
-        pygame.transform.scale_by(pygame.image.load(Path(*path)), scale_factor),
+        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
     )
 
-    rect = tex.get_rect()
-    return tex, rect
+    if return_rect:
+        rect = tex.get_rect(topleft=return_rect)
+        return tex, rect
+    return tex
+
+
+def timgload(*path, return_rect=False):
+    tex = Texture.from_surface(
+        display.renderer, pygame.image.load(Path(*path))
+    )
+    if return_rect:
+        rect = tex.get_rect(topleft=return_rect)
+        return tex, rect
+    return tex
 
 
 def fill_rect(color, rect):
@@ -370,9 +363,6 @@ def load_map_from_csv(path_, int_=True):
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
-print(load_map_from_csv(Path("client", "assets", "map.csv")))
-
-
 def write(
     anchor: str,
     content: str | int,
@@ -385,7 +375,7 @@ def write(
     border=None,
     special_flags=0,
     tex=True,
-) -> tuple[Texture, pygame.Rect]:
+):
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
@@ -408,13 +398,11 @@ def write(
     return tex, rect
 
 
-def borderize(img, color, thickness=1) -> pygame.Surface:
+def borderize(img, color, thickness=1):
     mask = pygame.mask.from_surface(img)
     mask_surf = mask.to_surface(setcolor=color)
     mask_surf.set_colorkey(Colors.BLACK)
-    surf = pygame.Surface(
-        [s + thickness * 2 for s in mask_surf.get_size()], pygame.SRCALPHA
-    )
+    surf = pygame.Surface([s + thickness * 2 for s in mask_surf.get_size()], pygame.SRCALPHA)
     poss = [[c * thickness for c in p] for p in [[1, 0], [2, 1], [1, 2], [0, 1]]]
     for pos in poss:
         surf.blit(mask_surf, pos)
