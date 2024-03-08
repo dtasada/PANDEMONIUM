@@ -37,7 +37,9 @@ except Exception as err:
         f"{Colors.ANSI_RED}TCP server failed to initialize: {Colors.ANSI_RESET}{err}"
     )
 
+
 addresses = {}
+
 
 def receive_udp():
     while True:
@@ -46,12 +48,12 @@ def receive_udp():
             addresses[str(addr)] = json.loads(data)
 
             for address in addresses:
-                response = json.dumps({k: v for k, v in addresses.items() if k != address})
+                response = json.dumps(
+                    {k: v for k, v in addresses.items() if k != address}
+                )
                 server_udp.sendto(response.encode(), eval(address))
         else:
-            print(addresses)
             del addresses[str(addr)]
-            print(addresses)
 
 
 def receive_tcp(client, client_addr):
@@ -79,7 +81,7 @@ Thread(target=receive_udp).start()
 while True:
     # TCP
     try:
-        client, client_addr = server_tcp.accept() 
+        client, client_addr = server_tcp.accept()
         print(f"New connection from {client_addr}")
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 

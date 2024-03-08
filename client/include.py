@@ -43,12 +43,20 @@ class Colors:
 
 class States(Enum):
     MAIN_MENU = 0
-    SETTINGS = 1
+    MAIN_SETTINGS = 1
     PLAY = 2
+    PLAY_SETTINGS = 3
 
 
-class Signal(Enum):
-    DECREASE_HEALTH = 0
+class Directions(Enum):
+    UP = 0
+    UP_RIGHT = 1
+    RIGHT = 2
+    DOWN_RIGHT = 3
+    DOWN = 4
+    DOWN_LEFT = 5
+    LEFT = 6
+    UP_LEFT = 7
 
 
 v_fonts = [
@@ -105,7 +113,7 @@ class Button:
         width=None,
         height=None,
         font_size=32,
-        color=Colors.LIGHT_GRAY,
+        color=Colors.WHITE,
         should_background=False,
         anchor="topleft",
         is_slider=False,
@@ -172,16 +180,6 @@ class Button:
                 self.rect.y,
             )[1]
 
-            if self.slider_display_rect:
-                setattr(
-                    self.right_slider_rect,
-                    self.anchor,
-                    (
-                        self.slider_display_rect.right,
-                        self.rect.y + 8,
-                    ),
-                )
-
     def process_event(self, event):
         if self.action is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -191,9 +189,8 @@ class Button:
                             self.action(-self.action_arg)
                         if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
                             self.action(self.action_arg)
-                    else:
-                        if self.rect.collidepoint(pygame.mouse.get_pos()):
-                            self.action()
+                    elif self.rect.collidepoint(pygame.mouse.get_pos()):
+                        self.action()
 
     def update(self):
         if (
@@ -217,6 +214,14 @@ class Button:
                 self.rect.y,
             )[1]
 
+            setattr(
+                self.right_slider_rect,
+                self.anchor,
+                (
+                    self.slider_display_rect.right,
+                    self.rect.y + 8,
+                ),
+            )
         write(
             "topleft",
             self.content,
@@ -285,6 +290,9 @@ class Client(socket.socket):
                 )
 
     def req(self, message):
+        """
+        send message to server without waiting for response
+        """
         if self.conn_type == "udp":
             self.sendto(str(message).encode(), self.target_server)
 
@@ -292,6 +300,9 @@ class Client(socket.socket):
             self.send(str(message).encode())
 
     def req_res(self, *messages):
+        """
+        send message to server and wait for response
+        """
         for message in messages:
             if self.conn_type == "udp":
                 self.sendto(str(message).encode(), self.target_server)
@@ -325,13 +336,12 @@ def timgload3(*path, return_rect=False):
     if return_rect:
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect
+
     return tex
 
 
 def timgload(*path, return_rect=False):
-    tex = Texture.from_surface(
-        display.renderer, pygame.image.load(Path(*path))
-    )
+    tex = Texture.from_surface(display.renderer, pygame.image.load(Path(*path)))
     if return_rect:
         rect = tex.get_rect(topleft=return_rect)
         return tex, rect
@@ -402,7 +412,9 @@ def borderize(img, color, thickness=1):
     mask = pygame.mask.from_surface(img)
     mask_surf = mask.to_surface(setcolor=color)
     mask_surf.set_colorkey(Colors.BLACK)
-    surf = pygame.Surface([s + thickness * 2 for s in mask_surf.get_size()], pygame.SRCALPHA)
+    surf = pygame.Surface(
+        [s + thickness * 2 for s in mask_surf.get_size()], pygame.SRCALPHA
+    )
     poss = [[c * thickness for c in p] for p in [[1, 0], [2, 1], [1, 2], [0, 1]]]
     for pos in poss:
         surf.blit(mask_surf, pos)
