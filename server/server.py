@@ -79,7 +79,7 @@ Thread(target=receive_udp).start()
 while True:
     # TCP
     try:
-        client, client_addr = server_tcp.accept() 
+        client, client_addr = server_tcp.accept()
         print(f"New connection from {client_addr}")
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 
