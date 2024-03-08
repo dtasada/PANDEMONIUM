@@ -1,5 +1,5 @@
 from enum import Enum
-from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
+from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand

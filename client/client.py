@@ -18,7 +18,7 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-        self.ray_density, self.resolution = 1280, 5 # Don't change this pair
+        self.ray_density, self.resolution = 1280 // 4, 5 # Don't change this pair ['§ok ±boomer}
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         # map
@@ -95,8 +95,6 @@ class Game:
         else:
             cursor.enable()
 
-        print(self.state)
-
     def get_fov(self):
         return self.fov
 
@@ -136,14 +134,11 @@ class Player:
         self.h = 8
         self.color = Colors.WHITE
         self.angle = -1.5708
-        self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "player_arrow.png")
-        )
+        self.arrow_img = Image(imgload(
+            "client", "assets", "images", "player_arrow.png", scale=1
+        ))
+        self.arrow_rect = pygame.Rect(0, 0, 16, 16)
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
-        self.arrow_img.color = (0, 0, 200, 255)
-        self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
-        self.arrow_rect.center = self.rect.center
         self.weapons = {}
         self.wall_textures = [
             (
@@ -209,7 +204,6 @@ class Player:
         return 100
 
     def draw(self):
-        self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         self.arrow_rect.center = self.rect.center
         self.arrow_img.angle = degrees(self.angle)
         display.renderer.blit(self.arrow_img, pygame.Rect(self.arrow_rect.x + game.mo, self.arrow_rect.y + game.mo, *self.arrow_rect.size))
@@ -507,13 +501,16 @@ class EnemyPlayer:
         )
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
+        self.indicator_img = imgload("client", "assets", "images", "enemy_indicator.png")
+        self.indicator_rect = self.indicator_img.get_rect()
 
     def draw(self):
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         arrow = self.arrow_img
         arrow.angle = degrees(self.angle)
         draw_rect(Colors.GREEN, arrow_rect)
-        display.renderer.blit(arrow, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
+        # display.renderer.blit(arrow, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
+        display.renderer.blit(self.indicator_img, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
 
     def update(self):
         if client_udp.current_message:
@@ -524,6 +521,10 @@ class EnemyPlayer:
             self.rect.x = message[self.id_]["x"]
             self.rect.y = message[self.id_]["y"]
             self.angle = message[self.id_]["angle"]
+        dist = hypot(
+            self.rect.centerx - player.rect.centerx,
+            self.rect.centery - player.rect.centery
+        )
         self.draw()
 
 
