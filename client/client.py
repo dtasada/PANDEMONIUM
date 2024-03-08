@@ -19,6 +19,8 @@ class Game:
         self.sens = 50
         self.fov = 60
         self.ray_density, self.resolution = 1280, 5 # Don't change this pair
+        self.target_zoom = self.zoom = 0
+        self.zoom_speed = 0.4
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
         self.object_map = load_map_from_csv(
@@ -309,6 +311,10 @@ class Player:
                     else:
                         self.rect.top = rect.bottom
 
+        # for rays
+        self.start_x = (self.rect.centerx + cos(self.angle) * game.zoom) / game.tile_size
+        self.start_y = (self.rect.centery + sin(self.angle) * game.zoom) / game.tile_size
+
         # surroundings
         tile_x = int(self.rect.x / game.tile_size)
         tile_y = int(self.rect.y / game.tile_size)
@@ -319,15 +325,18 @@ class Player:
                 y = tile_y + yo
                 self.surround.append((x, y))
 
-        # cast the rayss
-        o = -game.fov // 2
-        for index in range(game.ray_density):
-            o += game.fov / game.ray_density
-            self.cast_ray(o, index)
-        # self.cast_ray(0, 0)
+        # cast the rays
+        if game.target_zoom > 0:
+            start_x, start_y = self.rect.centerx / game.tile_size, self.rect.centery / game.tile_size
+            self.cast_ray(0, 0, start_x, start_y)
+        else:
+            o = -game.fov // 2
+            for index in range(game.ray_density):
+                o += game.fov / game.ray_density
+                self.cast_ray(o, index)
         _xvel, _yvel = angle_to_vel(self.angle)
 
-    def cast_ray(self, deg_offset, index):  # add comments here pls
+    def cast_ray(self, deg_offset, index, start_x=None, start_y=None):  # add comments here pls
         offset = radians(deg_offset)
         angle = self.angle + offset
         dx = cos(angle)
@@ -335,10 +344,8 @@ class Player:
 
         tot_length = 0
         y_length = x_length = 0
-        start_x, start_y = [
-            self.rect.centerx / game.tile_size,
-            self.rect.centery / game.tile_size,
-        ]
+        start_x = start_x if start_x is not None else self.start_x
+        start_y = start_y if start_y is not None else self.start_y
         cur_x, cur_y = [int(start_x), int(start_y)]
         hypot_x, hypot_y = sqrt(1 + (dy / dx) ** 2), sqrt(1 + (dx / dy) ** 2)
         direc = (dx, dy)
@@ -624,23 +631,6 @@ def check_new_players():
 
 
 def render_floor():
-    # y = int(display.height / 2)
-    # x = 0
-    # while y < display.height:
-    #     height = 16
-    #     width = y / display.width
-    #     offset = y / floor_tex.width
-    #     floor_tex.color = [int(min(height * 2 / display.height * 255, 255))] * 3
-    #
-    #     print(x, y, width, height)
-    #     display.renderer.blit(
-    #         floor_tex,
-    #         pygame.Rect(x, y, width, height),
-    #         pygame.Rect(0, offset, floor_tex.height, 1),
-    #     )
-    #     y += height
-    #     # x += width
-
     fill_rect(
         Colors.BROWN,
         (
@@ -664,8 +654,6 @@ def main(multiplayer):
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
-            for button in current_buttons:
-                button.process_event(event)
             match event.type:
                 case pygame.QUIT:
                     game.running = False
@@ -698,7 +686,15 @@ def main(multiplayer):
                                 player.bob -= event.rel[1]
 
                 case pygame.MOUSEBUTTONDOWN:
-                    pass
+                    if game.state == States.PLAY:
+                        if event.button == 1:
+                            game.target_zoom = 30
+                            game.zoom = 0
+
+                case pygame.MOUSEBUTTONUP:
+                    if game.state == States.PLAY:
+                        if event.button == 1:
+                            game.target_zoom = 0
 
                 case pygame.KEYDOWN:
                     match event.key:
@@ -719,6 +715,10 @@ def main(multiplayer):
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
+
+            for button_list in button_lists.values():
+                for button in button_list:
+                    button.process_event(event)
 
         display.renderer.clear()
 
@@ -756,6 +756,9 @@ def main(multiplayer):
             display.renderer.blit(redden_game.tex, redden_game.rect)
 
             if game.state == States.PLAY:
+                # zoom
+                game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
+
                 display.renderer.blit(crosshair_tex, crosshair_rect)
 
         if game.state == States.MAIN_SETTINGS:
