@@ -60,10 +60,14 @@ class Directions(Enum):
 
 
 class Joymap:
-    LEFT_JOYSTICK = 2
-    RIGHT_JOYSTICK = 3
+    # axes
+    LEFT_JOYSTICK_HOR = 0
+    LEFT_JOYSTICK_VER = 1
+    RIGHT_JOYSTICK_HOR = 2
+    RIGHT_JOYSTICK_VER = 3
     LEFT_TRIGGER = 4
     RIGHT_TRIGGER = 5
+    # buttons
     CROSS = 0
     CIRCLE = 1
     SQUARE = 2
@@ -79,14 +83,13 @@ v_fonts = [
 
 class Display:
     def __init__(self, width, height, title, fullscreen=False, vsync=False):
-        self.title = width, height, title
         if fullscreen:
             self.width = pygame.display.Info().current_w
             self.height = pygame.display.Info().current_h
         else:
             self.width, self.height = width, height
         self.center = (self.width / 2, self.height / 2)
-        self.window = Window(size=(self.width, self.height))
+        self.window = Window(size=(self.width, self.height), title=title)
         self.renderer = Renderer(self.window, vsync=vsync)
 
 
@@ -340,6 +343,29 @@ class Client(socket.socket):
             pass
 
 
+def normalize_angle(angle):
+    angle = positive_angle(angle)
+    while angle > 180:
+        angle -= 360
+    return angle
+
+
+def positive_angle(angle):
+    while angle < 0:
+        angle += 360
+    return angle
+
+
+def is_angle_between(a, testAngle, b):
+    a -= testAngle;
+    b -= testAngle;
+    a = normalize_angle(a);
+    b = normalize_angle(b);
+    if a * b >= 0:
+        return False;
+    return abs(a - b) < 180
+
+
 def imgload(*path_, colorkey=None, frames=None, whitespace=0, frame_pause=0, end_frame=None, scale=1, to_tex=True):
     if frames is None:
         ret = pygame.image.load(Path(*path_))
@@ -437,6 +463,10 @@ def borderize(img, color, thickness=1):
 
 def pi2pi(angle):
     return atan2(sin(angle), cos(angle))
+
+
+def angle_diff(angle1, angle2):
+    return min((angle1 - angle2 + 360) % 360, (angle2 - angle1 + 360) % 360)
 
 
 cursor = Cursor()
