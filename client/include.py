@@ -477,3 +477,7 @@ client_tcp = None
 weapon_costs = {
     "1": 1200,
 }
+
+ticks = pygame.time.get_ticks
+sound = pygame.mixer.Sound(Path("client", "assets", "sounds", "gun_sounds_2", "Full Sounds", ".308 (7.62x51)", "MP3", "308 Single.mp3"))
+channel = pygame.mixer.Channel(0)

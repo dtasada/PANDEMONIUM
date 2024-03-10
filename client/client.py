@@ -198,6 +198,7 @@ class Player:
         self.to_equip = None
         # weapon
         self.weapon_tex = self.weapon_rect = None
+        self.last_shot = ticks()
 
     @property
     def health(self):
@@ -372,8 +373,8 @@ class Player:
     
         #
         for te in test_enemies:
-            dy = te.rect.centery - self.rect.centery
-            dx = te.rect.centerx - self.rect.centerx
+            dy = te.indicator_rect.centery - self.rect.centery
+            dx = te.indicator_rect.centerx - self.rect.centerx
             te.angle = degrees(atan2(dy, dx))
             te.dist_px = hypot(dy, dx)
             if not self.enemies_to_render:
@@ -389,8 +390,28 @@ class Player:
 
         # processing other important joystick input
         if joystick is not None:
+            # picking up wall items
             if joystick.get_button(Joymap.SQUARE):
                 self.try_to_buy_wall_weapon()
+            # shoot
+            ax = joystick.get_axis(Joymap.RIGHT_TRIGGER)
+            if ax > -1:
+                self.shoot()
+        
+    def shoot(self):
+        # can shoot?
+        if ticks() - self.last_shot >= 100:
+            channel.play(sound)
+            # loop through the enemies
+            for te in test_enemies:
+                # is enemy in FOV?
+                if te.rendering:
+                    # can enemy take damage?
+                    if not te.regenerating:
+                        # hit the enemy with the mouse?
+                        if te.rect.collidepoint(display.center):
+                            te.hit()
+            self.last_shot = ticks()
 
     def cast_ray(self, deg_offset, index, start_x=None, start_y=None, abs_angle=False):  # add comments here pls
         offset = radians(deg_offset)
@@ -588,16 +609,21 @@ class TestEnemy:
         self.angle = -1.5708
         self.indicator = imgload("client", "assets", "images", "player_arrow.png")
         self.indicator.color = Colors.ORANGE
-        self.rect = pygame.Rect((0, 0, 16, 16))
-        self.rect.center = (self.x, self.y)
+        self.indicator_rect = pygame.Rect((0, 0, 16, 16))
+        self.indicator_rect.center = (self.x, self.y)
         self.image = imgload("client", "assets", "images", "player.png")
+        self.last_hit = ticks()
+        self.regenerating = False
+        self.rendering = False
 
     def draw(self):
-        draw_rect(Colors.RED, self.rect)
-        display.renderer.blit(self.indicator, self.rect)
+        self.rendering = False
+        draw_rect(Colors.RED, self.indicator_rect)
+        display.renderer.blit(self.indicator, self.indicator_rect)
 
     def update(self):
         self.draw()
+        self.regenerate()
     
     def render(self):
         start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
@@ -611,9 +637,20 @@ class TestEnemy:
             centery = display.height / 2 + player.bob
             height = game.projection_dist / self.dist_px * display.height / 2  # maths
             width = height / self.image.height * self.image.width
-            rect = pygame.Rect(0, 0, width, height)
-            rect.center = (centerx, centery)
-            display.renderer.blit(self.image, rect)
+            self.rect = pygame.Rect(0, 0, width, height)
+            self.rect.center = (centerx, centery)
+            display.renderer.blit(self.image, self.rect)
+            self.rendering = True
+    
+    def regenerate(self):
+        if self.regenerating and ticks() - self.last_hit >= 70:
+            self.regenerating = False
+            self.image.color = Colors.WHITE
+        
+    def hit(self):
+        self.image.color = Colors.RED
+        self.last_hit = ticks()
+        self.regenerating = True
 
 
 cursor.enable()
@@ -799,9 +836,10 @@ def main(multiplayer):
 
                 case pygame.MOUSEBUTTONDOWN:
                     if game.state == States.PLAY:
-                        if event.button == 1:
-                            game.target_zoom = 30
-                            game.zoom = 0
+                        pass
+                        # if event.button == 1:
+                        #     game.target_zoom = 30
+                        #     game.zoom = 0
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
@@ -855,7 +893,8 @@ def main(multiplayer):
                         display.height / 2 - player.bob,
                     ),
                 )
-
+                
+                
                 player.update()
                 for te in test_enemies:
                     te.update()
