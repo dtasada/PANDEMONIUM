@@ -18,10 +18,8 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-# <<<<<<< HEAD
-        self.ray_density = int(3/5 * display.width)
-        self.resolution = 3 # Don't change this pair
-# =======
+        self.resolution = 3
+        self.ray_density = int(display.width * (self.resolution / 5))
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
@@ -126,7 +124,7 @@ class Game:
         elif self.resolution < 1:
             self.resolution = 1
 
-        self.ray_density = int(display.width / (6 - self.resolution))
+        self.ray_density = int(display.width * (self.resolution / 5))
 
 class Player:
     def __init__(self):
