@@ -147,6 +147,7 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
+        self.id = None
         self.color = Colors.WHITE
         self.angle = -1.5708
         self.arrow_img = Image(
@@ -594,6 +595,9 @@ class Player:
         self.weapons[weapon] = 100
 
     def update(self):
+        if not self.id and client_udp.current_message:
+            message = json.loads(client_udp.current_message)
+            self.id = message["id"]
         self.rays = []
         self.walls_to_render = []
         self.enemies_to_render = []
@@ -639,10 +643,11 @@ class EnemyPlayer:
 
     def update(self):
         if client_udp.current_message:
-            if self.id_ not in client_udp.current_message:
-                enemy_players.remove(self)
-                return
             message = json.loads(client_udp.current_message)
+            if self.id_ not in message:
+                enemy_players.remove(self)
+                enemy_players_addr.remove(self.id_)
+                return
             self.rect.x = message[self.id_]["x"]
             self.rect.y = message[self.id_]["y"]
             self.angle = message[self.id_]["angle"]
@@ -709,6 +714,7 @@ game = Game()
 test_enemies = [TestEnemy()]
 player = Player()
 enemy_players = []
+enemy_players_addr = []
 hud = HUD()
 clock = pygame.time.Clock()
 joystick = None
@@ -828,7 +834,8 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if EnemyPlayer(addr) not in enemy_players:
+            if addr not in enemy_players_addr and addr != "id":
+                enemy_players_addr.append(addr)
                 enemy_players.append(EnemyPlayer(addr))
 
 
@@ -875,7 +882,7 @@ def main(multiplayer):
                 case pygame.QUIT:
                     game.running = False
                     if multiplayer:
-                        client_udp.req("quit")
+                        client_tcp.req(f"quit-{player.id}")
                         pygame.quit()
                         sys.exit()
 

@@ -342,11 +342,13 @@ class Client(socket.socket):
     def receive(self):
         if self.conn_type == "udp":
             while True:
-                data, addr = self.recvfrom(2**12)
+                data, addr  = self.recvfrom(2**12)
                 self.current_message = data.decode()
 
         elif self.conn_type == "tcp":
-            pass
+             while True:
+                data = self.recv(2**12)
+                self.current_message = data.decode()
 
 
 def normalize_angle(angle):
