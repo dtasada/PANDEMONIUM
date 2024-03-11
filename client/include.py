@@ -200,6 +200,8 @@ class Button:
             )[1]
 
     def process_event(self, event):
+        if self.content not in ("Resolution", "Unleash PANDEMONIUM"):
+            return
         if self.action is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
