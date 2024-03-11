@@ -95,7 +95,9 @@ class Display:
 
 class Cursor:
     def __init__(self):
-        self.surf = pygame.image.load(Path("client", "assets", "images", "cursor.png"))
+        self.surf = pygame.image.load(
+            Path("client", "assets", "images", "menu", "cursor.png")
+        )
         self.tex = Texture.from_surface(display.renderer, self.surf)
         self.rect = self.surf.get_rect()
         self.topleft = pygame.Rect(self.rect.topleft, (1, 1))
@@ -154,7 +156,9 @@ class Button:
         if action is not None:
             self.hover_tex = Texture.from_surface(
                 display.renderer,
-                pygame.image.load(Path("client", "assets", "images", "hover.png")),
+                pygame.image.load(
+                    Path("client", "assets", "images", "menu", "hover.png")
+                ),
             )
             self.hover_rect = self.hover_tex.get_rect(
                 midright=(self.rect.x - 16, self.rect.centery)
@@ -164,7 +168,7 @@ class Button:
             self.left_slider_tex = Texture.from_surface(
                 display.renderer,
                 pygame.image.load(
-                    Path("client", "assets", "images", "slider_arrow.png")
+                    Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
             self.left_slider_rect = self.left_slider_tex.get_rect()
@@ -178,7 +182,7 @@ class Button:
                 display.renderer,
                 pygame.transform.flip(
                     pygame.image.load(
-                        Path("client", "assets", "images", "slider_arrow.png")
+                        Path("client", "assets", "images", "menu", "slider_arrow.png")
                     ),
                     True,
                     False,
