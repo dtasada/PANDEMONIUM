@@ -18,7 +18,8 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-        self.ray_density, self.resolution = 1280, 5 # Don't change this pair
+        self.ray_density = int(1/4 * display.width)
+        self.resolution = 3 # Don't change this pair
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
         self.object_map = load_map_from_csv(
@@ -93,8 +94,6 @@ class Game:
         else:
             cursor.enable()
 
-        print(self.state)
-
     def get_fov(self):
         return self.fov
 
@@ -116,15 +115,13 @@ class Game:
         return self.resolution
 
     def set_res(self, amount):
-        resolutions = [80, 160, 320, 640, 1280]
         self.resolution += amount
         if self.resolution > 5:
             self.resolution = 5
         elif self.resolution < 1:
             self.resolution = 1
 
-        self.ray_density = resolutions[self.resolution - 1]
-
+        self.ray_density = int(display.width / (6 - self.resolution))
 
 class Player:
     def __init__(self):
@@ -652,6 +649,15 @@ def render_floor():
     )
 
 
+pistol_texs = [
+    Texture.from_surface(
+        display.renderer,
+        pygame.transform.scale_by(pygame.image.load(Path("client", "assets", "images", "pistol", f"0{i}.png")), 8)
+    )
+    for i in range(1, 7)
+]
+pistol_rect = pistol_texs[0].get_rect(midbottom=(display.width/2, display.height))
+
 def main(multiplayer):
     global client_udp, client_tcp
 
@@ -777,6 +783,8 @@ def main(multiplayer):
             display.width - 5,
             5,
         )
+
+        display.renderer.blit(pistol_texs[0], pistol_rect)
 
         display.renderer.present()
 
