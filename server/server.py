@@ -39,33 +39,25 @@ except Exception as err:
 
 
 addresses = {}
-
-
 def receive_udp():
     while True:
         data, addr = server_udp.recvfrom(2**12)
-        if data.decode() != "quit":
-            addresses[str(addr)] = json.loads(data)
+        addresses[str(addr)] = json.loads(data)
 
-            for address in addresses:
-                response = json.dumps(
-                    {k: v for k, v in addresses.items() if k != address}
-                )
-                server_udp.sendto(response.encode(), eval(address))
-        else:
-            del addresses[str(addr)]
+        for address in addresses:
+            response = {k: v for k, v in addresses.items() if k != address}
+            response["id"] = address
+            response = json.dumps(response)
+            server_udp.sendto(response.encode(), eval(address))
 
 
 def receive_tcp(client, client_addr):
     try:
         while True:
             data = client.recv(2**12).decode()
-            if not data:
-                break
-
-            # concoct response
-            response = "example response"
-            client.send(response.encode("utf-8"))
+            if data.startswith("quit"):
+                del addresses[data.split("-")[1]
+                              ]
     except Exception as err:
         print(
             f"{Colors.ANSI_RED}Could not handle client {client_addr}:{Colors.ANSI_RESET} {err}"
@@ -92,3 +84,4 @@ while True:
         break
 
 server_tcp.close()
+server_udp.close()
