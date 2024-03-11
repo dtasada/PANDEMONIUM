@@ -1,5 +1,5 @@
 from enum import Enum
-from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
+from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
@@ -59,6 +59,22 @@ class Directions(Enum):
     UP_LEFT = 7
 
 
+class Joymap:
+    # axes
+    LEFT_JOYSTICK_HOR = 0
+    LEFT_JOYSTICK_VER = 1
+    RIGHT_JOYSTICK_HOR = 2
+    RIGHT_JOYSTICK_VER = 3
+    LEFT_TRIGGER = 4
+    RIGHT_TRIGGER = 5
+    # buttons
+    CROSS = 0
+    CIRCLE = 1
+    SQUARE = 2
+    TRIANGLE = 3
+    LEFT_JOYSTICK_CLICK = 7
+
+
 v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
     for i in range(101)
@@ -67,14 +83,13 @@ v_fonts = [
 
 class Display:
     def __init__(self, width, height, title, fullscreen=False, vsync=False):
-        self.title = width, height, title
         if fullscreen:
             self.width = pygame.display.Info().current_w
             self.height = pygame.display.Info().current_h
         else:
             self.width, self.height = width, height
         self.center = (self.width / 2, self.height / 2)
-        self.window = Window(size=(self.width, self.height))
+        self.window = Window(size=(self.width, self.height), title=title)
         self.renderer = Renderer(self.window, vsync=vsync)
 
 
@@ -328,24 +343,48 @@ class Client(socket.socket):
             pass
 
 
-def timgload3(*path, return_rect=False):
-    tex = Texture.from_surface(
-        display.renderer, pygame.transform.scale_by(pygame.image.load(Path(*path)), 3)
-    )
-
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-
-    return tex
+def normalize_angle(angle):
+    angle = positive_angle(angle)
+    while angle > 180:
+        angle -= 360
+    return angle
 
 
-def timgload(*path, return_rect=False):
-    tex = Texture.from_surface(display.renderer, pygame.image.load(Path(*path)))
-    if return_rect:
-        rect = tex.get_rect(topleft=return_rect)
-        return tex, rect
-    return tex
+def positive_angle(angle):
+    while angle < 0:
+        angle += 360
+    return angle
+
+
+def is_angle_between(a, testAngle, b):
+    a -= testAngle;
+    b -= testAngle;
+    a = normalize_angle(a);
+    b = normalize_angle(b);
+    if a * b >= 0:
+        return False;
+    return abs(a - b) < 180
+
+
+def imgload(*path_, colorkey=None, frames=None, whitespace=0, frame_pause=0, end_frame=None, scale=1, to_tex=True):
+    if frames is None:
+        ret = pygame.image.load(Path(*path_))
+    else:
+        ret = []
+        img = pygame.image.load(Path(*path_))
+        frames = (frames, img.get_width() / frames)
+        for i in range(frames[0]):
+            ret.append(img.subsurface(i * frames[1], 0, frames[1] - whitespace, img.get_height()))
+        for i in range(frame_pause):
+            ret.append(ret[0])
+        if end_frame is not None:
+            ret.append(ret[end_frame])
+    if to_tex:
+        try:
+            return [Texture.from_surface(display.renderer, pygame.transform.scale_by(x, scale)) for x in ret]
+        except TypeError:
+            return Texture.from_surface(display.renderer, pygame.transform.scale_by(ret, scale))
+    return ret
 
 
 def fill_rect(color, rect):
@@ -426,6 +465,10 @@ def pi2pi(angle):
     return atan2(sin(angle), cos(angle))
 
 
+def angle_diff(angle1, angle2):
+    return min((angle1 - angle2 + 360) % 360, (angle2 - angle1 + 360) % 360)
+
+
 cursor = Cursor()
 
 client_udp = None
@@ -434,3 +477,7 @@ client_tcp = None
 weapon_costs = {
     "1": 1200,
 }
+
+ticks = pygame.time.get_ticks
+sound = pygame.mixer.Sound(Path("client", "assets", "sounds", "gun_sounds_2", "Full Sounds", ".308 (7.62x51)", "MP3", "308 Single.mp3"))
+channel = pygame.mixer.Channel(0)

@@ -18,8 +18,13 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-        self.ray_density = int(1/4 * display.width)
+# <<<<<<< HEAD
+        self.ray_density = int(3/5 * display.width)
         self.resolution = 3 # Don't change this pair
+# =======
+        self.target_zoom = self.zoom = 0
+        self.zoom_speed = 0.4
+        self.projection_dist = 32 / tan(radians(self.fov / 2))
         # map
         self.map = load_map_from_csv(Path("client", "assets", "map.csv"))
         self.object_map = load_map_from_csv(
@@ -76,7 +81,7 @@ class Game:
                 img = self.tiles[tile]
                 self.map_surf.blit(img, (x * self.tile_size, y * self.tile_size))
         self.map_tex = Texture.from_surface(display.renderer, self.map_surf)
-        self.mo = self.tile_size * 1  # map offset!!!!!!!!!!
+        self.mo = self.tile_size * 0  # map offset!!!!!!!!!!
         self.map_rect = self.map_tex.get_rect(topleft=(self.mo, self.mo))
 
     @property
@@ -131,14 +136,11 @@ class Player:
         self.h = 8
         self.color = Colors.WHITE
         self.angle = -1.5708
-        self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "player_arrow.png")
-        )
+        self.arrow_img = Image(imgload(
+            "client", "assets", "images", "player_arrow.png", scale=1
+        ))
+        self.arrow_rect = pygame.Rect(0, 0, 16, 16)
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
-        self.arrow_img.color = (0, 0, 200, 255)
-        self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
-        self.arrow_rect.center = self.rect.center
         self.weapons = {}
         self.wall_textures = [
             (
@@ -158,7 +160,7 @@ class Player:
         ]
         self.object_textures = [
             (
-                timgload("client", "assets", "images", file_name + ".png")
+                imgload("client", "assets", "images", file_name + ".png")
                 if file_name is not None
                 else None
             )
@@ -197,6 +199,7 @@ class Player:
         self.to_equip = None
         # weapon
         self.weapon_tex = self.weapon_rect = None
+        self.last_shot = ticks()
 
     @property
     def health(self):
@@ -204,7 +207,6 @@ class Player:
         return 100
 
     def draw(self):
-        self.arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         self.arrow_rect.center = self.rect.center
         self.arrow_img.angle = degrees(self.angle)
         display.renderer.blit(self.arrow_img, pygame.Rect(self.arrow_rect.x + game.mo, self.arrow_rect.y + game.mo, *self.arrow_rect.size))
@@ -220,10 +222,28 @@ class Player:
                 display.width / 2,
                 display.height - 50,
             )
+            if joystick is not None:
+                joystick_button_rect.midbottom = (display.width / 2 - 115, display.height - 42)
+                display.renderer.blit(joystick_button_sprs[Joymap.SQUARE], joystick_button_rect)
         if self.weapon_tex is not None:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
     def render_map(self):
+        self.walls_to_render.sort(key=lambda x: -x[0])
+        for dist_px, tex, dest, area, color in self.walls_to_render:
+            # render enemy first
+            if self.enemies_to_render:
+                te = self.enemies_to_render[0]
+                if te.dist_px > dist_px:
+                    te.render()
+                    del self.enemies_to_render[0]
+            # render the texture after the (farther away) enemy
+            tex.color = color
+            display.renderer.blit(tex, dest, area)
+        # render the remaining enemies
+        for te in self.enemies_to_render:
+            te.render()
+
         display.renderer.blit(game.map_tex, game.map_rect)
         if game.debug_map:
             for y in range(game.map_height):
@@ -238,6 +258,14 @@ class Player:
                     ((x + 1) * game.tile_size, game.tile_size),
                     ((x + 1) * game.tile_size, (game.map_height + 1) * game.tile_size),
                 )
+    
+    def try_to_buy_wall_weapon(self):
+        if self.to_equip is not None:
+            (x, y), obj = self.to_equip
+            x, y = int(x), int(y)
+            game.object_map[y][x] = "0"
+            weapon = obj[0]
+            self.set_weapon(weapon)
 
     def keys(self):
         # keyboard
@@ -248,11 +276,11 @@ class Player:
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
-            if keys[pygame.K_w] or keys[pygame.K_UP]:
+            if keys[pygame.K_w]:
                 xvel, yvel = angle_to_vel(self.angle, vmult)
             if keys[pygame.K_a]:
                 xvel, yvel = angle_to_vel(self.angle - pi / 2, vmult)
-            if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+            if keys[pygame.K_s]:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
@@ -262,13 +290,18 @@ class Player:
                 self.angle -= amult
             if keys[pygame.K_RIGHT]:
                 self.angle += amult
+            m = 12
+            if keys[pygame.K_UP]:
+                self.bob += m
+            if keys[pygame.K_DOWN]:
+                self.bob -= m
 
             # joystick isn't actually a literal joystick, pygame input term for gamepad
             if joystick is not None:
                 # movement
                 thr = 0.06
-                ax0 = joystick.get_axis(0)
-                ax1 = joystick.get_axis(1)
+                ax0 = joystick.get_axis(Joymap.LEFT_JOYSTICK_HOR)
+                ax1 = joystick.get_axis(Joymap.LEFT_JOYSTICK_VER)
                 if abs(ax0) <= thr:
                     ax0 = 0
                 if abs(ax1) <= thr:
@@ -277,16 +310,24 @@ class Player:
                 ax0p = ax0 * cos(theta) - ax1 * sin(theta)
                 ax1p = ax0 * sin(theta) + ax1 * cos(theta)
                 thr = 0.06
-                xvel, yvel = ax0p * vmult, ax1p * vmult
+                # run mechanics
+                if joystick.get_button(Joymap.LEFT_JOYSTICK_CLICK):
+                    run_m = 2
+                    ax0p *= run_m
+                    ax1p *= run_m
+                if ax0p != 0 or ax1p != 0:
+                    xvel, yvel = ax0p * vmult, ax1p * vmult
                 # rotation
-                m = game.sens * 60
-                ax2 = joystick.get_axis(2)
-                ax3 = joystick.get_axis(3)
+                hor_m = 0.0005 * game.sens
+                ver_m = -0.4 * game.sens
+                ax2 = joystick.get_axis(Joymap.RIGHT_JOYSTICK_HOR)
+                ax3 = joystick.get_axis(Joymap.RIGHT_JOYSTICK_VER)
                 if abs(ax2) <= thr:
                     ax2 = 0
                 if abs(ax3) <= thr:
                     ax3 = 0
-                rot_xvel = ax2 * m
+                rot_xvel = ax2 * hor_m
+                self.bob += ax3 * ver_m
                 # rot_yvel = ax3 * m
                 self.angle += rot_xvel
 
@@ -306,6 +347,10 @@ class Player:
                     else:
                         self.rect.top = rect.bottom
 
+        # for rays
+        self.start_x = (self.rect.centerx + cos(self.angle) * game.zoom) / game.tile_size
+        self.start_y = (self.rect.centery + sin(self.angle) * game.zoom) / game.tile_size
+
         # surroundings
         tile_x = int(self.rect.x / game.tile_size)
         tile_y = int(self.rect.y / game.tile_size)
@@ -316,26 +361,72 @@ class Player:
                 y = tile_y + yo
                 self.surround.append((x, y))
 
-        # cast the rayss
-        o = -game.fov // 2
-        for index in range(game.ray_density):
-            o += game.fov / game.ray_density
-            self.cast_ray(o, index)
-        # self.cast_ray(0, 0)
+        # cast the rays
+        if game.target_zoom > 0:
+            start_x, start_y = self.rect.centerx / game.tile_size, self.rect.centery / game.tile_size
+            self.cast_ray(0, 0, start_x, start_y)
+        else:
+            o = -game.fov // 2
+            for index in range(game.ray_density + 1):
+                self.cast_ray(o, index)
+                o += game.fov / game.ray_density
         _xvel, _yvel = angle_to_vel(self.angle)
+    
+        #
+        for te in test_enemies:
+            dy = te.indicator_rect.centery - self.rect.centery
+            dx = te.indicator_rect.centerx - self.rect.centerx
+            te.angle = degrees(atan2(dy, dx))
+            te.dist_px = hypot(dy, dx)
+            if not self.enemies_to_render:
+                self.enemies_to_render.append(te)
+            else:
+                index = 0
+                for index, enemy in enumerate(test_enemies):
+                    if te.dist_px > enemy.dist_px:
+                        self.enemies_to_render.insert(index, te)
+        
+        # map ofc
+        self.render_map()
 
-    def cast_ray(self, deg_offset, index):  # add comments here pls
+        # processing other important joystick input
+        if joystick is not None:
+            # picking up wall items
+            if joystick.get_button(Joymap.SQUARE):
+                self.try_to_buy_wall_weapon()
+            # shoot
+            ax = joystick.get_axis(Joymap.RIGHT_TRIGGER)
+            if ax > -1:
+                self.shoot()
+        
+    def shoot(self):
+        # can shoot?
+        if ticks() - self.last_shot >= 100:
+            channel.play(sound)
+            # loop through the enemies
+            for te in test_enemies:
+                # is enemy in FOV?
+                if te.rendering:
+                    # can enemy take damage?
+                    if not te.regenerating:
+                        # hit the enemy with the mouse?
+                        if te.rect.collidepoint(display.center):
+                            te.hit()
+            self.last_shot = ticks()
+
+    def cast_ray(self, deg_offset, index, start_x=None, start_y=None, abs_angle=False):  # add comments here pls
         offset = radians(deg_offset)
-        angle = self.angle + offset
+        if not abs_angle:
+            angle = self.angle + offset
+        else:
+            angle = offset
         dx = cos(angle)
         dy = sin(angle)
 
         tot_length = 0
         y_length = x_length = 0
-        start_x, start_y = [
-            self.rect.centerx / game.tile_size,
-            self.rect.centery / game.tile_size,
-        ]
+        start_x = start_x if start_x is not None else self.start_x
+        start_y = start_y if start_y is not None else self.start_y
         cur_x, cur_y = [int(start_x), int(start_y)]
         hypot_x, hypot_y = sqrt(1 + (dy / dx) ** 2), sqrt(1 + (dx / dy) ** 2)
         direc = (dx, dy)
@@ -376,14 +467,15 @@ class Player:
             p2 = (
                 p1[0] + dist * dx * game.tile_size,
                 p1[1] + dist * dy * game.tile_size,
-            )
-            self.rays.append((p1, p2))
+            ) 
             ray_mult = 1
-            # init vars for walls
             dist *= ray_mult
             dist_px = dist * game.tile_size
+            self.rays.append(((p1, p2), dist_px))
+            # init vars for walls
             ww = display.width / game.ray_density
-            wh = display.height * game.tile_size / dist_px * 1.7
+            # wh = display.height * game.tile_size / dist_px * 1.7  # brute force
+            wh = game.projection_dist / dist_px * display.height / 2  # maths
             wx = index * ww
             wy = display.height / 2 - wh / 2 + self.bob
             # texture calculations
@@ -412,14 +504,18 @@ class Player:
             #     pygame.FRect(wx, wy, ww, wh),
             # )
 
-            # Texture rendering
+            # texture rendering
             tex = self.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
-            display.renderer.blit(
-                tex,
-                pygame.Rect(wx, wy, ww, wh),
-                pygame.Rect(axo, 0, 1, tex.height),
+            self.walls_to_render.append(
+                (
+                    dist_px,
+                    tex,
+                    pygame.Rect(wx, wy, ww, wh),
+                    pygame.Rect(axo, 0, 1, tex.height),
+                    tex.color,
+                )
             )
             # check whether the wall weapon is in the correct orientation
             if len(obj) > 1:
@@ -431,12 +527,16 @@ class Player:
                     else:
                         lookup = self.object_textures
                     tex = lookup[int(obj[0])]
-                    display.renderer.blit(
-                        tex,
-                        pygame.Rect(wx, wy, ww, wh),
-                        pygame.Rect(axo + high, 0, 1, tex.height),
+                    tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
+                    self.walls_to_render.append(
+                        (
+                            dist_px,
+                            tex,
+                            pygame.Rect(wx, wy, ww, wh),
+                            pygame.Rect(axo + high, 0, 1, tex.height),
+                            tex.color,
+                        )
                     )
-            self.render_map()
 
     def send_location(self):
         data = {"x": self.arrow_rect.x + game.mo, "y": self.arrow_rect.y + game.mo, "angle": self.angle}
@@ -453,11 +553,14 @@ class Player:
 
     def update(self):
         self.rays = []
+        self.walls_to_render = []
+        self.enemies_to_render = []
         self.keys()
         hud.health_update(self.health, False)
         hud.ammo_update(self.health, False)
         # Thread(client_tcp.req, args=(self.health,)).start()
-        for ray in self.rays:
+        for data in self.rays:
+            ray, _ = data
             p1 = (ray[0][0] + game.mo, ray[0][1] + game.mo)
             p2 = (ray[1][0] + game.mo, ray[1][1] + game.mo)
             draw_line(Colors.GREEN, p1, p2)
@@ -475,13 +578,16 @@ class EnemyPlayer:
         )
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
         self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
+        self.indicator_img = imgload("client", "assets", "images", "enemy_indicator.png")
+        self.indicator_rect = self.indicator_img.get_rect()
 
     def draw(self):
         arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         arrow = self.arrow_img
         arrow.angle = degrees(self.angle)
         draw_rect(Colors.GREEN, arrow_rect)
-        display.renderer.blit(arrow, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
+        # display.renderer.blit(arrow, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
+        display.renderer.blit(self.indicator_img, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
 
     def update(self):
         if client_udp.current_message:
@@ -495,15 +601,69 @@ class EnemyPlayer:
         self.draw()
 
 
+class TestEnemy:
+    def __init__(self):
+        self.x = game.tile_size * 10 + game.tile_size / 2
+        self.y = game.tile_size * 10 + game.tile_size / 2
+        self.w = 8
+        self.h = 8
+        self.angle = -1.5708
+        self.indicator = imgload("client", "assets", "images", "player_arrow.png")
+        self.indicator.color = Colors.ORANGE
+        self.indicator_rect = pygame.Rect((0, 0, 16, 16))
+        self.indicator_rect.center = (self.x, self.y)
+        self.image = imgload("client", "assets", "images", "player.png")
+        self.last_hit = ticks()
+        self.regenerating = False
+        self.rendering = False
+
+    def draw(self):
+        self.rendering = False
+        draw_rect(Colors.RED, self.indicator_rect)
+        display.renderer.blit(self.indicator, self.indicator_rect)
+
+    def update(self):
+        self.draw()
+        self.regenerate()
+    
+    def render(self):
+        start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
+        angle = self.angle
+        end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
+        if is_angle_between(start_angle, angle, end_angle):
+            diff1 = angle_diff(start_angle, angle)
+            diff2 = angle_diff(angle, end_angle)
+            perc = (diff1) / (diff1 + diff2)
+            centerx = perc * display.width
+            centery = display.height / 2 + player.bob
+            height = game.projection_dist / self.dist_px * display.height / 2  # maths
+            width = height / self.image.height * self.image.width
+            self.rect = pygame.Rect(0, 0, width, height)
+            self.rect.center = (centerx, centery)
+            display.renderer.blit(self.image, self.rect)
+            self.rendering = True
+    
+    def regenerate(self):
+        if self.regenerating and ticks() - self.last_hit >= 70:
+            self.regenerating = False
+            self.image.color = Colors.WHITE
+        
+    def hit(self):
+        self.image.color = Colors.RED
+        self.last_hit = ticks()
+        self.regenerating = True
+
+
 cursor.enable()
 game = Game()
+test_enemies = [TestEnemy()]
 player = Player()
 enemy_players = []
 hud = HUD()
 clock = pygame.time.Clock()
 joystick = None
 
-crosshair_tex = timgload3("client", "assets", "images", "crosshair.png")
+crosshair_tex = imgload("client", "assets", "images", "crosshair.png", scale=3)
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
 title = Button(
@@ -607,9 +767,9 @@ darken_game = Hue(Colors.BLACK, 80)
 redden_game = Hue(Colors.RED, 20)
 
 
-floor_tex = Texture.from_surface(
-    display.renderer, pygame.image.load(Path("client", "assets", "images", "floor.jpg"))
-)
+floor_tex = imgload("client", "assets", "images", "floor.jpg")
+joystick_button_sprs = imgload("client", "assets", "images", "buttons.png", scale=4, frames=4)
+joystick_button_rect = joystick_button_sprs[0].get_rect()
 
 
 def check_new_players():
@@ -621,23 +781,6 @@ def check_new_players():
 
 
 def render_floor():
-    # y = int(display.height / 2)
-    # x = 0
-    # while y < display.height:
-    #     height = 16
-    #     width = y / display.width
-    #     offset = y / floor_tex.width
-    #     floor_tex.color = [int(min(height * 2 / display.height * 255, 255))] * 3
-    #
-    #     print(x, y, width, height)
-    #     display.renderer.blit(
-    #         floor_tex,
-    #         pygame.Rect(x, y, width, height),
-    #         pygame.Rect(0, offset, floor_tex.height, 1),
-    #     )
-    #     y += height
-    #     # x += width
-
     fill_rect(
         Colors.BROWN,
         (
@@ -659,7 +802,7 @@ pistol_texs = [
 pistol_rect = pistol_texs[0].get_rect(midbottom=(display.width/2, display.height))
 
 def main(multiplayer):
-    global client_udp, client_tcp
+    global client_udp, client_tcp, joystick
 
     if multiplayer:
         client_udp = Client("udp")
@@ -670,8 +813,6 @@ def main(multiplayer):
     while game.running:
         clock.tick(game.fps)
         for event in pygame.event.get():
-            for button in current_buttons:
-                button.process_event(event)
             match event.type:
                 case pygame.QUIT:
                     game.running = False
@@ -704,7 +845,16 @@ def main(multiplayer):
                                 player.bob -= event.rel[1]
 
                 case pygame.MOUSEBUTTONDOWN:
-                    pass
+                    if game.state == States.PLAY:
+                        pass
+                        # if event.button == 1:
+                        #     game.target_zoom = 30
+                        #     game.zoom = 0
+
+                case pygame.MOUSEBUTTONUP:
+                    if game.state == States.PLAY:
+                        if event.button == 1:
+                            game.target_zoom = 0
 
                 case pygame.KEYDOWN:
                     match event.key:
@@ -716,15 +866,19 @@ def main(multiplayer):
                                     game.set_state(States.PLAY_SETTINGS)
 
                         case pygame.K_e:
-                            if player.to_equip is not None:
-                                (x, y), obj = player.to_equip
-                                x, y = int(x), int(y)
-                                game.object_map[y][x] = "0"
-                                weapon = obj[0]
-                                player.set_weapon(weapon)
+                            player.try_to_buy_wall_weapon()
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
+                
+                case pygame.JOYBUTTONDOWN:
+                    if event.button == Joymap.CROSS:
+                        # player.jump() implement
+                        ...
+
+            for button_list in all_buttons.values():
+                for button in button_list:
+                    button.process_event(event)
 
         display.renderer.clear()
 
@@ -749,8 +903,11 @@ def main(multiplayer):
                         display.height / 2 - player.bob,
                     ),
                 )
-
+                
+                
                 player.update()
+                for te in test_enemies:
+                    te.update()
                 if game.should_render_map:
                     player.draw()
                     if multiplayer:
@@ -762,6 +919,9 @@ def main(multiplayer):
             display.renderer.blit(redden_game.tex, redden_game.rect)
 
             if game.state == States.PLAY:
+                # zoom
+                game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
+
                 display.renderer.blit(crosshair_tex, crosshair_rect)
 
         if game.state == States.MAIN_SETTINGS:
