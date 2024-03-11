@@ -18,7 +18,8 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-        self.ray_density, self.resolution = 1280 // 1, 5 # Don't change this pair ['§ok ±boomer}
+        self.resolution = 3
+        self.ray_density = int(display.width * (self.resolution / 5))
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
@@ -117,15 +118,13 @@ class Game:
         return self.resolution
 
     def set_res(self, amount):
-        resolutions = [80, 160, 320, 640, 1280]
         self.resolution += amount
         if self.resolution > 5:
             self.resolution = 5
         elif self.resolution < 1:
             self.resolution = 1
 
-        self.ray_density = resolutions[self.resolution - 1]
-
+        self.ray_density = int(display.width * (self.resolution / 5))
 
 class Player:
     def __init__(self):
@@ -799,6 +798,15 @@ def render_floor():
     )
 
 
+pistol_texs = [
+    Texture.from_surface(
+        display.renderer,
+        pygame.transform.scale_by(pygame.image.load(Path("client", "assets", "images", "pistol", f"0{i}.png")), 8)
+    )
+    for i in range(1, 7)
+]
+pistol_rect = pistol_texs[0].get_rect(midbottom=(display.width/2, display.height))
+
 def main(multiplayer):
     global client_udp, client_tcp, joystick
 
@@ -874,9 +882,8 @@ def main(multiplayer):
                         # player.jump() implement
                         ...
 
-            for button_list in all_buttons.values():
-                for button in button_list:
-                    button.process_event(event)
+            for button in current_buttons:
+                button.process_event(event)
 
         display.renderer.clear()
 
@@ -941,6 +948,8 @@ def main(multiplayer):
             display.width - 5,
             5,
         )
+
+        display.renderer.blit(pistol_texs[0], pistol_rect)
 
         display.renderer.present()
 
