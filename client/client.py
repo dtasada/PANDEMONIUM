@@ -18,7 +18,7 @@ class Game:
         self.fps = 60
         self.sens = 50
         self.fov = 60
-        self.resolution = 3
+        self.resolution = 5
         self.ray_density = int(display.width * (self.resolution / 5))
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
@@ -158,36 +158,36 @@ class Player:
         ]
         self.object_textures = [
             (
-                imgload("client", "assets", "images", file_name + ".png")
-                if file_name is not None
+                imgload("client", "assets", "images", "objects", file_name_with_ext)
+                if file_name_with_ext is not None
                 else None
             )
-            for file_name in [None, "ak"]
+            for file_name_with_ext in [None] + os.listdir(Path("client", "assets", "images", "objects"))
         ]
+        #
         self.highlighted_object_textures = [
-            (
-                Texture.from_surface(
-                    display.renderer,
-                    borderize(
-                        pygame.image.load(
-                            Path("client", "assets", "images", file_name + ".png")
-                        ),
-                        Colors.YELLOW,
+            Texture.from_surface(
+                display.renderer,
+                borderize(
+                    pygame.image.load(
+                        Path("client", "assets", "images", "objects", file_name_with_ext)
                     ),
-                )
-                if file_name is not None
-                else None
+                    Colors.YELLOW,
+                ),
             )
-            for file_name in [None, "ak"]
+            if file_name_with_ext is not None
+            else None
+            for file_name_with_ext in [None] + os.listdir(Path("client", "assets", "images", "objects"))
         ]
+        #
         self.mask_object_textures = []
-        for file_name in [None, "ak"]:
-            if file_name is None:
+        for file_name_with_ext in os.listdir(Path("client", "assets", "images", "objects")):
+            if file_name_with_ext is None:
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
                     pygame.image.load(
-                        Path("client", "assets", "images", file_name + ".png")
+                        Path("client", "assets", "images", "objects", file_name_with_ext)
                     )
                 ).to_surface(setcolor=Colors.WHITE)
                 surf.set_colorkey(Colors.BLACK)
@@ -211,10 +211,12 @@ class Player:
         # draw_rect(Colors.GREEN, self.rect)
         if self.to_equip is not None:
             coord, obj = self.to_equip
-            cost = weapon_costs[obj[0]]
+            weapon_id, weapon_orien = obj
+            # weapon_name = 
+            cost = weapon_costs[weapon_id]
             write(
                 "midbottom",
-                f"Press <e> to buy for ${cost}",
+                f"Press <e> to buy {'asd'} [${cost}]",
                 v_fonts[52],
                 Colors.WHITE,
                 display.width / 2,
@@ -396,6 +398,7 @@ class Player:
             ax = joystick.get_axis(Joymap.RIGHT_TRIGGER)
             if ax > -1:
                 self.shoot()
+            # 
         
     def shoot(self):
         # can shoot?

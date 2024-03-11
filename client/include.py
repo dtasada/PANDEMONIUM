@@ -10,6 +10,7 @@ import pygame
 import socket
 import sys
 from pprint import pprint
+import os
 
 
 SERVER_ADDRESS, SERVER_PORT = (
