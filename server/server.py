@@ -56,8 +56,7 @@ def receive_tcp(client, client_addr):
         while True:
             data = client.recv(2**12).decode()
             if data.startswith("quit"):
-                del addresses[data.split("-")[1]
-                              ]
+                del addresses[data.split("-")[1]]
     except Exception as err:
         print(
             f"{Colors.ANSI_RED}Could not handle client {client_addr}:{Colors.ANSI_RESET} {err}"
