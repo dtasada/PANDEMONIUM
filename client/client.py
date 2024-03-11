@@ -25,20 +25,20 @@ class Game:
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
         # map
-        self.maps = [
-            (
-                load_map_from_csv(
-                    Path("client", "assets", "maps", f"{file.split('-')[0]}-0.csv")
+        self.maps = {}
+        for file in os.listdir(Path("client", "assets", "maps")):
+            self.maps[file.split('-')[0]] = {
+                "walls": load_map_from_csv(
+                    Path("client", "assets", "maps", f"{file.split('-')[0]}-walls.csv")
                 ),
-                load_map_from_csv(
-                    Path("client", "assets", "maps", f"{file.split('-')[0]}-1.csv"),
+                "weapons": load_map_from_csv(
+                    Path("client", "assets", "maps", f"{file.split('-')[0]}-weapons.csv"),
                     int_=False,
-                ),
-            )
-            for file in os.listdir(Path("client", "assets", "maps"))
-        ]
-        self.current_map = self.maps[1][0]
-        self.current_object_map = self.maps[1][1]
+                )
+            }
+
+        self.current_map = self.maps["strike"]["walls"]
+        self.current_object_map = self.maps["strike"]["weapons"]
 
         self.tile_size = 16
         self.map_height = len(self.current_map)
@@ -904,7 +904,7 @@ def main(multiplayer):
 
                 case pygame.MOUSEBUTTONDOWN:
                     if game.state == States.PLAY:
-                        pass
+                        player.shoot()
                         # if event.button == 1:
                         #     game.target_zoom = 30
                         #     game.zoom = 0
