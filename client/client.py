@@ -874,9 +874,8 @@ def main(multiplayer):
                         # player.jump() implement
                         ...
 
-            for button_list in all_buttons.values():
-                for button in button_list:
-                    button.process_event(event)
+            for button in current_buttons:
+                button.process_event(event)
 
         display.renderer.clear()
 
