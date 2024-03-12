@@ -1,0 +1,10 @@
+{
+    "1": {
+        "name": "revolver",
+        "cost": 1000,
+        "ammo": 60,
+        "mag": 6,
+        "fire_rate": 3,
+        "auto": false
+    }
+}

@@ -10,6 +10,8 @@ import pygame
 import socket
 import sys
 from pprint import pprint
+import os
+import json
 
 
 SERVER_ADDRESS, SERVER_PORT = (
@@ -383,35 +385,42 @@ def imgload(
     end_frame=None,
     scale=1,
     to_tex=True,
+    return_rect=False,
 ):
+    # init
+    ret = []
+    img = pygame.image.load(Path(*path_))
+    # frame loading
     if frames is None:
-        ret = pygame.image.load(Path(*path_))
+        frames_used = (1, img.get_width())
     else:
-        ret = []
-        img = pygame.image.load(Path(*path_))
-        frames = (frames, img.get_width() / frames)
-        for i in range(frames[0]):
-            ret.append(
-                img.subsurface(
-                    i * frames[1], 0, frames[1] - whitespace, img.get_height()
-                )
+        frames_used = (frames, img.get_width() / frames)
+    for i in range(frames_used[0]):
+        ret.append(
+            img.subsurface(
+                i * frames_used[1], 0, frames_used[1] - whitespace, img.get_height()
             )
-        for i in range(frame_pause):
-            ret.append(ret[0])
-        if end_frame is not None:
-            ret.append(ret[end_frame])
+        )
+    for i in range(frame_pause):
+        ret.append(ret[0])
+    if end_frame is not None:
+        ret.append(ret[end_frame])
+    # colorkey
+    if colorkey is not None:
+        for x in ret:
+            x.set_colorkey(colorkey)
     if to_tex:
-        try:
-            return [
-                Texture.from_surface(
-                    display.renderer, pygame.transform.scale_by(x, scale)
-                )
-                for x in ret
-            ]
-        except TypeError:
-            return Texture.from_surface(
-                display.renderer, pygame.transform.scale_by(ret, scale)
+        ret = [
+            Texture.from_surface(
+                display.renderer, pygame.transform.scale_by(x, scale)
             )
+            for x in ret
+        ]
+    # final return
+    if frames is None:
+        ret = ret[0]
+        if return_rect:
+            ret = (ret, ret.get_rect())
     return ret
 
 
@@ -505,6 +514,9 @@ client_tcp = None
 weapon_costs = {
     "1": 1200,
 }
+with open(Path("client", "assets", "weapon_data.json"), "r") as f:
+    weapon_data = json.load(f)
+weapon_names = [v["name"] for k, v in weapon_data.items()]
 
 ticks = pygame.time.get_ticks
 sound = pygame.mixer.Sound(
