@@ -158,7 +158,6 @@ class GlobalTextures:
         )
         self.arrow_rect = pygame.Rect(0, 0, 16, 16)
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.weapons = {}
         self.wall_textures = [
             (
                 Texture.from_surface(
@@ -214,7 +213,7 @@ class GlobalTextures:
             self.mask_object_textures.append(tex)
         self.weapon_textures = {
             weapon: [
-                imgload("client", "assets", "images", "weapons", data["name"], f"{data['name']}{i}.png", scale=4, return_rect=True)
+                imgload("client", "assets", "images", "weapons", data["name"], f"{data['name']}{i}.png", scale=6, colorkey=Colors.PINK, return_rect=True)
                 for i in range(1, 6)
             ]
             for weapon, data in weapon_data.items()
@@ -241,6 +240,8 @@ class Player:
         self.weapons = []
         self.ammos = []
         self.weapon_index = 0
+        self.weapon_anim = 1
+        self.shooting = False
         #
         self.bob = 0
         self.to_equip = None
@@ -262,7 +263,19 @@ class Player:
 
     def display_weapon(self):
         if self.weapon is not None:
-            weapon_tex, weapon_rect = gtex.weapon_textures[self.weapon]
+            weapon_data = gtex.weapon_textures[self.weapon]
+            if self.shooting:
+                self.weapon_anim += 0.2
+            try:
+                weapon_data[int(self.weapon_anim)]
+            except IndexError:
+                self.shooting = False
+                self.weapon_anim = 1
+                return
+            else:
+                weapon_tex = weapon_data[int(self.weapon_anim)][0]
+            weapon_rect = weapon_data[int(self.weapon_anim)][1]
+            weapon_rect.midbottom = (display.width / 2, display.height)
             display.renderer.blit(weapon_tex, weapon_rect)
 
     def draw(self):
@@ -477,10 +490,12 @@ class Player:
                 weapon_data[self.weapon]["auto"]
                 mouses = pygame.mouse.get_pressed()
                 shoot = mouses[0]
-        if shoot:
+        if shoot and not self.shooting or self.process_shot:
             self.shoot()
 
     def shoot(self):
+        self.shooting = True
+        self.weapon_anim = 1
         if ticks() - self.last_shot >= 100:
             channel.play(sound)
             for te in test_enemies:
@@ -659,6 +674,7 @@ class Player:
             p1 = (ray[0][0] + game.mo, ray[0][1] + game.mo)
             p2 = (ray[1][0] + game.mo, ray[1][1] + game.mo)
             draw_line(Colors.GREEN, p1, p2)
+        player.display_weapon()
 
 
 class EnemyPlayer:
@@ -720,6 +736,7 @@ class TestEnemy:
         self.last_hit = ticks()
         self.regenerating = False
         self.rendering = False
+        self.images = imgload("client", "assets", "images", "3d", )
 
     def draw(self):
         self.rendering = False
@@ -913,6 +930,8 @@ def main(multiplayer):
 
     while game.running:
         clock.tick(game.fps)
+        player.process_shot = False
+
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
@@ -947,7 +966,7 @@ def main(multiplayer):
 
                 case pygame.MOUSEBUTTONDOWN:
                     if game.state == States.PLAY:
-                        player.shoot()
+                        player.process_shot = True
                         # if event.button == 1:
                         #     game.target_zoom = 30
                         #     game.zoom = 0
@@ -1041,8 +1060,6 @@ def main(multiplayer):
             display.width - 5,
             5,
         )
-
-        player.display_weapon()
 
         display.renderer.present()
 

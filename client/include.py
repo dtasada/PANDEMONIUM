@@ -37,6 +37,7 @@ class Colors:
     WHITE = (255, 255, 255, 255)
     YELLOW = (255, 255, 0, 255)
     LIGHT_BLUE = (0, 150, 255)
+    PINK = (152, 0, 136, 255)
 
     ANSI_GREEN = "\033[1;32m"
     ANSI_RED = "\033[1;31;31m"
