@@ -1,9 +1,10 @@
 {
     "1": {
-        "name": "AK-47",
-        "cost": 1200,
-        "ammo": 240,
-        "mag_size": 30,
-        "fire_rate": 10
+        "name": "revolver",
+        "cost": 1000,
+        "ammo": 60,
+        "mag": 6,
+        "fire_rate": 3,
+        "auto": false
     }
 }

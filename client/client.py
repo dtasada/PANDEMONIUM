@@ -126,21 +126,9 @@ class Game:
 
         self.ray_density = int(display.width * (self.resolution / 5))
 
-class Player:
+
+class GlobalTextures:
     def __init__(self):
-        self.x = game.tile_size * 8
-        self.y = game.tile_size * 8
-        self.w = 8
-        self.h = 8
-        self.id = None
-        self.color = Colors.WHITE
-        self.angle = -1.5708
-        self.arrow_img = Image(imgload(
-            "client", "assets", "images", "player_arrow.png", scale=1
-        ))
-        self.arrow_rect = pygame.Rect(0, 0, 16, 16)
-        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.weapons = {}
         self.wall_textures = [
             (
                 Texture.from_surface(
@@ -159,11 +147,11 @@ class Player:
         ]
         self.object_textures = [
             (
-                imgload("client", "assets", "images", "objects", file_name_with_ext)
+                imgload("client", "assets", "images", "objects", file_name_with_ext + ".png")
                 if file_name_with_ext is not None
                 else None
             )
-            for file_name_with_ext in [None] + os.listdir(Path("client", "assets", "images", "objects"))
+            for file_name_with_ext in [None] + weapon_names
         ]
         #
         self.highlighted_object_textures = [
@@ -171,39 +159,77 @@ class Player:
                 display.renderer,
                 borderize(
                     pygame.image.load(
-                        Path("client", "assets", "images", "objects", file_name_with_ext)
+                        Path("client", "assets", "images", "objects", file_name_with_ext + ".png")
                     ),
                     Colors.YELLOW,
                 ),
             )
             if file_name_with_ext is not None
             else None
-            for file_name_with_ext in [None] + os.listdir(Path("client", "assets", "images", "objects"))
+            for file_name_with_ext in [None] + weapon_names
         ]
         #
         self.mask_object_textures = []
-        for file_name_with_ext in os.listdir(Path("client", "assets", "images", "objects")):
+        for file_name_with_ext in [None] + weapon_names:
             if file_name_with_ext is None:
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
                     pygame.image.load(
-                        Path("client", "assets", "images", "objects", file_name_with_ext)
+                        Path("client", "assets", "images", "objects", file_name_with_ext + ".png")
                     )
                 ).to_surface(setcolor=Colors.WHITE)
                 surf.set_colorkey(Colors.BLACK)
                 tex = Texture.from_surface(display.renderer, surf)
             self.mask_object_textures.append(tex)
+        self.weapon_textures = {
+            weapon: [
+                imgload("client", "assets", "images", "weapons", data["name"], f"{data['name']}{i}.png", scale=4, return_rect=True)
+                for i in range(1, 6)
+            ]
+            for weapon, data in weapon_data.items()
+        }
+
+
+class Player:
+    def __init__(self):
+        self.x = game.tile_size * 8
+        self.y = game.tile_size * 8
+        self.w = 8
+        self.h = 8
+        self.id = None
+        self.color = Colors.WHITE
+        self.angle = -1.5708
+        self.arrow_img = Image(imgload(
+            "client", "assets", "images", "player_arrow.png", scale=1
+        ))
+        self.arrow_rect = pygame.Rect(0, 0, 16, 16)
+        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
+        #
+        self.weapons = []
+        self.ammos = []
+        self.weapon_index = 0
+        #
         self.bob = 0
         self.to_equip = None
         # weapon
-        self.weapon_tex = self.weapon_rect = None
+        self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
+    
+    @property
+    def weapon(self):
+        print(self.weapons, self.weapon_index)
+        return "1", pygame.Rect((0, 0, 0, 0,))
 
     @property
     def health(self):
         # TODO: Server call
         return 100
+
+    def display_weapon(self):
+        if self.weapon is not None:
+            weapon_tex, weapon_rect = gtex.weapon_textures[self.weapon]
+            display.renderer.blit(weapon_tex, weapon_rect)
 
     def draw(self):
         self.arrow_rect.center = self.rect.center
@@ -226,8 +252,8 @@ class Player:
             if joystick is not None:
                 joystick_button_rect.midbottom = (display.width / 2 - 115, display.height - 42)
                 display.renderer.blit(joystick_button_sprs[Joymap.SQUARE], joystick_button_rect)
-        if self.weapon_tex is not None:
-            display.renderer.blit(self.weapon_tex, self.weapon_rect)
+        if self.weapon_hud_tex is not None:
+            display.renderer.blit(self.weapon_hud_tex, self.weapon_hud_rect)
 
     def render_map(self):
         self.walls_to_render.sort(key=lambda x: -x[0])
@@ -391,15 +417,21 @@ class Player:
         self.render_map()
 
         # processing other important joystick input
+        shoot = False
         if joystick is not None:
             # picking up wall items
             if joystick.get_button(Joymap.SQUARE):
                 self.try_to_buy_wall_weapon()
-            # shoot
+            # shoot with joystick
             ax = joystick.get_axis(Joymap.RIGHT_TRIGGER)
-            if ax > -1:
-                self.shoot()
-            # 
+            shoot = ax > -1
+        else:
+            if self.weapon in weapon_data:
+                weapon_data[self.weapon]["auto"]
+                mouses = pygame.mouse.get_pressed()
+                shoot = mouses[0]
+        if shoot:
+            self.shoot()
         
     def shoot(self):
         # can shoot?
@@ -507,7 +539,7 @@ class Player:
             # )
 
             # texture rendering
-            tex = self.wall_textures[tile_value]
+            tex = gtex.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
             self.walls_to_render.append(
@@ -524,10 +556,10 @@ class Player:
                 if int(obj[1]) == orien:
                     high = (cur_x, cur_y) in self.surround
                     if high:
-                        lookup = self.highlighted_object_textures
+                        lookup = gtex.highlighted_object_textures
                         self.to_equip = ((cur_x, cur_y), obj)
                     else:
-                        lookup = self.object_textures
+                        lookup = gtex.object_textures
                     tex = lookup[int(obj[0])]
                     tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
                     self.walls_to_render.append(
@@ -547,16 +579,26 @@ class Player:
 
     def set_weapon(self, weapon):
         weapon = int(weapon)
-        self.weapon_tex = self.mask_object_textures[weapon]
-        self.weapon_rect = self.weapon_tex.get_rect(
+        self.weapon_hud_tex = gtex.mask_object_textures[weapon]
+        self.weapon_hud_rect = self.weapon_hud_tex.get_rect(
             bottomright=(display.width - 140, display.height - 10)
         ).scale_by(4)
-        self.weapons[weapon] = 100
+        weapon = str(weapon)
+        if len(self.weapons) == 2:
+            self.weapons[self.weapon_index] = weapon
+            self.ammos[self.weapon_index] = weapon_data[weapon]["ammo"]
+        elif len(self.weapons) == 1:
+            self.weapons[1] = weapon
+            self.ammos[1] = weapon_data[weapon]["ammo"]
+        else:
+            self.weapons.append(weapon)
+            self.ammos.append(weapon_data[weapon]["ammo"])
 
     def update(self):
-        if not self.id and client_udp.current_message:
-            message = json.loads(client_udp.current_message)
-            self.id = message["id"]
+        if game.multiplayer:
+            if not self.id and client_udp.current_message:
+                message = json.loads(client_udp.current_message)
+                self.id = message["id"]
         self.rays = []
         self.walls_to_render = []
         self.enemies_to_render = []
@@ -665,6 +707,7 @@ cursor.enable()
 game = Game()
 test_enemies = [TestEnemy()]
 player = Player()
+gtex = GlobalTextures()
 enemy_players = []
 enemy_players_addr = []
 hud = HUD()
@@ -801,18 +844,10 @@ def render_floor():
     )
 
 
-pistol_texs = [
-    Texture.from_surface(
-        display.renderer,
-        pygame.transform.scale_by(pygame.image.load(Path("client", "assets", "images", "pistol", f"0{i}.png")), 8)
-    )
-    for i in range(1, 7)
-]
-pistol_rect = pistol_texs[0].get_rect(midbottom=(display.width/2, display.height))
-
 def main(multiplayer):
     global client_udp, client_tcp, joystick
 
+    game.multiplayer = multiplayer
     if multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
@@ -952,7 +987,7 @@ def main(multiplayer):
             5,
         )
 
-        display.renderer.blit(pistol_texs[0], pistol_rect)
+        player.display_weapon()
 
         display.renderer.present()
 
