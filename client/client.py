@@ -44,9 +44,9 @@ class Game:
                 # ),
             }
 
-        self.current_map = self.maps["firing_range"]["walls"]
+        self.current_map = self.maps["strike"]["walls"]
         # self.current_floor_map = self.maps["firing_range"]["floor"]
-        self.current_object_map = self.maps["firing_range"]["weapons"]
+        self.current_object_map = self.maps["strike"]["weapons"]
 
         self.tile_size = 16
         self.map_height = len(self.current_map)
@@ -243,8 +243,9 @@ class GlobalTextures:
                     "weapons",
                     data["name"],
                     f"{data['name']}{i}.png",
-                    scale=4,
+                    scale=6,
                     return_rect=True,
+                    colorkey=Colors.PINK,
                 )
                 for i in range(1, 6)
             ]
@@ -586,7 +587,6 @@ class Player:
                 cur_y += step_y
                 dist = y_length
                 y_length += hypot_y
-            print(cur_y, cur_x)
             tile_value = game.current_map[cur_y][cur_x]
             if tile_value != 0:
                 col = True
@@ -762,8 +762,8 @@ class EnemyPlayer:
 
 class TestEnemy:
     def __init__(self):
-        self.x = game.tile_size * 10 + game.tile_size / 2
-        self.y = game.tile_size * 10 + game.tile_size / 2
+        self.x = game.tile_size * rand(0, game.map_width - 3) + game.tile_size / 2
+        self.y = game.tile_size * rand(0, game.map_height - 3) + game.tile_size / 2
         self.w = 8
         self.h = 8
         self.angle = -1.5708
@@ -773,11 +773,12 @@ class TestEnemy:
         self.indicator.color = Colors.ORANGE
         self.indicator_rect = pygame.Rect((0, 0, 16, 16))
         self.indicator_rect.center = (self.x, self.y)
-        self.image = imgload("client", "assets", "images", "3d", "player.png")
         self.last_hit = ticks()
         self.regenerating = False
         self.rendering = False
-        self.images = imgload("client", "assets", "images", "3d", )
+        self.images = imgload("client", "assets", "images", "3d", "player.png", frames=4)
+        self.image = self.images[0]
+        self.hp = 10
 
     def draw(self):
         self.rendering = False
@@ -814,6 +815,10 @@ class TestEnemy:
         self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
+        self.hp -= 1
+        if self.hp == 0:
+            test_enemies.remove(self)
+            test_enemies.append(TestEnemy())
 
 
 cursor.enable()
@@ -929,7 +934,6 @@ class Hue:
 
 darken_game = Hue(Colors.BLACK, 80)
 redden_game = Hue(Colors.RED, 20)
-
 
 floor_tex = imgload("client", "assets", "images", "3d", "floor.png")
 joystick_button_sprs = imgload(
