@@ -218,8 +218,10 @@ class Player:
     
     @property
     def weapon(self):
-        print(self.weapons, self.weapon_index)
-        return "1", pygame.Rect((0, 0, 0, 0,))
+        try:
+            return self.weapons[self.weapon_index]
+        except IndexError:
+            return None
 
     @property
     def health(self):
