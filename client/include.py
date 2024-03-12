@@ -344,11 +344,11 @@ class Client(socket.socket):
     def receive(self):
         if self.conn_type == "udp":
             while True:
-                data, addr  = self.recvfrom(2**12)
+                data, addr = self.recvfrom(2**12)
                 self.current_message = data.decode()
 
         elif self.conn_type == "tcp":
-             while True:
+            while True:
                 data = self.recv(2**12)
                 self.current_message = data.decode()
 
@@ -411,9 +411,7 @@ def imgload(
             x.set_colorkey(colorkey)
     if to_tex:
         ret = [
-            Texture.from_surface(
-                display.renderer, pygame.transform.scale_by(x, scale)
-            )
+            Texture.from_surface(display.renderer, pygame.transform.scale_by(x, scale))
             for x in ret
         ]
     # final return
@@ -446,7 +444,10 @@ def angle_to_vel(angle, speed=1):
 def load_map_from_csv(path_, int_=True):
     with open(path_, "r") as f:
         reader = csv.reader(f)
-        return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
+        return [
+            [int(x) if int_ else x.lstrip() for x in line]
+            for line in reader
+        ]
 
 
 def write(

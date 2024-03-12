@@ -27,18 +27,26 @@ class Game:
         # map
         self.maps = {}
         for file in os.listdir(Path("client", "assets", "maps")):
-            self.maps[file.split('-')[0]] = {
+            self.maps[file.split("-")[0]] = {
                 "walls": load_map_from_csv(
                     Path("client", "assets", "maps", f"{file.split('-')[0]}-walls.csv")
                 ),
                 "weapons": load_map_from_csv(
-                    Path("client", "assets", "maps", f"{file.split('-')[0]}-weapons.csv"),
+                    Path(
+                        "client", "assets", "maps", f"{file.split('-')[0]}-weapons.csv"
+                    ),
                     int_=False,
-                )
+                ),
+                # "floor": load_map_from_csv(
+                #     Path(
+                #         "client", "assets", "maps", f"{file.split('-')[0]}-floor.csv"
+                #     ),
+                # ),
             }
 
-        self.current_map = self.maps["strike"]["walls"]
-        self.current_object_map = self.maps["strike"]["weapons"]
+        self.current_map = self.maps["firing_range"]["walls"]
+        # self.current_floor_map = self.maps["firing_range"]["floor"]
+        self.current_object_map = self.maps["firing_range"]["weapons"]
 
         self.tile_size = 16
         self.map_height = len(self.current_map)
@@ -141,7 +149,6 @@ class Game:
         self.ray_density = int(display.width * (self.resolution / 4))
 
 
-
 class GlobalTextures:
     def __init__(self):
         self.x = game.tile_size * 8
@@ -177,7 +184,9 @@ class GlobalTextures:
         ]
         self.object_textures = [
             (
-                imgload("client", "assets", "images", "objects", file_name_with_ext + ".png")
+                imgload(
+                    "client", "assets", "images", "objects", file_name_with_ext + ".png"
+                )
                 if file_name_with_ext is not None
                 else None
             )
@@ -185,17 +194,25 @@ class GlobalTextures:
         ]
         #
         self.highlighted_object_textures = [
-            Texture.from_surface(
-                display.renderer,
-                borderize(
-                    pygame.image.load(
-                        Path("client", "assets", "images", "objects", file_name_with_ext + ".png")
+            (
+                Texture.from_surface(
+                    display.renderer,
+                    borderize(
+                        pygame.image.load(
+                            Path(
+                                "client",
+                                "assets",
+                                "images",
+                                "objects",
+                                file_name_with_ext + ".png",
+                            )
+                        ),
+                        Colors.YELLOW,
                     ),
-                    Colors.YELLOW,
-                ),
+                )
+                if file_name_with_ext is not None
+                else None
             )
-            if file_name_with_ext is not None
-            else None
             for file_name_with_ext in [None] + weapon_names
         ]
         #
@@ -206,7 +223,13 @@ class GlobalTextures:
             else:
                 surf = pygame.mask.from_surface(
                     pygame.image.load(
-                        Path("client", "assets", "images", "objects", file_name_with_ext + ".png")
+                        Path(
+                            "client",
+                            "assets",
+                            "images",
+                            "objects",
+                            file_name_with_ext + ".png",
+                        )
                     )
                 ).to_surface(setcolor=Colors.WHITE)
                 surf.set_colorkey(Colors.BLACK)
@@ -214,7 +237,16 @@ class GlobalTextures:
             self.mask_object_textures.append(tex)
         self.weapon_textures = {
             weapon: [
-                imgload("client", "assets", "images", "weapons", data["name"], f"{data['name']}{i}.png", scale=4, return_rect=True)
+                imgload(
+                    "client",
+                    "assets",
+                    "images",
+                    "weapons",
+                    data["name"],
+                    f"{data['name']}{i}.png",
+                    scale=4,
+                    return_rect=True,
+                )
                 for i in range(1, 6)
             ]
             for weapon, data in weapon_data.items()
@@ -229,7 +261,7 @@ class Player:
         self.h = 8
         self.id = None
         self.color = Colors.WHITE
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.arrow_img = Image(
             imgload(
                 "client", "assets", "images", "minimap", "player_arrow.png", scale=1
@@ -247,7 +279,7 @@ class Player:
         # weapon
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
-    
+
     @property
     def weapon(self):
         try:
@@ -280,7 +312,7 @@ class Player:
         if self.to_equip is not None:
             coord, obj = self.to_equip
             weapon_id, weapon_orien = obj
-            # weapon_name = 
+            # weapon_name =
             cost = weapon_costs[weapon_id]
             write(
                 "midbottom",
@@ -291,8 +323,13 @@ class Player:
                 display.height - 50,
             )
             if joystick is not None:
-                joystick_button_rect.midbottom = (display.width / 2 - 115, display.height - 42)
-                display.renderer.blit(joystick_button_sprs[Joymap.SQUARE], joystick_button_rect)
+                joystick_button_rect.midbottom = (
+                    display.width / 2 - 115,
+                    display.height - 42,
+                )
+                display.renderer.blit(
+                    joystick_button_sprs[Joymap.SQUARE], joystick_button_rect
+                )
         if self.weapon_hud_tex is not None:
             display.renderer.blit(self.weapon_hud_tex, self.weapon_hud_rect)
 
@@ -534,6 +571,7 @@ class Player:
                 cur_y += step_y
                 dist = y_length
                 y_length += hypot_y
+            print(cur_y, cur_x)
             tile_value = game.current_map[cur_y][cur_x]
             if tile_value != 0:
                 col = True
@@ -583,6 +621,9 @@ class Player:
             # )
 
             # texture rendering
+            if tile_value == -1:
+                return
+
             tex = gtex.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
