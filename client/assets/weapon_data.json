@@ -4,7 +4,7 @@
         "cost": 1000,
         "ammo": 60,
         "mag": 6,
-        "fire_rate": 3,
+        "fire_pause": 300,
         "auto": false
     }
 }

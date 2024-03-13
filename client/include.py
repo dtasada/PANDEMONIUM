@@ -257,41 +257,6 @@ class Button:
         )
 
 
-class HUD:
-    def __init__(self):
-        self.health_font_size = 64
-        self.health_tex_rect = None
-        self.ammo_tex_rect = None
-
-    def health(self, health, has_changed):
-        if has_changed or self.health_tex_rect is None:
-            return write(
-                "bottomleft",
-                "HP: " + str(health),
-                v_fonts[self.health_font_size],
-                Colors.WHITE,
-                16,
-                display.height - 4,
-            )
-
-    def ammo(self, ammo_count, has_changed):
-        if has_changed or self.ammo_tex_rect is None:
-            return write(
-                "bottomright",
-                ammo_count,
-                v_fonts[self.health_font_size],
-                Colors.WHITE,
-                display.width - 16,
-                display.height - 4,
-            )
-
-    def ammo_update(self, ammo_count, has_changed):
-        display.renderer.blit(*self.ammo(ammo_count, has_changed))
-
-    def health_update(self, health, has_changed):
-        display.renderer.blit(*self.health(health, has_changed))
-
-
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
 
 
@@ -518,7 +483,7 @@ weapon_costs = {
 }
 with open(Path("client", "assets", "weapon_data.json"), "r") as f:
     weapon_data = json.load(f)
-weapon_names = [v["name"] for k, v in weapon_data.items()]
+weapon_names = [None] + [v["name"] for k, v in weapon_data.items()]
 
 ticks = pygame.time.get_ticks
 sound = pygame.mixer.Sound(

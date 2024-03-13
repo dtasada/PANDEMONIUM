@@ -189,7 +189,7 @@ class GlobalTextures:
                 if file_name_with_ext is not None
                 else None
             )
-            for file_name_with_ext in [None] + weapon_names
+            for file_name_with_ext in weapon_names
         ]
         #
         self.highlighted_object_textures = [
@@ -212,11 +212,11 @@ class GlobalTextures:
                 if file_name_with_ext is not None
                 else None
             )
-            for file_name_with_ext in [None] + weapon_names
+            for file_name_with_ext in weapon_names
         ]
         #
         self.mask_object_textures = []
-        for file_name_with_ext in [None] + weapon_names:
+        for file_name_with_ext in weapon_names:
             if file_name_with_ext is None:
                 tex = None
             else:
@@ -253,6 +253,79 @@ class GlobalTextures:
         }
 
 
+class HUD:
+    def __init__(self):
+        self.health_tex = None
+        self.ammo_tex = None
+        self.weapon_name_tex = None
+        self.weapon_tex = None
+    
+    def update(self):
+        if self.health_tex is not None:
+            display.renderer.blit(self.health_tex, self.health_rect)
+        if self.ammo_tex is not None:
+            display.renderer.blit(self.ammo_tex, self.ammo_rect)
+            w, h = 3, 25
+            for yo in range(player.mag):
+                yo = -yo * w * 4
+                fill_rect(Colors.WHITE, (
+                    self.ammo_rect.x + yo - 14,
+                    self.ammo_rect.centery - h / 2 + 2,
+                    w,
+                    h,
+                    )
+                )
+
+        if self.weapon_name_tex is not None:
+            display.renderer.blit(self.weapon_name_tex, self.weapon_name_rect)
+        if self.weapon_tex is not None:
+            display.renderer.blit(self.weapon_tex, self.weapon_rect)
+
+    def update_weapon_general(self, player):
+        self.update_ammo(player)
+        self.update_weapon_name(player)
+        self.update_weapon_name(player)
+        self.update_weapon_tex(player)
+
+    def update_health(self, player):
+        self.health_tex, self.health_rect = write(
+            "bottomleft",
+            f"HP: {player.health}",
+            v_fonts[64],
+            Colors.WHITE,
+            16,
+            display.height - 4,
+        )
+    
+    def update_ammo(self, player):
+        self.ammo_tex, self.ammo_rect = write(
+            "bottomright",
+            player.ammo,
+            v_fonts[64],
+            Colors.WHITE,
+            display.width - 16,
+            display.height - 4
+        )
+        
+    
+    def update_weapon_name(self, player):
+        self.weapon_name_tex, self.weapon_name_rect = write(
+            "bottomright",
+            weapon_names[int(player.weapon)].title(),
+            v_fonts[32],
+            Colors.WHITE,
+            display.width - 16,
+            self.ammo_rect.y
+        )
+    
+    def update_weapon_tex(self, player):
+        self.weapon_tex = gtex.mask_object_textures[int(player.weapon)]
+        self.weapon_rect = self.weapon_tex.get_rect()
+        m = 3
+        self.weapon_rect.inflate_ip(self.weapon_rect.width * m, self.weapon_rect.height * m)
+        self.weapon_rect.center = (display.width - 200, display.height - 40)
+
+
 class Player:
     def __init__(self):
         self.x = game.tile_size * 8
@@ -269,18 +342,24 @@ class Player:
         )
         self.arrow_rect = pygame.Rect(0, 0, 16, 16)
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        #
+        # weapon and shooting tech
         self.weapons = []
         self.ammos = []
+        self.mags = []
         self.weapon_index = 0
         self.weapon_anim = 1
         self.shooting = False
+        self.reloading = False
+        self.reload_direc = 1
+        self.weapon_yoffset = 0
         #
         self.bob = 0
         self.to_equip = None
         # weapon
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
+        #
+        hud.update_health(self)
 
     @property
     def weapon(self):
@@ -288,6 +367,28 @@ class Player:
             return self.weapons[self.weapon_index]
         except IndexError:
             return None
+    
+    @property
+    def mag(self):
+        try:
+            return self.mags[self.weapon_index]
+        except IndexError:
+            return None
+    
+    @mag.setter
+    def mag(self, value):
+        self.mags[self.weapon_index] = value
+    
+    @property
+    def ammo(self):
+        try:
+            return self.ammos[self.weapon_index]
+        except IndexError:
+            return None
+
+    @ammo.setter
+    def ammo(self, value):
+        self.ammos[self.weapon_index] = value
 
     @property
     def health(self):
@@ -304,11 +405,19 @@ class Player:
             except IndexError:
                 self.shooting = False
                 self.weapon_anim = 1
-                return
-            else:
-                weapon_tex = weapon_data[int(self.weapon_anim)][0]
+            weapon_tex = weapon_data[int(self.weapon_anim)][0]
             weapon_rect = weapon_data[int(self.weapon_anim)][1]
-            weapon_rect.midbottom = (display.width / 2, display.height)
+            weapon_rect.midbottom = (display.width / 2, display.height + self.weapon_yoffset)
+            if self.reloading:
+                # reload down
+                if weapon_rect.y >= display.height - 180:
+                    self.reload_direc = -self.reload_direc
+                # reload back up and get the ammo and magazine that was promised to you beforehand
+                if self.weapon_yoffset == 0 and self.reload_direc == -1:
+                    self.reloading = False
+                    self.mag = self.new_mag
+                    self.ammo = self.new_ammo
+                    hud.update_weapon_general(self)
             display.renderer.blit(weapon_tex, weapon_rect)
 
     def draw(self):
@@ -326,11 +435,12 @@ class Player:
         if self.to_equip is not None:
             coord, obj = self.to_equip
             weapon_id, weapon_orien = obj
+            weapon_name = weapon_names[int(weapon_id)].title()
             # weapon_name =
             cost = weapon_costs[weapon_id]
             write(
                 "midbottom",
-                f"Press <e> to buy {'asd'} [${cost}]",
+                f"Press <e> to buy {weapon_name} [${cost}]",
                 v_fonts[52],
                 Colors.WHITE,
                 display.width / 2,
@@ -344,8 +454,6 @@ class Player:
                 display.renderer.blit(
                     joystick_button_sprs[Joymap.SQUARE], joystick_button_rect
                 )
-        if self.weapon_hud_tex is not None:
-            display.renderer.blit(self.weapon_hud_tex, self.weapon_hud_rect)
 
     def render_map(self):
         self.walls_to_render.sort(key=lambda x: -x[0])
@@ -515,7 +623,7 @@ class Player:
         self.render_map()
 
         # processing other important joystick input
-        shoot = False
+        shoot_auto = False
         if joystick is not None:
             # picking up wall items
             if joystick.get_button(Joymap.SQUARE):
@@ -525,23 +633,42 @@ class Player:
             shoot = ax > -1
         else:
             if self.weapon in weapon_data:
-                weapon_data[self.weapon]["auto"]
-                mouses = pygame.mouse.get_pressed()
-                shoot = mouses[0]
-        if shoot and not self.shooting or self.process_shot:
-            self.shoot()
+                if weapon_data[self.weapon]["auto"]:
+                    mouses = pygame.mouse.get_pressed()
+                    shoot_auto = mouses[0]
+                else:
+                    if player.weapon is not None:
+                        if shoot_auto or self.process_shot:
+                            if self.mag == 0:
+                                self.reload()
+                            else:
+                                self.shoot()
+        # check whether reloading
+        if self.reloading:
+            m = 6
+            self.weapon_yoffset += self.reload_direc * m
 
     def shoot(self):
         self.shooting = True
         self.weapon_anim = 1
-        if ticks() - self.last_shot >= 100:
-            channel.play(sound)
-            for te in test_enemies:
-                if te.rendering:
-                    if not te.regenerating:
-                        if te.rect.collidepoint(display.center):
-                            te.hit()
-            self.last_shot = ticks()
+        # channel.play(sound)
+        for te in test_enemies:
+            if te.rendering:
+                if not te.regenerating:
+                    if te.rect.collidepoint(display.center):
+                        te.hit()
+        self.last_shot = ticks()
+        self.mag -= 1
+        hud.update_weapon_general(self)
+    
+    def reload(self, amount=None):
+        if self.mag < weapon_data[self.weapon]["mag"]:
+            if not self.reloading:
+                self.reloading = True
+                self.reload_direc = 1
+                self.new_mag = weapon_data[self.weapon]["mag"]
+                self.mag_diff = self.new_mag - self.mag
+                self.new_ammo = self.ammo - self.mag_diff
 
     def cast_ray(
         self, deg_offset, index, start_x=None, start_y=None, abs_angle=False
@@ -685,18 +812,24 @@ class Player:
         weapon = int(weapon)
         self.weapon_hud_tex = gtex.mask_object_textures[weapon]
         self.weapon_hud_rect = self.weapon_hud_tex.get_rect(
-            bottomright=(display.width - 140, display.height - 10)
+            bottomright=(display.width - 160, display.height - 10)
         ).scale_by(4)
         weapon = str(weapon)
         if len(self.weapons) == 2:
             self.weapons[self.weapon_index] = weapon
             self.ammos[self.weapon_index] = weapon_data[weapon]["ammo"]
+            self.mags[self.weapon_index] = weapon_data[weapon]["mag"]
         elif len(self.weapons) == 1:
             self.weapons[1] = weapon
             self.ammos[1] = weapon_data[weapon]["ammo"]
+            self.mags[1] = weapon_data[weapon]["mag"]
+            self.weapon_index = 1
         else:
             self.weapons.append(weapon)
             self.ammos.append(weapon_data[weapon]["ammo"])
+            self.mags.append(weapon_data[weapon]["mag"])
+    
+        hud.update_weapon_general(self)
 
     def update(self):
         if game.multiplayer:
@@ -707,8 +840,9 @@ class Player:
         self.walls_to_render = []
         self.enemies_to_render = []
         self.keys()
-        hud.health_update(self.health, False)
-        hud.ammo_update(self.health, False)
+        # updates
+        pass
+        # 
         # Thread(client_tcp.req, args=(self.health,)).start()
         for data in self.rays:
             ray, _ = data
@@ -824,11 +958,11 @@ class TestEnemy:
 cursor.enable()
 game = Game()
 test_enemies = [TestEnemy()]
+hud = HUD()
 player = Player()
 gtex = GlobalTextures()
 enemy_players = []
 enemy_players_addr = []
-hud = HUD()
 clock = pygame.time.Clock()
 joystick = None
 
@@ -1032,6 +1166,9 @@ def main(multiplayer):
 
                         case pygame.K_e:
                             player.try_to_buy_wall_weapon()
+                        
+                        case pygame.K_r:
+                            player.reload()
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
@@ -1076,6 +1213,8 @@ def main(multiplayer):
                         check_new_players()
                         for enemy in enemy_players:
                             enemy.update()
+                
+                hud.update()
 
             display.renderer.blit(crosshair_tex, crosshair_rect)
             display.renderer.blit(redden_game.tex, redden_game.rect)
@@ -1096,7 +1235,7 @@ def main(multiplayer):
 
         if cursor.enabled:
             cursor.update()
-
+        
         write(
             "topright",
             str(int(clock.get_fps())),
