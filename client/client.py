@@ -37,16 +37,10 @@ class Game:
                     ),
                     int_=False,
                 ),
-                # "floor": load_map_from_csv(
-                #     Path(
-                #         "client", "assets", "maps", f"{file.split('-')[0]}-floor.csv"
-                #     ),
-                # ),
             }
 
-        self.current_map = self.maps["strike"]["walls"]
-        # self.current_floor_map = self.maps["firing_range"]["floor"]
-        self.current_object_map = self.maps["strike"]["weapons"]
+        self.current_map = self.maps["firing_range"]["walls"]
+        self.current_object_map = self.maps["firing_range"]["weapons"]
 
         self.tile_size = 16
         self.map_height = len(self.current_map)
@@ -89,7 +83,7 @@ class Game:
                 img = self.tiles[tile]
                 self.map_surf.blit(img, (x * self.tile_size, y * self.tile_size))
         self.map_tex = Texture.from_surface(display.renderer, self.map_surf)
-        self.mo = self.tile_size * 0  # map offset!!!!!!!!!!
+        self.mo = self.tile_size * 0
         self.map_rect = self.map_tex.get_rect(topleft=(self.mo, self.mo))
 
     @property
@@ -179,7 +173,7 @@ class GlobalTextures:
             )
             for file_name_with_ext in weapon_names
         ]
-        #
+
         self.highlighted_object_textures = [
             (
                 Texture.from_surface(
@@ -340,13 +334,13 @@ class Player:
         self.reloading = False
         self.reload_direc = 1
         self.weapon_yoffset = 0
-        #
+
         self.bob = 0
         self.to_equip = None
         # weapon
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
-        #
+
         hud.update_health(self)
 
     @property
@@ -444,6 +438,9 @@ class Player:
                 )
 
     def render_map(self):
+        game.mo = game.tile_size * 0
+        game.map_rect = game.map_tex.get_rect(topleft=(game.mo, game.mo))
+
         self.walls_to_render.sort(key=lambda x: -x[0])
         for dist_px, tex, dest, area, color in self.walls_to_render:
             # render enemy first
@@ -856,17 +853,17 @@ class EnemyPlayer:
         self.indicator_img = imgload(
             "client", "assets", "images", "enemy_indicator.png"
         )
+
         self.indicator_rect = self.indicator_img.get_rect()
+        self.arrow_rect = self.arrow_surf.get_rect(middle=(64, 64))
 
     def draw(self):
-        arrow_rect = pygame.Rect(*self.rect.topleft, 16, 16)
         arrow = self.arrow_img
         arrow.angle = degrees(self.angle)
-        draw_rect(Colors.GREEN, arrow_rect)
-        # display.renderer.blit(arrow, pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size))
+        draw_rect(Colors.GREEN, self.arrow_rect)
         display.renderer.blit(
             self.indicator_img,
-            pygame.Rect(arrow_rect.x, arrow_rect.y, *arrow_rect.size),
+            pygame.Rect(self.arrow_rect.x, self.arrow_rect.y, *self.arrow_rect.size),
         )
 
     def update(self):
