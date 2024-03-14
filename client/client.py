@@ -248,10 +248,11 @@ class HUD:
         if self.ammo_tex is not None:
             display.renderer.blit(self.ammo_tex, self.ammo_rect)
             w, h = 3, 25
-            for yo in range(player.mag):
+            for yo in range(weapon_data[player.weapon]["mag"]):
+                color = Colors.WHITE if yo < player.mag else Colors.GRAY
                 yo = -yo * w * 4
-                fill_rect(Colors.WHITE, (
-                    self.ammo_rect.x + yo - 14,
+                fill_rect(color, (
+                    self.ammo_rect.x + yo - 15,
                     self.ammo_rect.centery - h / 2 + 2,
                     w,
                     h,
@@ -264,10 +265,9 @@ class HUD:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
     def update_weapon_general(self, player):
+        self.update_weapon_tex(player)
         self.update_ammo(player)
         self.update_weapon_name(player)
-        self.update_weapon_name(player)
-        self.update_weapon_tex(player)
 
     def update_health(self, player):
         self.health_tex, self.health_rect = write(
@@ -285,7 +285,7 @@ class HUD:
             player.ammo,
             v_fonts[64],
             Colors.WHITE,
-            display.width - 16,
+            display.width - 120,
             display.height - 4
         )
         
@@ -305,7 +305,7 @@ class HUD:
         self.weapon_rect = self.weapon_tex.get_rect()
         m = 3
         self.weapon_rect.inflate_ip(self.weapon_rect.width * m, self.weapon_rect.height * m)
-        self.weapon_rect.center = (display.width - 200, display.height - 40)
+        self.weapon_rect.center = (display.width - 60, display.height - 40)
 
 
 class Player:
@@ -596,10 +596,10 @@ class Player:
             dx = te.indicator_rect.centerx - self.rect.centerx
             te.angle = degrees(atan2(dy, dx))
             te.dist_px = hypot(dy, dx)
+        for te in test_enemies:
             if not self.enemies_to_render:
                 self.enemies_to_render.append(te)
             else:
-                index = 0
                 for index, enemy in enumerate(test_enemies):
                     if te.dist_px > enemy.dist_px:
                         self.enemies_to_render.insert(index, te)
@@ -634,17 +634,18 @@ class Player:
             self.weapon_yoffset += self.reload_direc * m
 
     def shoot(self):
-        self.shooting = True
-        self.weapon_anim = 1
-        channel.play(sound)
-        for te in test_enemies:
-            if te.rendering:
-                if not te.regenerating:
-                    if te.rect.collidepoint(display.center):
-                        te.hit()
-        self.last_shot = ticks()
-        self.mag -= 1
-        hud.update_weapon_general(self)
+        if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
+            self.shooting = True
+            self.weapon_anim = 1
+            channel.play(sound)
+            for te in test_enemies:
+                if te.rendering:
+                    if not te.regenerating:
+                        if te.rect.collidepoint(display.center):
+                            te.hit()
+            self.last_shot = ticks()
+            self.mag -= 1
+            hud.update_weapon_general(self)
     
     def reload(self, amount=None):
         if self.mag < weapon_data[self.weapon]["mag"]:
@@ -813,7 +814,6 @@ class Player:
             self.weapons.append(weapon)
             self.ammos.append(weapon_data[weapon]["ammo"])
             self.mags.append(weapon_data[weapon]["mag"])
-    
         hud.update_weapon_general(self)
 
     def update(self):
@@ -896,7 +896,9 @@ class TestEnemy:
         self.regenerating = False
         self.rendering = False
         self.images = imgload("client", "assets", "images", "3d", "player.png", frames=4)
-        self.image = self.images[0]
+        self.image = self.images[1]
+        self.color = [rand(0, 255) for _ in range(3)] + [255]
+        self.image.color = self.color
         self.hp = 10
 
     def draw(self):
@@ -918,7 +920,7 @@ class TestEnemy:
             perc = (diff1) / (diff1 + diff2)
             centerx = perc * display.width
             centery = display.height / 2 + player.bob
-            height = game.projection_dist / self.dist_px * display.height / 2  # maths
+            height = game.projection_dist / self.dist_px * display.height / 2 # maths
             width = height / self.image.height * self.image.width
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
@@ -928,7 +930,7 @@ class TestEnemy:
     def regenerate(self):
         if self.regenerating and ticks() - self.last_hit >= 70:
             self.regenerating = False
-            self.image.color = Colors.WHITE
+            self.image.color = self.color
 
     def hit(self):
         self.image.color = Colors.RED
@@ -937,7 +939,8 @@ class TestEnemy:
         self.hp -= 1
         if self.hp == 0:
             test_enemies.remove(self)
-            test_enemies.append(TestEnemy())
+            for _ in range(2):
+                test_enemies.append(TestEnemy())
 
 
 cursor.enable()
