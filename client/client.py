@@ -273,7 +273,7 @@ class HUD:
     def update_health(self, player):
         self.health_tex, self.health_rect = write(
             "bottomleft",
-            f"HP: {player.health}",
+            f"{player.health} HP",
             v_fonts[64],
             Colors.WHITE,
             16,
