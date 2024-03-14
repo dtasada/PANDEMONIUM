@@ -39,8 +39,8 @@ class Game:
                 ),
             }
 
-        self.current_map = self.maps["firing_range"]["walls"]
-        self.current_object_map = self.maps["firing_range"]["weapons"]
+        self.current_map = self.maps["strike"]["walls"]
+        self.current_object_map = self.maps["strike"]["weapons"]
 
         self.tile_size = 16
         self.map_height = len(self.current_map)
@@ -272,7 +272,7 @@ class HUD:
     def update_health(self, player):
         self.health_tex, self.health_rect = write(
             "bottomleft",
-            f"HP: {player.health}",
+            f"{player.health} HP",
             v_fonts[64],
             Colors.WHITE,
             16,
@@ -636,7 +636,7 @@ class Player:
     def shoot(self):
         self.shooting = True
         self.weapon_anim = 1
-        # channel.play(sound)
+        channel.play(sound)
         for te in test_enemies:
             if te.rendering:
                 if not te.regenerating:
