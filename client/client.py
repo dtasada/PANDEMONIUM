@@ -24,6 +24,7 @@ class Game:
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
+        self.rendered_enemies = 0
         # map
         self.maps = {}
         for file in os.listdir(Path("client", "assets", "maps")):
@@ -39,8 +40,8 @@ class Game:
                 ),
             }
 
-        self.current_map = self.maps["firing_range"]["walls"]
-        self.current_object_map = self.maps["firing_range"]["weapons"]
+        self.current_map = self.maps["strike"]["walls"]
+        self.current_object_map = self.maps["strike"]["weapons"]
 
         self.tile_size = 16
         self.map_height = len(self.current_map)
@@ -440,10 +441,10 @@ class Player:
     def render_map(self):
         game.mo = game.tile_size * 0
         game.map_rect = game.map_tex.get_rect(topleft=(game.mo, game.mo))
-
+        game.rendered_enemies = 0
         self.walls_to_render.sort(key=lambda x: -x[0])
         for dist_px, tex, dest, area, color in self.walls_to_render:
-            # render enemy first
+            # # render enemy first
             if self.enemies_to_render:
                 te = self.enemies_to_render[0]
                 if te.dist_px > dist_px:
@@ -453,6 +454,8 @@ class Player:
             tex.color = color
             display.renderer.blit(tex, dest, area)
         # render the remaining enemies
+        for te in self.enemies_to_render:
+            te.render()
         for te in self.enemies_to_render:
             te.render()
 
@@ -603,6 +606,9 @@ class Player:
                 for index, enemy in enumerate(test_enemies):
                     if te.dist_px > enemy.dist_px:
                         self.enemies_to_render.insert(index, te)
+                        break
+                else:
+                    self.enemies_to_render.append(te)
 
         # map ofc
         self.render_map()
@@ -881,8 +887,8 @@ class EnemyPlayer:
 
 class TestEnemy:
     def __init__(self):
-        self.x = game.tile_size * rand(0, game.map_width - 3) + game.tile_size / 2
-        self.y = game.tile_size * rand(0, game.map_height - 3) + game.tile_size / 2
+        self.x = int(game.tile_size * rand(0, game.map_width - 3))
+        self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
         self.angle = -1.5708
@@ -896,7 +902,7 @@ class TestEnemy:
         self.regenerating = False
         self.rendering = False
         self.images = imgload("client", "assets", "images", "3d", "player.png", frames=4)
-        self.image = self.images[1]
+        self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
         self.hp = 10
@@ -915,6 +921,7 @@ class TestEnemy:
         angle = self.angle
         end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
         if is_angle_between(start_angle, angle, end_angle):
+            game.rendered_enemies += 1
             diff1 = angle_diff(start_angle, angle)
             diff2 = angle_diff(angle, end_angle)
             perc = (diff1) / (diff1 + diff2)
