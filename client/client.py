@@ -456,8 +456,6 @@ class Player:
         # render the remaining enemies
         for te in self.enemies_to_render:
             te.render()
-        for te in self.enemies_to_render:
-            te.render()
 
         display.renderer.blit(game.map_tex, game.map_rect)
         if game.debug_map:
