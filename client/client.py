@@ -241,6 +241,11 @@ class HUD:
         self.ammo_tex = None
         self.weapon_name_tex = None
         self.weapon_tex = None
+        self.heart_tex = Texture.from_surface(
+            display.renderer,
+            pygame.image.load(Path("client", "assets", "images", "hud", "heart.png"))
+        )
+        self.heart_rect = self.heart_tex.get_rect(bottomright=(140, display.height - 12))
     
     def update(self):
         if self.health_tex is not None:
@@ -264,6 +269,8 @@ class HUD:
         if self.weapon_tex is not None:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
+        display.renderer.blit(self.heart_tex, self.heart_rect)
+
     def update_weapon_general(self, player):
         self.update_weapon_tex(player)
         self.update_ammo(player)
@@ -272,7 +279,7 @@ class HUD:
     def update_health(self, player):
         self.health_tex, self.health_rect = write(
             "bottomleft",
-            f"{player.health} HP",
+            str(player.health),
             v_fonts[64],
             Colors.WHITE,
             16,
@@ -917,8 +924,8 @@ class TestEnemy:
         if is_angle_between(start_angle, angle, end_angle):
             diff1 = angle_diff(start_angle, angle)
             diff2 = angle_diff(angle, end_angle)
-            perc = (diff1) / (diff1 + diff2)
-            centerx = perc * display.width
+            ratio = (diff1) / (diff1 + diff2)
+            centerx = ratio * display.width
             centery = display.height / 2 + player.bob
             height = game.projection_dist / self.dist_px * display.height / 2 # maths
             width = height / self.image.height * self.image.width
@@ -1130,6 +1137,8 @@ def main(multiplayer):
                                 pygame.mouse.set_pos(xpos, display.height - 21)
                             else:
                                 player.bob -= event.rel[1]
+                                player.bob = min(player.bob, display.height * 1.5)
+                                player.bob = max(player.bob, -display.height * 1.5)
 
                 case pygame.MOUSEBUTTONDOWN:
                     if game.state == States.PLAY:
