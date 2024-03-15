@@ -22,7 +22,7 @@ class Game:
         self.resolution = 2
         self.ray_density = int(display.width * (self.resolution / 4))
         self.resolutions_list = [
-            int(display.width * coef) for coef in [1 / 8, 1 / 4, 1 / 2, 1]
+            int(display.width * coef) for coef in [0.125, 0.25, 0.5, 1.0]
         ]
 
         self.target_zoom = self.zoom = 0
@@ -656,11 +656,12 @@ class Player:
             self.shooting = True
             self.weapon_anim = 1
             channel.play(sound)
+
             for te in test_enemies:
-                if te.rendering:
-                    if not te.regenerating:
-                        if te.rect.collidepoint(display.center):
-                            te.hit()
+                if te.rendering and not te.regenerating:
+                    if te.rect.collidepoint(display.center):
+                        te.hit()
+
             self.last_shot = ticks()
             self.mag -= 1
             hud.update_weapon_general(self)
@@ -845,7 +846,7 @@ class Player:
         self.keys()
         # updates
         pass
-        #
+
         # Thread(client_tcp.req, args=(self.health,)).start()
         for data in self.rays:
             ray, _ = data
@@ -882,11 +883,9 @@ class TestEnemy:
 
     def draw(self):
         if client_udp.current_message:
-            print("here")
             message = json.loads(client_udp.current_message)
             if self.id_ not in message:
-                test_enemies.remove(self)
-                test_enemies_addr.remove(self.id_)
+                self.die()
                 return
             self.indicator_rect.x = message[self.id_]["x"]
             self.indicator_rect.y = message[self.id_]["y"]
@@ -897,6 +896,16 @@ class TestEnemy:
         display.renderer.blit(self.indicator, self.indicator_rect)
 
     def update(self):
+        if client_tcp.current_message:
+            print(client_tcp.current_message, self.id_)
+        if (
+            client_tcp.current_message == f"quit-{self.id_}"
+            or self.hp == 0
+        ):
+            print("received")
+            self.die()
+            return
+
         self.draw()
         self.regenerate()
 
@@ -929,9 +938,12 @@ class TestEnemy:
         self.last_hit = ticks()
         self.regenerating = True
         self.hp -= 1
-        if self.hp == 0:
-            test_enemies.remove(self)
 
+    def die(self):
+        client_tcp.req(f"kill-{self.id_}")
+        test_enemies.remove(self)
+        test_enemies_addr.remove(self.id_)
+        game.set_state(States.MAIN_MENU)
 
 cursor.enable()
 game = Game()
@@ -1185,8 +1197,6 @@ def main(multiplayer):
                 )
 
                 player.update()
-                for te in test_enemies:
-                    te.update()
                 if game.should_render_map:
                     player.draw()
                     if multiplayer:
