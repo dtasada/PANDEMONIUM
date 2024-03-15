@@ -141,7 +141,7 @@ class GlobalTextures:
         self.h = 8
         self.id = None
         self.color = Colors.WHITE
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.arrow_img = Image(
             imgload(
                 "client", "assets", "images", "minimap", "player_arrow.png", scale=1
@@ -855,55 +855,14 @@ class Player:
         player.display_weapon()
 
 
-class EnemyPlayer:
+class TestEnemy:
     def __init__(self, id_):
         self.id_ = id_
-        self.x = game.tile_size * 8
-        self.y = game.tile_size * 8
-        self.w = 8
-        self.h = 8
-        self.angle = -1.5708
-        self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "minimap", "player_arrow.png")
-        )
-        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
-        self.indicator_img = imgload(
-            "client", "assets", "images", "enemy_indicator.png"
-        )
-
-        self.indicator_rect = self.indicator_img.get_rect()
-        self.arrow_rect = self.arrow_surf.get_rect(center=(64, 64))
-
-    def draw(self):
-        arrow = self.arrow_img
-        arrow.angle = degrees(self.angle)
-        draw_rect(Colors.GREEN, self.arrow_rect)
-        display.renderer.blit(
-            self.indicator_img,
-            pygame.Rect(self.arrow_rect.x, self.arrow_rect.y, *self.arrow_rect.size),
-        )
-
-    def update(self):
-        if client_udp.current_message:
-            message = json.loads(client_udp.current_message)
-            if self.id_ not in message:
-                enemy_players.remove(self)
-                enemy_players_addr.remove(self.id_)
-                return
-            self.rect.x = message[self.id_]["x"]
-            self.rect.y = message[self.id_]["y"]
-            self.angle = message[self.id_]["angle"]
-        self.draw()
-
-
-class TestEnemy:
-    def __init__(self):
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.indicator = imgload(
             "client", "assets", "images", "minimap", "player_arrow.png"
         )
@@ -922,6 +881,17 @@ class TestEnemy:
         self.hp = 10
 
     def draw(self):
+        if client_udp.current_message:
+            print("here")
+            message = json.loads(client_udp.current_message)
+            if self.id_ not in message:
+                test_enemies.remove(self)
+                test_enemies_addr.remove(self.id_)
+                return
+            self.indicator_rect.x = message[self.id_]["x"]
+            self.indicator_rect.y = message[self.id_]["y"]
+            self.angle = message[self.id_]["angle"]
+
         self.rendering = False
         draw_rect(Colors.RED, self.indicator_rect)
         display.renderer.blit(self.indicator, self.indicator_rect)
@@ -934,6 +904,7 @@ class TestEnemy:
         start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
         angle = self.angle
         end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
+
         if is_angle_between(start_angle, angle, end_angle):
             game.rendered_enemies += 1
             diff1 = angle_diff(start_angle, angle)
@@ -960,18 +931,16 @@ class TestEnemy:
         self.hp -= 1
         if self.hp == 0:
             test_enemies.remove(self)
-            for _ in range(2):
-                test_enemies.append(TestEnemy())
 
 
 cursor.enable()
 game = Game()
-test_enemies = [TestEnemy()]
+test_enemies = []
 hud = HUD()
 player = Player()
 gtex = GlobalTextures()
-enemy_players = []
-enemy_players_addr = []
+test_enemies = []
+test_enemies_addr = []
 clock = pygame.time.Clock()
 joystick = None
 
@@ -1089,9 +1058,9 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if addr not in enemy_players_addr and addr != "id":
-                enemy_players_addr.append(addr)
-                enemy_players.append(EnemyPlayer(addr))
+            if addr not in test_enemies_addr and addr != "id":
+                test_enemies_addr.append(addr)
+                test_enemies.append(TestEnemy(addr))
 
 
 def render_floor():
@@ -1222,7 +1191,7 @@ def main(multiplayer):
                     player.draw()
                     if multiplayer:
                         check_new_players()
-                        for enemy in enemy_players:
+                        for enemy in test_enemies:
                             enemy.update()
 
                 hud.update()
