@@ -21,6 +21,10 @@ class Game:
         self.fov = 60
         self.resolution = 2
         self.ray_density = int(display.width * (self.resolution / 4))
+        self.resolutions_list = [
+            int(display.width * coef) for coef in [1 / 8, 1 / 4, 1 / 2, 1]
+        ]
+
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
@@ -108,28 +112,25 @@ class Game:
     def set_fov(self, amount):
         self.fov += amount
 
-        if self.fov > 120:
-            self.fov = 120
-        if self.fov < 30:
-            self.fov = 30
+        self.fov = min(self.fov, 120)
+        self.fov = max(self.fov, 30)
 
     def get_sens(self):
         return self.sens
 
     def set_sens(self, amount):
         self.sens += amount
+        self.sens = max(self.sens, 10)
 
     def get_res(self):
         return self.resolution
 
     def set_res(self, amount):
         self.resolution += amount
-        if self.resolution > 4:
-            self.resolution = 4
-        elif self.resolution < 1:
-            self.resolution = 1
+        self.resolution = min(self.resolution, 4)
+        self.resolution = max(self.resolution, 1)
 
-        self.ray_density = int(display.width * (self.resolution / 4))
+        self.ray_density = self.resolutions_list[self.resolution - 1]
 
 
 class GlobalTextures:
@@ -166,13 +167,11 @@ class GlobalTextures:
         ]
         self.object_textures = [
             (
-                imgload(
-                    "client", "assets", "images", "objects", file_name_with_ext + ".png"
-                )
-                if file_name_with_ext is not None
+                imgload("client", "assets", "images", "objects", file_name + ".png")
+                if file_name is not None
                 else None
             )
-            for file_name_with_ext in weapon_names
+            for file_name in weapon_names
         ]
 
         self.highlighted_object_textures = [
@@ -186,18 +185,18 @@ class GlobalTextures:
                                 "assets",
                                 "images",
                                 "objects",
-                                file_name_with_ext + ".png",
+                                file_name + ".png",
                             )
                         ),
                         Colors.YELLOW,
                     ),
                 )
-                if file_name_with_ext is not None
+                if file_name is not None
                 else None
             )
-            for file_name_with_ext in weapon_names
+            for file_name in weapon_names
         ]
-        #
+
         self.mask_object_textures = []
         for file_name_with_ext in weapon_names:
             if file_name_with_ext is None:
@@ -244,10 +243,12 @@ class HUD:
         self.weapon_tex = None
         self.heart_tex = Texture.from_surface(
             display.renderer,
-            pygame.image.load(Path("client", "assets", "images", "hud", "heart.png"))
+            pygame.image.load(Path("client", "assets", "images", "hud", "heart.png")),
         )
-        self.heart_rect = self.heart_tex.get_rect(bottomright=(140, display.height - 12))
-    
+        self.heart_rect = self.heart_tex.get_rect(
+            bottomright=(140, display.height - 12)
+        )
+
     def update(self):
         if self.health_tex is not None:
             display.renderer.blit(self.health_tex, self.health_rect)
@@ -257,12 +258,14 @@ class HUD:
             for yo in range(weapon_data[player.weapon]["mag"]):
                 color = Colors.WHITE if yo < player.mag else Colors.GRAY
                 yo = -yo * w * 4
-                fill_rect(color, (
-                    self.ammo_rect.x + yo - 15,
-                    self.ammo_rect.centery - h / 2 + 2,
-                    w,
-                    h,
-                    )
+                fill_rect(
+                    color,
+                    (
+                        self.ammo_rect.x + yo - 15,
+                        self.ammo_rect.centery - h / 2 + 2,
+                        w,
+                        h,
+                    ),
                 )
 
         if self.weapon_name_tex is not None:
@@ -286,7 +289,7 @@ class HUD:
             16,
             display.height - 4,
         )
-    
+
     def update_ammo(self, player):
         self.ammo_tex, self.ammo_rect = write(
             "bottomright",
@@ -294,10 +297,9 @@ class HUD:
             v_fonts[64],
             Colors.WHITE,
             display.width - 120,
-            display.height - 4
+            display.height - 4,
         )
-        
-    
+
     def update_weapon_name(self, player):
         self.weapon_name_tex, self.weapon_name_rect = write(
             "bottomright",
@@ -305,14 +307,16 @@ class HUD:
             v_fonts[32],
             Colors.WHITE,
             display.width - 16,
-            self.ammo_rect.y
+            self.ammo_rect.y,
         )
-    
+
     def update_weapon_tex(self, player):
         self.weapon_tex = gtex.mask_object_textures[int(player.weapon)]
         self.weapon_rect = self.weapon_tex.get_rect()
         m = 3
-        self.weapon_rect.inflate_ip(self.weapon_rect.width * m, self.weapon_rect.height * m)
+        self.weapon_rect.inflate_ip(
+            self.weapon_rect.width * m, self.weapon_rect.height * m
+        )
         self.weapon_rect.center = (display.width - 60, display.height - 40)
 
 
@@ -357,18 +361,18 @@ class Player:
             return self.weapons[self.weapon_index]
         except IndexError:
             return None
-    
+
     @property
     def mag(self):
         try:
             return self.mags[self.weapon_index]
         except IndexError:
             return None
-    
+
     @mag.setter
     def mag(self, value):
         self.mags[self.weapon_index] = value
-    
+
     @property
     def ammo(self):
         try:
@@ -397,7 +401,10 @@ class Player:
                 self.weapon_anim = 1
             weapon_tex = weapon_data[int(self.weapon_anim)][0]
             weapon_rect = weapon_data[int(self.weapon_anim)][1]
-            weapon_rect.midbottom = (display.width / 2, display.height + self.weapon_yoffset)
+            weapon_rect.midbottom = (
+                display.width / 2,
+                display.height + self.weapon_yoffset,
+            )
             if self.reloading:
                 # reload down
                 if weapon_rect.y >= display.height - 180:
@@ -657,7 +664,7 @@ class Player:
             self.last_shot = ticks()
             self.mag -= 1
             hud.update_weapon_general(self)
-    
+
     def reload(self, amount=None):
         if self.mag < weapon_data[self.weapon]["mag"]:
             if not self.reloading:
@@ -838,7 +845,7 @@ class Player:
         self.keys()
         # updates
         pass
-        # 
+        #
         # Thread(client_tcp.req, args=(self.health,)).start()
         for data in self.rays:
             ray, _ = data
@@ -866,7 +873,7 @@ class EnemyPlayer:
         )
 
         self.indicator_rect = self.indicator_img.get_rect()
-        self.arrow_rect = self.arrow_surf.get_rect(middle=(64, 64))
+        self.arrow_rect = self.arrow_surf.get_rect(center=(64, 64))
 
     def draw(self):
         arrow = self.arrow_img
@@ -906,7 +913,9 @@ class TestEnemy:
         self.last_hit = ticks()
         self.regenerating = False
         self.rendering = False
-        self.images = imgload("client", "assets", "images", "3d", "player.png", frames=4)
+        self.images = imgload(
+            "client", "assets", "images", "3d", "player.png", frames=4
+        )
         self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
@@ -932,7 +941,7 @@ class TestEnemy:
             ratio = (diff1) / (diff1 + diff2)
             centerx = ratio * display.width
             centery = display.height / 2 + player.bob
-            height = game.projection_dist / self.dist_px * display.height / 2 # maths
+            height = game.projection_dist / self.dist_px * display.height / 2  # maths
             width = height / self.image.height * self.image.width
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
@@ -1141,7 +1150,7 @@ def main(multiplayer):
                             elif ypos < 20:
                                 pygame.mouse.set_pos(xpos, display.height - 21)
                             else:
-                                player.bob -= event.rel[1]
+                                player.bob -= event.rel[1] * game.sens / 100
                                 player.bob = min(player.bob, display.height * 1.5)
                                 player.bob = max(player.bob, -display.height * 1.5)
 
@@ -1168,7 +1177,7 @@ def main(multiplayer):
 
                         case pygame.K_e:
                             player.try_to_buy_wall_weapon()
-                        
+
                         case pygame.K_r:
                             player.reload()
 
@@ -1215,7 +1224,7 @@ def main(multiplayer):
                         check_new_players()
                         for enemy in enemy_players:
                             enemy.update()
-                
+
                 hud.update()
 
             display.renderer.blit(crosshair_tex, crosshair_rect)
@@ -1237,7 +1246,7 @@ def main(multiplayer):
 
         if cursor.enabled:
             cursor.update()
-        
+
         write(
             "topright",
             str(int(clock.get_fps())),
