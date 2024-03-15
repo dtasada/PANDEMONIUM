@@ -39,6 +39,7 @@ except Exception as err:
 
 
 addresses = {}
+clients = []
 
 
 def receive_udp():
@@ -57,9 +58,34 @@ def receive_tcp(client, client_addr):
     try:
         while True:
             data = client.recv(2**12).decode()
-            if data.startswith("quit"):
-                del addresses[data.split("-")[1]]
-    except Exception as err:
+            verb = data.split("-")[0]
+            target = data.split("-")[1]
+
+            try:
+                match verb:
+                    case "quit":
+                        for client_ in clients:
+                            client_.send(f"quit-{target}".encode())
+                            # if client_.raddr == target:
+                            #     clients.remove(client_)
+
+                        del addresses[target]
+
+                    case "kill":
+                        print("kill_target:", target)
+                        for client_ in clients:
+                            client_.send(f"kill-{target}".encode())
+                            # if client_.raddr == target:
+                            #     clients.remove(client_)
+
+                        del addresses[target]
+
+            except BaseException as err:
+                print(
+                    f"{Colors.ANSI_RED}Error sending TCP message:{Colors.ANSI_RESET} {err}"
+                )
+
+    except BaseException as err:
         print(
             f"{Colors.ANSI_RED}Could not handle client {client_addr}:{Colors.ANSI_RESET} {err}"
         )
@@ -75,13 +101,15 @@ while True:
     # TCP
     try:
         client, client_addr = server_tcp.accept()
+        clients.append(client)
         print(f"New connection from {client_addr}")
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 
     except ConnectionAbortedError:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
         break
-    except KeyboardInterrupt:
+
+    except BaseException:
         break
 
 server_tcp.close()

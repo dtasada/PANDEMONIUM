@@ -4,3 +4,6 @@
 
 ## Requirements
 * Please replace `pygame` with `pygame-ce`
+
+## How to run
+To run the singleplayer mode (for demonstration purposes), run the `pandemonium.py` file and make sure `multiplayer` is set to `False`.

@@ -38,7 +38,7 @@ class Game:
             self.resolution = 2
         self.ray_density = int(display.width * (self.resolution / 4))
         self.resolutions_list = [
-            int(display.width * coef) for coef in [1 / 8, 1 / 4, 1 / 2, 1]
+            int(display.width * coef) for coef in [0.125, 0.25, 0.5, 1.0]
         ]
         # misc.
         self.running = True
@@ -164,7 +164,7 @@ class GlobalTextures:
         self.h = 8
         self.id = None
         self.color = Colors.WHITE
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.arrow_img = Image(
             imgload(
                 "client", "assets", "images", "minimap", "player_arrow.png", scale=1
@@ -703,11 +703,12 @@ class Player:
             self.shooting = True
             self.weapon_anim = 1
             channel.play(sound)
+
             for te in test_enemies:
-                if te.rendering:
-                    if not te.regenerating:
-                        if te.rect.collidepoint(display.center):
-                            te.hit()
+                if te.rendering and not te.regenerating:
+                    if te.rect.collidepoint(display.center):
+                        te.hit()
+
             self.last_shot = ticks()
             self.mag -= 1
             hud.update_weapon_general(self)
@@ -892,7 +893,7 @@ class Player:
         self.keys()
         # updates
         pass
-        #
+
         # Thread(client_tcp.req, args=(self.health,)).start()
         for data in self.rays:
             ray, _ = data
@@ -902,59 +903,14 @@ class Player:
         player.display_weapon()
 
 
-class EnemyPlayer:
-    def __init__(self, id_):
-        self.id_ = id_
-        self.x = game.tile_size * 8
-        self.y = game.tile_size * 8
-        self.w = 8
-        self.h = 8
-        self.angle = -1.5708
-        self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "minimap", "player_arrow.png")
-        )
-        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
-        self.indicator_img = imgload(
-            "client", "assets", "images", "enemy_indicator.png"
-        )
-
-        self.indicator_rect = self.indicator_img.get_rect()
-        self.arrow_rect = self.arrow_surf.get_rect(center=(64, 64))
-
-    def draw(self):
-        arrow = self.arrow_img
-        arrow.angle = degrees(self.angle)
-        draw_rect(Colors.GREEN, self.arrow_rect)
-        display.renderer.blit(
-            self.indicator_img,
-            pygame.Rect(self.arrow_rect.x, self.arrow_rect.y, *self.arrow_rect.size),
-        )
-
-    def update(self):
-        if client_udp.current_message:
-            message = json.loads(client_udp.current_message)
-            if self.id_ not in message:
-                enemy_players.remove(self)
-                enemy_players_addr.remove(self.id_)
-                return
-            self.rect.x = message[self.id_]["x"]
-            self.rect.y = message[self.id_]["y"]
-            self.angle = message[self.id_]["angle"]
-        self.draw()
-
-
 class TestEnemy:
-    def __init__(self, pos=None):
-        if pos is None:
-            x, y = rand(0, game.map_width - 3), rand(0, game.map_height - 3)
-        else:
-            x, y = pos
-        self.x = int(game.tile_size * x) + game.tile_size / 2
-        self.y = int(game.tile_size * y) + game.tile_size / 2
+    def __init__(self, id_=None):
+        self.id_ = id_
+        self.x = int(game.tile_size * rand(0, game.map_width - 3))
+        self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.indicator = imgload(
             "client", "assets", "images", "minimap", "player_arrow.png"
         )
@@ -973,11 +929,31 @@ class TestEnemy:
         self.hp = 1
 
     def draw(self):
+        if game.multiplayer:
+            if client_udp.current_message:
+                message = json.loads(client_udp.current_message)
+                if self.id_ not in message:
+                    self.die()
+                    return
+                self.indicator_rect.x = message[self.id_]["x"]
+                self.indicator_rect.y = message[self.id_]["y"]
+                self.angle = message[self.id_]["angle"]
+
         self.rendering = False
         draw_rect(Colors.RED, self.indicator_rect)
         display.renderer.blit(self.indicator, self.indicator_rect)
 
     def update(self):
+        if game.multiplayer:
+            if client_tcp.current_message:
+                print(client_tcp.current_message, self.id_)
+            if (
+                client_tcp.current_message == f"quit-{self.id_}"
+                or self.hp == 0
+            ):
+                print("received")
+                self.die()
+                return
         self.draw()
         self.regenerate()
 
@@ -985,6 +961,7 @@ class TestEnemy:
         start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
         angle = self.angle
         end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
+
         if is_angle_between(start_angle, angle, end_angle):
             game.rendered_enemies += 1
             diff1 = angle_diff(start_angle, angle)
@@ -1009,19 +986,25 @@ class TestEnemy:
         self.last_hit = ticks()
         self.regenerating = True
         self.hp -= 1
-        if self.hp == 0:
+        if self.hp <= 0:
             test_enemies.remove(self)
+
+    def die(self):
+        client_tcp.req(f"kill-{self.id_}")
+        test_enemies.remove(self)
+        test_enemies_addr.remove(self.id_)
+        game.set_state(States.MAIN_MENU)
 
 cursor.enable()
 game = Game()
-test_enemies = [TestEnemy()]
+test_enemies = []
 hud = HUD()
 player = Player()
 player_selector = PlayerSelector()
 exit_handler = ExitHandler()
 gtex = GlobalTextures()
-enemy_players = []
-enemy_players_addr = []
+test_enemies = []
+test_enemies_addr = []
 clock = pygame.time.Clock()
 joystick = None
 
@@ -1154,9 +1137,9 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if addr not in enemy_players_addr and addr != "id":
-                enemy_players_addr.append(addr)
-                enemy_players.append(EnemyPlayer(addr))
+            if addr not in test_enemies_addr and addr != "id":
+                test_enemies_addr.append(addr)
+                test_enemies.append(TestEnemy(addr))
 
 
 def render_floor():
@@ -1175,7 +1158,7 @@ def main(multiplayer):
     global client_udp, client_tcp, joystick
 
     game.multiplayer = multiplayer
-    if multiplayer:
+    if game.multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
         Thread(target=client_udp.receive, daemon=True).start()
@@ -1189,7 +1172,7 @@ def main(multiplayer):
             match event.type:
                 case pygame.QUIT:
                     game.running = False
-                    if multiplayer:
+                    if game.multiplayer:
                         client_tcp.req(f"quit-{player.id}")
                         pygame.quit()
                         sys.exit()
@@ -1292,14 +1275,11 @@ def main(multiplayer):
                 )
 
                 player.update()
-                for te in test_enemies:
-                    te.update()
                 if game.should_render_map:
                     player.draw()
-                    if multiplayer:
-                        check_new_players()
-                        for enemy in enemy_players:
-                            enemy.update()
+                    # check_new_players()
+                    for enemy in test_enemies:
+                        enemy.update()
 
                 hud.update()
 
