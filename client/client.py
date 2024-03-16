@@ -15,6 +15,7 @@ class Game:
     def __init__(self):
         # misc.
         self.running = True
+        self.multiplayer = False
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
         self.sens = 50
@@ -326,7 +327,7 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
-        self.id = None
+        self.tcp_id = None
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -805,12 +806,14 @@ class Player:
                     )
 
     def send_location(self):
-        data = {
-            "x": self.arrow_rect.x + game.mo,
-            "y": self.arrow_rect.y + game.mo,
-            "angle": self.angle,
-        }
-        data = json.dumps(data)
+        data = json.dumps({
+            "tcp_id": str(player.tcp_id),
+            "body": {
+                "x": self.arrow_rect.x + game.mo,
+                "y": self.arrow_rect.y + game.mo,
+                "angle": self.angle,
+            }
+        })
         client_udp.req(data)
 
     def set_weapon(self, weapon):
@@ -837,9 +840,7 @@ class Player:
 
     def update(self):
         if game.multiplayer:
-            if not self.id and client_udp.current_message:
-                message = json.loads(client_udp.current_message)
-                self.id = message["id"]
+            self.send_location()
         self.rays = []
         self.walls_to_render = []
         self.enemies_to_render = []
@@ -896,13 +897,14 @@ class TestEnemy:
         display.renderer.blit(self.indicator, self.indicator_rect)
 
     def update(self):
-        if client_tcp.current_message:
-            print(client_tcp.current_message, self.id_)
-        if (
-            client_tcp.current_message == f"quit-{self.id_}"
-            or self.hp == 0
-        ):
-            print("received")
+        if client_tcp.current_message == f"kill-{self.id_}":
+            print(f"received signal to kill {self.id_}")
+            self.die()
+            return
+
+        if self.hp == 0:
+            print(f"sending signal to kill {self.id_}")
+            client_tcp.req(f"kill-{self.id_}")
             self.die()
             return
 
@@ -940,10 +942,11 @@ class TestEnemy:
         self.hp -= 1
 
     def die(self):
-        client_tcp.req(f"kill-{self.id_}")
         test_enemies.remove(self)
         test_enemies_addr.remove(self.id_)
-        game.set_state(States.MAIN_MENU)
+
+        if player.tcp_id == self.id_:
+            game.set_state(States.MAIN_MENU)
 
 cursor.enable()
 game = Game()
@@ -1070,7 +1073,11 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if addr not in test_enemies_addr and addr != "id":
+            if (
+                addr not in test_enemies_addr # enemy already exists
+                and addr != player.tcp_id # enemy is not self
+                and addr != "id"
+            ):
                 test_enemies_addr.append(addr)
                 test_enemies.append(TestEnemy(addr))
 
@@ -1096,6 +1103,7 @@ def main(multiplayer):
         client_tcp = Client("tcp")
         Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
+        player.tcp_id = client_tcp.getsockname()
 
     while game.running:
         clock.tick(game.fps)
@@ -1106,7 +1114,7 @@ def main(multiplayer):
                 case pygame.QUIT:
                     game.running = False
                     if multiplayer:
-                        client_tcp.req(f"quit-{player.id}")
+                        client_tcp.req(f"quit-{player.tcp_id}")
                         pygame.quit()
                         sys.exit()
 

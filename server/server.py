@@ -3,6 +3,7 @@ import sys
 import socket
 import json
 from threading import Thread
+from pprint import pprint
 
 
 class Colors:
@@ -44,14 +45,16 @@ clients = []
 
 def receive_udp():
     while True:
-        data, addr = server_udp.recvfrom(2**12)
-        addresses[str(addr)] = json.loads(data)
+        request, addr = server_udp.recvfrom(2**12)
+        request = json.loads(request)
+        addresses[request["tcp_id"]] = request["body"]
 
-        for address in addresses:
-            response = {k: v for k, v in addresses.items() if k != address}
-            response["id"] = address
+        addresses[request["tcp_id"]]["udp_id"] = addr
+
+        for tcp_id, content in addresses.items():
+            response = {k: v for k, v in addresses.items() if k != tcp_id}
             response = json.dumps(response)
-            server_udp.sendto(response.encode(), eval(address))
+            server_udp.sendto(response.encode(), content["udp_id"])
 
 
 def receive_tcp(client, client_addr):
@@ -65,20 +68,23 @@ def receive_tcp(client, client_addr):
                 match verb:
                     case "quit":
                         for client_ in clients:
-                            client_.send(f"quit-{target}".encode())
-                            # if client_.raddr == target:
-                            #     clients.remove(client_)
+                            if client_ != client:
+                                client_.send(f"quit-{target}".encode())
 
-                        del addresses[target]
+                            if client_.getpeername() == client_addr:
+                                clients.remove(client_)
+
+                        del addresses[client_addr]
 
                     case "kill":
-                        print("kill_target:", target)
                         for client_ in clients:
-                            client_.send(f"kill-{target}".encode())
-                            # if client_.raddr == target:
-                            #     clients.remove(client_)
+                            if client_ != client:
+                                client_.send(f"kill-{target}".encode())
 
-                        del addresses[target]
+                            if client_.getpeername() == client_addr:
+                                clients.remove(client_)
+
+                        del addresses[client_addr]
 
             except BaseException as err:
                 print(
