@@ -4,7 +4,6 @@ from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
 from time import perf_counter
-from typing import List
 import csv
 import pygame
 import socket
@@ -410,10 +409,7 @@ def angle_to_vel(angle, speed=1):
 def load_map_from_csv(path_, int_=True):
     with open(path_, "r") as f:
         reader = csv.reader(f)
-        return [
-            [int(x) if int_ else x.lstrip() for x in line]
-            for line in reader
-        ]
+        return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
 def write(
