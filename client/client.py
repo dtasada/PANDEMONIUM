@@ -978,6 +978,13 @@ title = Button(
     anchor="center",
 )
 
+username_input = UserInput(
+    display.width - 450,
+    325,
+    32,
+    Colors.WHITE        
+)
+
 main_settings_buttons = [
     title,
     Button(
@@ -1158,6 +1165,9 @@ def main(multiplayer):
                             game.target_zoom = 0
 
                 case pygame.KEYDOWN:
+                    if game.state == States.MAIN_MENU:
+                        username_input.process_event(event)
+
                     match event.key:
                         case pygame.K_ESCAPE:
                             match game.state:
@@ -1170,7 +1180,8 @@ def main(multiplayer):
                             player.try_to_buy_wall_weapon()
                         
                         case pygame.K_r:
-                            player.reload()
+                            if game.state == States.PLAY:
+                                player.reload()
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
@@ -1187,6 +1198,7 @@ def main(multiplayer):
 
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
+            username_input.update()
         else:
             if multiplayer:
                 player.send_location()
