@@ -4,7 +4,6 @@ from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
 from time import perf_counter
-from typing import List
 import csv
 import pygame
 import socket

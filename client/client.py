@@ -5,7 +5,7 @@ import os
 
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
 from pathlib import Path
-from pygame._sdl2.video import Window, Renderer, Texture, Image
+from pygame._sdl2.video import Texture, Image
 from threading import Thread
 
 from .include import *
@@ -52,14 +52,13 @@ class Game:
         # map
         self.maps = {}
         for file in os.listdir(Path("client", "assets", "maps")):
-            self.maps[file.split("-")[0]] = {
+            file_name = file.split("-")[0]
+            self.maps[file_name] = {
                 "walls": load_map_from_csv(
-                    Path("client", "assets", "maps", f"{file.split('-')[0]}-walls.csv")
+                    Path("client", "assets", "maps", f"{file_name}-walls.csv")
                 ),
                 "weapons": load_map_from_csv(
-                    Path(
-                        "client", "assets", "maps", f"{file.split('-')[0]}-weapons.csv"
-                    ),
+                    Path("client", "assets", "maps", f"{file_name}-weapons.csv"),
                     int_=False,
                 ),
             }
@@ -399,11 +398,15 @@ class Player:
         self.reload_direc = 1
         self.weapon_yoffset = 0
 
+        self.weapon_hud_tex = self.weapon_hud_rect = None
+        self.last_shot = ticks()
+
+        self.melee_anim = 1
+        self.last_melee = ticks()
+
         self.bob = 0
         self.to_equip = None
         # weapon
-        self.weapon_hud_tex = self.weapon_hud_rect = None
-        self.last_shot = ticks()
 
         hud.update_health(self)
 
@@ -512,16 +515,16 @@ class Player:
         for dist_px, tex, dest, area, color in self.walls_to_render:
             # # render enemy first
             if self.enemies_to_render:
-                te = self.enemies_to_render[0]
-                if te.dist_px > dist_px:
-                    te.render()
+                enemy = self.enemies_to_render[0]
+                if enemy.dist_px > dist_px:
+                    enemy.render()
                     del self.enemies_to_render[0]
             # render the texture after the (farther away) enemy
             tex.color = color
             display.renderer.blit(tex, dest, area)
         # render the remaining enemies
-        for te in self.enemies_to_render:
-            te.render()
+        for enemy in self.enemies_to_render:
+            enemy.render()
 
         display.renderer.blit(game.map_tex, game.map_rect)
         if game.debug_map:
@@ -565,8 +568,11 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
             
             if keys[pygame.K_q]:
-                  for te in test_enemies:
+                  for te in enemies:
                     te.indicator_rect.y -= 1
+
+            if keys[pygame.K_q]:
+                self.melee()
 
             amult = 0.03
             if keys[pygame.K_LEFT]:
@@ -662,12 +668,12 @@ class Player:
                 o += game.fov / game.ray_density
         _xvel, _yvel = angle_to_vel(self.angle)
 
-        for te in test_enemies:
+        for te in enemies:
             dy = te.indicator_rect.centery - self.rect.centery
             dx = te.indicator_rect.centerx - self.rect.centerx
             te.angle = degrees(atan2(dy, dx))
             te.dist_px = hypot(dy, dx)
-        self.enemies_to_render = sorted(test_enemies, key=lambda te: te.dist_px, reverse=True)
+        self.enemies_to_render = sorted(enemies, key=lambda te: te.dist_px, reverse=True)
 
         # map ofc
         self.render_map()
@@ -693,6 +699,7 @@ class Player:
                                 self.reload()
                             elif not self.reloading:
                                 self.shoot()
+
         # check whether reloading
         if self.reloading:
             m = 6
@@ -704,7 +711,7 @@ class Player:
             self.weapon_anim = 1
             channel.play(sound)
 
-            for te in test_enemies:
+            for te in enemies:
                 if te.rendering and not te.regenerating:
                     if te.rect.collidepoint(display.center):
                         te.hit()
@@ -903,7 +910,7 @@ class Player:
         player.display_weapon()
 
 
-class TestEnemy:
+class EnemyPlayer:
     def __init__(self, id_=None):
         self.id_ = id_
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
@@ -988,25 +995,25 @@ class TestEnemy:
         self.regenerating = True
         self.hp -= 1
         if self.hp <= 0:
-            test_enemies.remove(self)
+            enemies.remove(self)
 
     def die(self):
-        test_enemies.remove(self)
-        test_enemies_addr.remove(self.id_)
+        enemies.remove(self)
+        enemy_addresses.remove(self.id_)
 
         if player.tcp_id == self.id_:
             game.set_state(States.MAIN_MENU)
 
 cursor.enable()
 game = Game()
-test_enemies = []
+enemies = []
 hud = HUD()
 player = Player()
 player_selector = PlayerSelector()
 exit_handler = ExitHandler()
 gtex = GlobalTextures()
-test_enemies = []
-test_enemies_addr = []
+enemies = []
+enemy_addresses = []
 clock = pygame.time.Clock()
 joystick = None
 
@@ -1147,12 +1154,12 @@ def check_new_players():
         message = json.loads(client_udp.current_message)
         for addr in message:
             if (
-                addr not in test_enemies_addr # enemy already exists
+                addr not in enemy_addresses # enemy already exists
                 and addr != player.tcp_id # enemy is not self
                 and addr != "id"
             ):
-                test_enemies_addr.append(addr)
-                test_enemies.append(TestEnemy(addr))
+                enemy_addresses.append(addr)
+                enemies.append(EnemyPlayer(addr))
 
 
 def render_floor():
@@ -1249,14 +1256,16 @@ def main(multiplayer):
                                 player.reload()
                             player.reload()
                             
+
                         case pygame.K_SPACE:
-                            test_enemies.append(TestEnemy())
-                        
+                            enemies.append(EnemyPlayer())
+
                         case pygame.K_q:
                             for _ in range(3):
                                 try:
                                     del test_enemies[rand(0, len(test_enemies) - 1)]
                                 except: pass
+                                    del enemies[rand(0, len(enemies) - 1)]
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
@@ -1297,9 +1306,10 @@ def main(multiplayer):
                 player.update()
                 if game.should_render_map:
                     player.draw()
-                    # check_new_players()
-                    for enemy in test_enemies:
-                        enemy.update()
+                    if game.multiplayer:
+                        check_new_players()
+                        for enemy in enemy_players:
+                            enemy.update()
 
                 hud.update()
 

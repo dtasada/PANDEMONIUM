@@ -3,5 +3,5 @@ from client.client import *
 
 
 if __name__ == "__main__":
-    main(multiplayer=False)
+    main(multiplayer=True)
     # import cProfile; cProfile.run("main(multiplayer=False)", sort="cumtime")
