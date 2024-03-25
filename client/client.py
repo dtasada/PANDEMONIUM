@@ -1245,10 +1245,8 @@ def main(multiplayer):
                             player.try_to_buy_wall_weapon()
 
                         case pygame.K_r:
-<<<<<<< HEAD
                             if game.state == States.PLAY:
                                 player.reload()
-=======
                             player.reload()
                             
                         case pygame.K_SPACE:
@@ -1259,7 +1257,6 @@ def main(multiplayer):
                                 try:
                                     del test_enemies[rand(0, len(test_enemies) - 1)]
                                 except: pass
->>>>>>> 6f79f7a3480b9f10db803b5159bc4849528de1fb
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
@@ -1276,11 +1273,8 @@ def main(multiplayer):
 
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
-<<<<<<< HEAD
             username_input.update()
-=======
             player_selector.update()
->>>>>>> 6f79f7a3480b9f10db803b5159bc4849528de1fb
         else:
             if multiplayer:
                 player.send_location()
