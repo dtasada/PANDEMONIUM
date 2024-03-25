@@ -1306,7 +1306,7 @@ def main(multiplayer):
                     player.draw()
                     if game.multiplayer:
                         check_new_players()
-                        for enemy in enemy_players:
+                        for enemy in enemies:
                             enemy.update()
 
                 hud.update()

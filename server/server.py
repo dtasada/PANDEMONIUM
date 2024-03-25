@@ -74,7 +74,7 @@ def receive_tcp(client, client_addr):
                             if client_.getpeername() == client_addr:
                                 clients.remove(client_)
 
-                        del addresses[client_addr]
+                        del addresses[target]
 
                     case "kill":
                         for client_ in clients:
