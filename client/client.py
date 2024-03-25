@@ -25,16 +25,7 @@ class ExitHandler:
 class Game:
     def __init__(self):
         # settings values
-        is_empty = False
         if os.path.isfile(Path("client", "settings.json")):
-            with open(Path("client", "settings.json"), "r") as f:
-                try:
-                    json_load = json.load(f)
-                except json.decoder.JSONDecodeError:
-                    is_empty = True
-        else:
-            is_empty = True
-        if not is_empty:
             with open(Path("client", "settings.json"), "r") as f:
                 json_load = json.load(f)
                 self.sens = json_load["sens"]
@@ -45,7 +36,6 @@ class Game:
             self.sens = 50
             self.fov = 60
             self.resolution = 2
-        #
         self.ray_density = int(display.width * (self.resolution / 4))
         self.resolutions_list = [
             int(display.width * coef) for coef in [0.125, 0.25, 0.5, 1.0]
@@ -1264,8 +1254,6 @@ def main(multiplayer):
                         case pygame.K_r:
                             if game.state == States.PLAY:
                                 player.reload()
-                            player.reload()
-                            
 
                         case pygame.K_SPACE:
                             enemies.append(EnemyPlayer())
@@ -1273,9 +1261,9 @@ def main(multiplayer):
                         case pygame.K_q:
                             for _ in range(3):
                                 try:
-                                    del test_enemies[rand(0, len(test_enemies) - 1)]
-                                except:
                                     del enemies[rand(0, len(enemies) - 1)]
+                                except:
+                                    pass
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
