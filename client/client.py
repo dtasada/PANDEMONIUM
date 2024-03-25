@@ -1264,8 +1264,6 @@ def main(multiplayer):
                         case pygame.K_r:
                             if game.state == States.PLAY:
                                 player.reload()
-                            player.reload()
-                            
 
                         case pygame.K_SPACE:
                             enemies.append(EnemyPlayer())
