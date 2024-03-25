@@ -3,6 +3,7 @@ import sys
 import socket
 import json
 from threading import Thread
+from pprint import pprint
 
 
 class Colors:
@@ -39,27 +40,58 @@ except Exception as err:
 
 
 addresses = {}
+clients = []
 
 
 def receive_udp():
     while True:
-        data, addr = server_udp.recvfrom(2**12)
-        addresses[str(addr)] = json.loads(data)
+        request, addr = server_udp.recvfrom(2**12)
+        request = json.loads(request)
+        addresses[request["tcp_id"]] = request["body"]
 
-        for address in addresses:
-            response = {k: v for k, v in addresses.items() if k != address}
-            response["id"] = address
+        addresses[request["tcp_id"]]["udp_id"] = addr
+
+        for tcp_id, content in addresses.items():
+            response = {k: v for k, v in addresses.items() if k != tcp_id}
             response = json.dumps(response)
-            server_udp.sendto(response.encode(), eval(address))
+            server_udp.sendto(response.encode(), content["udp_id"])
 
 
 def receive_tcp(client, client_addr):
     try:
         while True:
             data = client.recv(2**12).decode()
-            if data.startswith("quit"):
-                del addresses[data.split("-")[1]]
-    except Exception as err:
+            verb = data.split("-")[0]
+            target = data.split("-")[1]
+
+            try:
+                match verb:
+                    case "quit":
+                        for client_ in clients:
+                            if client_ != client:
+                                client_.send(f"quit-{target}".encode())
+
+                            if client_.getpeername() == client_addr:
+                                clients.remove(client_)
+
+                        del addresses[client_addr]
+
+                    case "kill":
+                        for client_ in clients:
+                            if client_ != client:
+                                client_.send(f"kill-{target}".encode())
+
+                            if client_.getpeername() == client_addr:
+                                clients.remove(client_)
+
+                        del addresses[client_addr]
+
+            except BaseException as err:
+                print(
+                    f"{Colors.ANSI_RED}Error sending TCP message:{Colors.ANSI_RESET} {err}"
+                )
+
+    except BaseException as err:
         print(
             f"{Colors.ANSI_RED}Could not handle client {client_addr}:{Colors.ANSI_RESET} {err}"
         )
@@ -75,13 +107,15 @@ while True:
     # TCP
     try:
         client, client_addr = server_tcp.accept()
+        clients.append(client)
         print(f"New connection from {client_addr}")
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 
     except ConnectionAbortedError:
         print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
         break
-    except KeyboardInterrupt:
+
+    except BaseException:
         break
 
 server_tcp.close()

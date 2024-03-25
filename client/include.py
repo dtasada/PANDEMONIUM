@@ -8,7 +8,6 @@ import csv
 import pygame
 import socket
 import sys
-from pprint import pprint
 import os
 import json
 
@@ -81,6 +80,45 @@ v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
     for i in range(101)
 ]
+
+
+class UserInput:
+    def __init__(self, x, y, font_size, color):
+        self.x = x
+        self.y = y
+        self.text = " "
+        self.font_size = font_size
+        self.color = color
+
+    def process_event(self, event):
+            if event.key == pygame.K_BACKSPACE:
+                if len(self.text) == 1:
+                    self.text = " "
+                else:
+                    self.text = self.text[:-1]
+            elif event.key != pygame.K_BACKSPACE:
+                if self.text == " ":
+                    self.text = event.unicode 
+                else:
+                    self.text += event.unicode 
+
+    def update(self):
+        write(
+            "topleft", 
+            self.text, 
+            v_fonts[self.font_size], 
+            self.color,
+            self.x,
+            self.y,
+        )
+        draw_rect(Colors.RED, write(
+            "topleft", 
+            self.text, 
+            v_fonts[self.font_size], 
+            self.color,
+            self.x,
+            self.y,
+        )[1])
 
 
 class Display:
@@ -173,11 +211,8 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
-            self.left_slider_rect = self.left_slider_tex.get_rect()
-            setattr(
-                self.left_slider_rect,
-                "midleft",
-                (self.rect.right + 4, self.rect.midright[1]),
+            self.left_slider_rect = self.left_slider_tex.get_rect(
+                midleft=(self.rect.right + 4, self.rect.midright[1])
             )
 
             self.right_slider_tex = Texture.from_surface(
@@ -202,8 +237,6 @@ class Button:
             )[1]
 
     def process_event(self, event):
-        if self.content not in ("Resolution", "Unleash PANDEMONIUM"):
-            return
         if self.action is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -212,6 +245,7 @@ class Button:
                             self.action(-self.action_arg)
                         if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
                             self.action(self.action_arg)
+
                     elif self.rect.collidepoint(pygame.mouse.get_pos()):
                         self.action()
 

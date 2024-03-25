@@ -11,16 +11,40 @@ from threading import Thread
 from .include import *
 
 
+class ExitHandler:
+    def quit(self):
+        json_save = {
+            "res": game.resolution,
+            "fov": game.fov,
+            "sens": game.sens,
+        }
+        with open(Path("client", "settings.json"), "w") as f:
+            json.dump(json_save, f)
+
+
 class Game:
     def __init__(self):
+        # settings values
+        if os.path.isfile(Path("client", "settings.json")):
+            with open(Path("client", "settings.json"), "r") as f:
+                json_load = json.load(f)
+                self.sens = json_load["sens"]
+                self.fov = json_load["fov"]
+                self.resolution = json_load["res"]
+        else:
+            open(Path("client", "settings.json"), "w").close()
+            self.sens = 50
+            self.fov = 60
+            self.resolution = 2
+        self.ray_density = int(display.width * (self.resolution / 4))
+        self.resolutions_list = [
+            int(display.width * coef) for coef in [0.125, 0.25, 0.5, 1.0]
+        ]
         # misc.
         self.running = True
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
-        self.sens = 50
-        self.fov = 60
-        self.resolution = 2
-        self.ray_density = int(display.width * (self.resolution / 4))
+        
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
@@ -90,6 +114,9 @@ class Game:
     def rect_list(self):
         return sum(self.rects, [])
 
+    def stop_running(self):
+        self.running = False
+
     def set_state(self, state):
         self.previous_state = self.state
         self.state = state
@@ -107,28 +134,25 @@ class Game:
     def set_fov(self, amount):
         self.fov += amount
 
-        if self.fov > 120:
-            self.fov = 120
-        if self.fov < 30:
-            self.fov = 30
+        self.fov = min(self.fov, 120)
+        self.fov = max(self.fov, 30)
 
     def get_sens(self):
         return self.sens
 
     def set_sens(self, amount):
         self.sens += amount
+        self.sens = max(self.sens, 10)
 
     def get_res(self):
         return self.resolution
 
     def set_res(self, amount):
         self.resolution += amount
-        if self.resolution > 4:
-            self.resolution = 4
-        elif self.resolution < 1:
-            self.resolution = 1
+        self.resolution = min(self.resolution, 4)
+        self.resolution = max(self.resolution, 1)
 
-        self.ray_density = int(display.width * (self.resolution / 4))
+        self.ray_density = self.resolutions_list[self.resolution - 1]
 
 
 class GlobalTextures:
@@ -139,7 +163,7 @@ class GlobalTextures:
         self.h = 8
         self.id = None
         self.color = Colors.WHITE
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.arrow_img = Image(
             imgload(
                 "client", "assets", "images", "minimap", "player_arrow.png", scale=1
@@ -165,13 +189,11 @@ class GlobalTextures:
         ]
         self.object_textures = [
             (
-                imgload(
-                    "client", "assets", "images", "objects", file_name_with_ext + ".png"
-                )
-                if file_name_with_ext is not None
+                imgload("client", "assets", "images", "objects", file_name + ".png")
+                if file_name is not None
                 else None
             )
-            for file_name_with_ext in weapon_names
+            for file_name in weapon_names
         ]
 
         self.highlighted_object_textures = [
@@ -185,18 +207,18 @@ class GlobalTextures:
                                 "assets",
                                 "images",
                                 "objects",
-                                file_name_with_ext + ".png",
+                                file_name + ".png",
                             )
                         ),
                         Colors.YELLOW,
                     ),
                 )
-                if file_name_with_ext is not None
+                if file_name is not None
                 else None
             )
-            for file_name_with_ext in weapon_names
+            for file_name in weapon_names
         ]
-        #
+
         self.mask_object_textures = []
         for file_name_with_ext in weapon_names:
             if file_name_with_ext is None:
@@ -320,13 +342,42 @@ class HUD:
         self.weapon_rect.center = (display.width - 60, display.height - 40)
 
 
+class PlayerSelector:
+    def __init__(self):
+        self.image = imgload("client", "assets", "images", "3d", "player.png", frames=4, scale=4)[0]
+        self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
+        self.color = 0
+        self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
+        self.color_keys = list(self.colors.keys())
+        self.color_values = list(self.colors.values())
+    
+    def get_skin(self):
+        return self.color
+
+    def set_skin(self, amount):
+        self.color += amount
+        if self.color == len(self.color_values):
+            self.color = 0
+        elif self.color == -1:
+            self.color = len(self.color_values) - 1
+        self.image.color = self.color_values[self.color]
+    
+    def update(self):
+        o = 30
+        outline = pygame.Rect(self.rect.x - o, self.rect.y - o, self.rect.width + o * 2, self.rect.height + o * 4)
+        fill_rect(Colors.GRAY, outline)
+        draw_rect(Colors.WHITE, outline)
+        display.renderer.blit(self.image, self.rect)
+        write("midtop", self.color_keys[self.color].replace("_", " "), v_fonts[64], Colors.WHITE, self.rect.centerx, self.rect.bottom + 30)
+
+
 class Player:
     def __init__(self):
         self.x = game.tile_size * 8
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
-        self.id = None
+        self.tcp_id = None
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -464,16 +515,16 @@ class Player:
         for dist_px, tex, dest, area, color in self.walls_to_render:
             # # render enemy first
             if self.enemies_to_render:
-                te = self.enemies_to_render[0]
-                if te.dist_px > dist_px:
-                    te.render()
+                enemy = self.enemies_to_render[0]
+                if enemy.dist_px > dist_px:
+                    enemy.render()
                     del self.enemies_to_render[0]
             # render the texture after the (farther away) enemy
             tex.color = color
             display.renderer.blit(tex, dest, area)
         # render the remaining enemies
-        for te in self.enemies_to_render:
-            te.render()
+        for enemy in self.enemies_to_render:
+            enemy.render()
 
         display.renderer.blit(game.map_tex, game.map_rect)
         if game.debug_map:
@@ -515,6 +566,10 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+            
+            if keys[pygame.K_q]:
+                  for te in enemies:
+                    te.indicator_rect.y -= 1
 
             if keys[pygame.K_q]:
                 self.melee()
@@ -613,21 +668,12 @@ class Player:
                 o += game.fov / game.ray_density
         _xvel, _yvel = angle_to_vel(self.angle)
 
-        for te in test_enemies:
+        for te in enemies:
             dy = te.indicator_rect.centery - self.rect.centery
             dx = te.indicator_rect.centerx - self.rect.centerx
             te.angle = degrees(atan2(dy, dx))
             te.dist_px = hypot(dy, dx)
-        for te in test_enemies:
-            if not self.enemies_to_render:
-                self.enemies_to_render.append(te)
-            else:
-                for index, enemy in enumerate(test_enemies):
-                    if te.dist_px > enemy.dist_px:
-                        self.enemies_to_render.insert(index, te)
-                        break
-                else:
-                    self.enemies_to_render.append(te)
+        self.enemies_to_render = sorted(enemies, key=lambda te: te.dist_px, reverse=True)
 
         # map ofc
         self.render_map()
@@ -651,7 +697,7 @@ class Player:
                         if shoot_auto or self.process_shot:
                             if self.mag == 0:
                                 self.reload()
-                            else:
+                            elif not self.reloading:
                                 self.shoot()
 
         # check whether reloading
@@ -664,28 +710,15 @@ class Player:
             self.shooting = True
             self.weapon_anim = 1
             channel.play(sound)
-            for te in test_enemies:
-                if te.rendering:
-                    if not te.regenerating:  # why this line?
-                        if te.rect.collidepoint(display.center):
-                            te.hit()
+
+            for te in enemies:
+                if te.rendering and not te.regenerating:
+                    if te.rect.collidepoint(display.center):
+                        te.hit()
+
             self.last_shot = ticks()
             self.mag -= 1
             hud.update_weapon_general(self)
-
-    def melee(self):
-        if ticks() - self.last_shot >= 1000:
-            self.melee_anim = 1
-            channel.play(sound)
-            for te in test_enemies:
-                if te.rendering:
-                    if not te.regenerating:  # why this line?
-                        if sqrt((self.x - te.x)**2 + (self.y - te.y)**2) < 16:
-                            print(123)
-                            te.hit()
-            self.last_melee = ticks()
-            hud.update_weapon_general(self)
-
 
     def reload(self, amount=None):
         if self.mag < weapon_data[self.weapon]["mag"]:
@@ -826,12 +859,14 @@ class Player:
                     )
 
     def send_location(self):
-        data = {
-            "x": self.arrow_rect.x + game.mo,
-            "y": self.arrow_rect.y + game.mo,
-            "angle": self.angle,
-        }
-        data = json.dumps(data)
+        data = json.dumps({
+            "tcp_id": str(player.tcp_id),
+            "body": {
+                "x": self.arrow_rect.x + game.mo,
+                "y": self.arrow_rect.y + game.mo,
+                "angle": self.angle,
+            }
+        })
         client_udp.req(data)
 
     def set_weapon(self, weapon):
@@ -858,9 +893,7 @@ class Player:
 
     def update(self):
         if game.multiplayer:
-            if not self.id and client_udp.current_message:
-                message = json.loads(client_udp.current_message)
-                self.id = message["id"]
+            self.send_location()
         self.rays = []
         self.walls_to_render = []
         self.enemies_to_render = []
@@ -878,54 +911,13 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, id_):
+    def __init__(self, id_=None):
         self.id_ = id_
-        self.x = game.tile_size * 8
-        self.y = game.tile_size * 8
-        self.w = 8
-        self.h = 8
-        self.angle = -1.5708
-        self.arrow_surf = pygame.image.load(
-            Path("client", "assets", "images", "minimap", "player_arrow.png")
-        )
-        self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
-        self.arrow_img = Image(Texture.from_surface(display.renderer, self.arrow_surf))
-        self.indicator_img = imgload(
-            "client", "assets", "images", "enemy_indicator.png"
-        )
-
-        self.indicator_rect = self.indicator_img.get_rect()
-        self.arrow_rect = self.arrow_surf.get_rect(center=(64, 64))
-
-    def draw(self):
-        arrow = self.arrow_img
-        arrow.angle = degrees(self.angle)
-        draw_rect(Colors.GREEN, self.arrow_rect)
-        display.renderer.blit(
-            self.indicator_img,
-            pygame.Rect(self.arrow_rect.x, self.arrow_rect.y, *self.arrow_rect.size),
-        )
-
-    def update(self):
-        if client_udp.current_message:
-            message = json.loads(client_udp.current_message)
-            if self.id_ not in message:
-                enemy_players.remove(self)
-                enemy_players_addr.remove(self.id_)
-                return
-            self.rect.x = message[self.id_]["x"]
-            self.rect.y = message[self.id_]["y"]
-            self.angle = message[self.id_]["angle"]
-        self.draw()
-
-
-class TestEnemy:
-    def __init__(self):
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
-        self.angle = -1.5708
+        self.angle = radians(-90)
         self.indicator = imgload(
             "client", "assets", "images", "minimap", "player_arrow.png"
         )
@@ -941,14 +933,35 @@ class TestEnemy:
         self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
-        self.hp = 10
+        self.hp = 1
 
     def draw(self):
+        if game.multiplayer:
+            if client_udp.current_message:
+                message = json.loads(client_udp.current_message)
+                if self.id_ not in message:
+                    self.die()
+                    return
+                self.indicator_rect.x = message[self.id_]["x"]
+                self.indicator_rect.y = message[self.id_]["y"]
+                self.angle = message[self.id_]["angle"]
+
         self.rendering = False
         draw_rect(Colors.RED, self.indicator_rect)
         display.renderer.blit(self.indicator, self.indicator_rect)
 
     def update(self):
+        if game.multiplayer:
+            if client_tcp.current_message == f"kill-{self.id_}":
+                print(f"received signal to kill {self.id_}")
+                self.die()
+                return
+
+            if self.hp == 0:
+                print(f"sending signal to kill {self.id_}")
+                client_tcp.req(f"kill-{self.id_}")
+                self.die()
+                return
         self.draw()
         self.regenerate()
 
@@ -956,6 +969,7 @@ class TestEnemy:
         start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
         angle = self.angle
         end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
+
         if is_angle_between(start_angle, angle, end_angle):
             game.rendered_enemies += 1
             diff1 = angle_diff(start_angle, angle)
@@ -980,20 +994,26 @@ class TestEnemy:
         self.last_hit = ticks()
         self.regenerating = True
         self.hp -= 1
-        if self.hp == 0:
-            test_enemies.remove(self)
-            for _ in range(2):
-                test_enemies.append(TestEnemy())
+        if self.hp <= 0:
+            enemies.remove(self)
 
+    def die(self):
+        enemies.remove(self)
+        enemy_addresses.remove(self.id_)
+
+        if player.tcp_id == self.id_:
+            game.set_state(States.MAIN_MENU)
 
 cursor.enable()
 game = Game()
-test_enemies = [TestEnemy()]
+enemies = []
 hud = HUD()
 player = Player()
+player_selector = PlayerSelector()
+exit_handler = ExitHandler()
 gtex = GlobalTextures()
-enemy_players = []
-enemy_players_addr = []
+enemies = []
+enemy_addresses = []
 clock = pygame.time.Clock()
 joystick = None
 
@@ -1007,6 +1027,13 @@ title = Button(
     None,
     font_size=96,
     anchor="center",
+)
+
+username_input = UserInput(
+    display.width - 450,
+    325,
+    32,
+    Colors.WHITE        
 )
 
 main_settings_buttons = [
@@ -1064,6 +1091,21 @@ all_buttons = {
             "Settings",
             lambda: game.set_state(States.MAIN_SETTINGS),
         ),
+        Button(
+            80,
+            display.height / 2 + 48 * 2,
+            "Exit",
+            game.stop_running,
+        ),
+        Button(
+            player_selector.rect.centerx,
+            player_selector.rect.bottom + 10,
+            "Skin",
+            player_selector.set_skin,
+            action_arg=1,
+            is_slider=True,
+            slider_display=player_selector.get_skin,
+        )
     ],
     States.MAIN_SETTINGS: main_settings_buttons,
     States.PLAY_SETTINGS: [
@@ -1111,9 +1153,13 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if addr not in enemy_players_addr and addr != "id":
-                enemy_players_addr.append(addr)
-                enemy_players.append(EnemyPlayer(addr))
+            if (
+                addr not in enemy_addresses # enemy already exists
+                and addr != player.tcp_id # enemy is not self
+                and addr != "id"
+            ):
+                enemy_addresses.append(addr)
+                enemies.append(EnemyPlayer(addr))
 
 
 def render_floor():
@@ -1132,11 +1178,12 @@ def main(multiplayer):
     global client_udp, client_tcp, joystick
 
     game.multiplayer = multiplayer
-    if multiplayer:
+    if game.multiplayer:
         client_udp = Client("udp")
         client_tcp = Client("tcp")
         Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
+        player.tcp_id = client_tcp.getsockname()
 
     while game.running:
         clock.tick(game.fps)
@@ -1146,8 +1193,8 @@ def main(multiplayer):
             match event.type:
                 case pygame.QUIT:
                     game.running = False
-                    if multiplayer:
-                        client_tcp.req(f"quit-{player.id}")
+                    if game.multiplayer:
+                        client_tcp.req(f"quit-{player.tcp_id}")
                         pygame.quit()
                         sys.exit()
 
@@ -1172,16 +1219,17 @@ def main(multiplayer):
                             elif ypos < 20:
                                 pygame.mouse.set_pos(xpos, display.height - 21)
                             else:
-                                player.bob -= event.rel[1]
+                                player.bob -= event.rel[1] * game.sens / 100
                                 player.bob = min(player.bob, display.height * 1.5)
                                 player.bob = max(player.bob, -display.height * 1.5)
 
                 case pygame.MOUSEBUTTONDOWN:
-                    if game.state == States.PLAY:
-                        player.process_shot = True
-                        # if event.button == 1:
-                        #     game.target_zoom = 30
-                        #     game.zoom = 0
+                    if event.button == 1:
+                        if game.state == States.PLAY:
+                            player.process_shot = True
+                            # if event.button == 1:
+                            #     game.target_zoom = 30
+                            #     game.zoom = 0
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
@@ -1189,6 +1237,9 @@ def main(multiplayer):
                             game.target_zoom = 0
 
                 case pygame.KEYDOWN:
+                    if game.state == States.MAIN_MENU:
+                        username_input.process_event(event)
+
                     match event.key:
                         case pygame.K_ESCAPE:
                             match game.state:
@@ -1201,7 +1252,18 @@ def main(multiplayer):
                             player.try_to_buy_wall_weapon()
 
                         case pygame.K_r:
-                            player.reload()
+                            if game.state == States.PLAY:
+                                player.reload()
+
+                        case pygame.K_SPACE:
+                            enemies.append(EnemyPlayer())
+
+                        case pygame.K_q:
+                            for _ in range(3):
+                                try:
+                                    del enemies[rand(0, len(enemies) - 1)]
+                                except:
+                                    pass
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)
@@ -1218,6 +1280,8 @@ def main(multiplayer):
 
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
+            username_input.update()
+            player_selector.update()
         else:
             if multiplayer:
                 player.send_location()
@@ -1238,11 +1302,9 @@ def main(multiplayer):
                 )
 
                 player.update()
-                for te in test_enemies:
-                    te.update()
                 if game.should_render_map:
                     player.draw()
-                    if multiplayer:
+                    if game.multiplayer:
                         check_new_players()
                         for enemy in enemy_players:
                             enemy.update()
@@ -1280,5 +1342,6 @@ def main(multiplayer):
 
         display.renderer.present()
 
+    exit_handler.quit()
     pygame.quit()
     sys.exit()

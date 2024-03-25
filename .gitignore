@@ -163,3 +163,4 @@ cython_debug/
 .vscode/
 
 langtons_ant.py
+client/settings.json
