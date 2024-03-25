@@ -67,14 +67,8 @@ def receive_tcp(client, client_addr):
             try:
                 match verb:
                     case "quit":
-                        for client_ in clients:
-                            if client_ != client:
-                                client_.send(f"quit-{target}".encode())
-
-                            if client_.getpeername() == client_addr:
-                                clients.remove(client_)
-
                         del addresses[target]
+                        clients.remove(client)
 
                     case "kill":
                         for client_ in clients:
