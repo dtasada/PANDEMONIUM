@@ -86,39 +86,34 @@ class UserInput:
     def __init__(self, x, y, font_size, color):
         self.x = x
         self.y = y
-        self.text = " "
+        self.text = ""
         self.font_size = font_size
         self.color = color
 
     def process_event(self, event):
             if event.key == pygame.K_BACKSPACE:
-                if len(self.text) == 1:
-                    self.text = " "
-                else:
-                    self.text = self.text[:-1]
+                self.text = self.text[:-1]
             elif event.key != pygame.K_BACKSPACE:
-                if self.text == " ":
-                    self.text = event.unicode 
-                else:
-                    self.text += event.unicode 
+                self.text += event.unicode 
 
     def update(self):
-        write(
-            "topleft", 
-            self.text, 
-            v_fonts[self.font_size], 
-            self.color,
-            self.x,
-            self.y,
-        )
-        draw_rect(Colors.RED, write(
-            "topleft", 
-            self.text, 
-            v_fonts[self.font_size], 
-            self.color,
-            self.x,
-            self.y,
-        )[1])
+        if self.text != "":
+            write(
+                "topleft", 
+                self.text, 
+                v_fonts[self.font_size], 
+                self.color,
+                self.x,
+                self.y,
+            )
+            draw_rect(Colors.RED, write(
+                "topleft", 
+                self.text, 
+                v_fonts[self.font_size], 
+                self.color,
+                self.x,
+                self.y,
+            )[1])
 
 
 class Display:
