@@ -895,12 +895,18 @@ class Player:
     def update(self):
         if game.multiplayer:
             self.send_location()
+            if client_tcp.current_message == f"kill-{self.tcp_id}":
+                print(f"received signal to kill self")
+                game.set_state(States.MAIN_MENU)
+                return
+
         self.rays = []
         self.walls_to_render = []
         self.enemies_to_render = []
         self.keys()
+
         # updates
-        pass
+        ...
 
         # Thread(client_tcp.req, args=(self.health,)).start()
         for data in self.rays:
@@ -909,11 +915,6 @@ class Player:
             p2 = (ray[1][0] + game.mo, ray[1][1] + game.mo)
             draw_line(Colors.GREEN, p1, p2)
         player.display_weapon()
-
-        if game.multiplayer:
-            if client_tcp.current_message == f"kill-{self.tcp_id}":
-                print(f"received signal to kill self")
-                game.set_state(States.MAIN_MENU)
 
 
 
@@ -964,7 +965,11 @@ class EnemyPlayer:
                 or self.hp == 0
             ):
                 if self.hp == 0:
+                    print(f"requesting to kill {self.id_}")
                     client_tcp.req(f"kill-{self.id_}")
+
+                if client_tcp.current_message == f"kill-{self.id_}":
+                    print(f"killing {self.id_}")
                 self.die()
                 return
 
@@ -1001,7 +1006,7 @@ class EnemyPlayer:
         self.regenerating = True
         self.hp -= 1
         if self.hp <= 0:
-            enemies.remove(self)
+            self.update() # for dying
 
     def die(self):
         enemies.remove(self)

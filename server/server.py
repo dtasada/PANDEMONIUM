@@ -73,6 +73,7 @@ def receive_tcp(client, client_addr):
                     case "kill":
                         for client_ in clients:
                             if client_ != client:
+                                print(f"sending sig to kill {target}")
                                 client_.send(f"kill-{target}".encode())
 
                             if client_.getpeername() == client_addr:

@@ -1,6 +1,8 @@
 from enum import Enum
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
 from pathlib import Path
+from types import FunctionType, LambdaType
+from typing import Any, Literal, Optional
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
 from time import perf_counter
@@ -68,6 +70,7 @@ class Joymap:
     RIGHT_JOYSTICK_VER = 3
     LEFT_TRIGGER = 4
     RIGHT_TRIGGER = 5
+
     # buttons
     CROSS = 0
     CIRCLE = 1
@@ -157,19 +160,19 @@ class Cursor:
 class Button:
     def __init__(
         self,
-        x,
-        y,
-        content,
-        action,
-        action_arg=None,
-        width=None,
-        height=None,
-        font_size=32,
-        color=Colors.WHITE,
-        should_background=False,
-        anchor="topleft",
-        is_slider=False,
-        slider_display=None,
+        x: int,
+        y: int,
+        content: str,
+        action: LambdaType,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        action_arg: Any = None,
+        font_size: int = 32,
+        color: tuple[Literal[255], Literal[255], Literal[255], Literal[255]] = Colors.WHITE,
+        should_background: bool = False,
+        anchor: str = "topleft",
+        is_slider: bool = False,
+        slider_display: Optional[str] = None,
     ):
         self.content = content
         self.color = self.initial_color = color
@@ -316,7 +319,7 @@ class Client(socket.socket):
         if self.conn_type == "tcp":
             self.send(str(message).encode())
 
-    def req_res(self, *messages):
+    def req_res(self, *messages) -> str:
         """
         send message to server and wait for response
         """
@@ -327,7 +330,7 @@ class Client(socket.socket):
             if self.conn_type == "tcp":
                 self.send(str(message).encode())
 
-            response = None
+            response = ""
             while not response:
                 data, addr = self.recvfrom(2**12)
                 if data:
