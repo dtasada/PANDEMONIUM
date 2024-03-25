@@ -25,17 +25,18 @@ class ExitHandler:
 class Game:
     def __init__(self):
         # settings values
-        if os.path.isfile(Path("client", "settings.json")):
-            with open(Path("client", "settings.json"), "r") as f:
-                json_load = json.load(f)
-                self.sens = json_load["sens"]
-                self.fov = json_load["fov"]
-                self.resolution = json_load["res"]
-        else:
-            open(Path("client", "settings.json"), "w").close()
-            self.sens = 50
-            self.fov = 60
-            self.resolution = 2
+        # if os.path.isfile(Path("client", "settings.json")):
+        #     with open(Path("client", "settings.json"), "r") as f:
+        #         json_load = json.load(f)
+        #         self.sens = json_load["sens"]
+        #         self.fov = json_load["fov"]
+        #         self.resolution = json_load["resolution"]
+        # else:
+        #     open(Path("client", "settings.json"), "w").close()
+        self.sens = 50
+        self.fov = 60
+        self.resolution = 2
+
         self.ray_density = int(display.width * (self.resolution / 4))
         self.resolutions_list = [
             int(display.width * coef) for coef in [0.125, 0.25, 0.5, 1.0]
@@ -909,6 +910,12 @@ class Player:
             draw_line(Colors.GREEN, p1, p2)
         player.display_weapon()
 
+        if game.multiplayer:
+            if client_tcp.current_message == f"kill-{self.tcp_id}":
+                print(f"received signal to kill self")
+                game.set_state(States.MAIN_MENU)
+
+
 
 class EnemyPlayer:
     def __init__(self, id_=None):
@@ -952,16 +959,15 @@ class EnemyPlayer:
 
     def update(self):
         if game.multiplayer:
-            if client_tcp.current_message == f"kill-{self.id_}":
-                print(f"received signal to kill {self.id_}")
+            if (
+                client_tcp.current_message == f"kill-{self.id_}"
+                or self.hp == 0
+            ):
+                if self.hp == 0:
+                    client_tcp.req(f"kill-{self.id_}")
                 self.die()
                 return
 
-            if self.hp == 0:
-                print(f"sending signal to kill {self.id_}")
-                client_tcp.req(f"kill-{self.id_}")
-                self.die()
-                return
         self.draw()
         self.regenerate()
 
@@ -1000,9 +1006,6 @@ class EnemyPlayer:
     def die(self):
         enemies.remove(self)
         enemy_addresses.remove(self.id_)
-
-        if player.tcp_id == self.id_:
-            game.set_state(States.MAIN_MENU)
 
 cursor.enable()
 game = Game()
@@ -1306,7 +1309,7 @@ def main(multiplayer):
                     player.draw()
                     if game.multiplayer:
                         check_new_players()
-                        for enemy in enemy_players:
+                        for enemy in enemies:
                             enemy.update()
 
                 hud.update()
