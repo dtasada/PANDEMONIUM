@@ -14,7 +14,7 @@ from .include import *
 class ExitHandler:
     def quit(self):
         json_save = {
-            "res": game.resolution,
+            "resolution": game.resolution,
             "fov": game.fov,
             "sens": game.sens,
         }
@@ -43,6 +43,7 @@ class Game:
         ]
         # misc.
         self.running = True
+        self.multiplayer = None
         self.state = self.previous_state = States.MAIN_MENU
         self.fps = 60
         
@@ -128,6 +129,7 @@ class Game:
             cursor.disable()
         else:
             cursor.enable()
+
 
     def get_fov(self):
         return self.fov
@@ -398,11 +400,13 @@ class Player:
         self.reloading = False
         self.reload_direc = 1
         self.weapon_yoffset = 0
+        self.health = 100
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
 
         self.melee_anim = 1
+        self.process_shot = None
         self.last_melee = ticks()
 
         self.bob = 0
@@ -439,11 +443,6 @@ class Player:
     @ammo.setter
     def ammo(self, value):
         self.ammos[self.weapon_index] = value
-
-    @property
-    def health(self):
-        # TODO: Server call
-        return 100
 
     def display_weapon(self):
         if self.weapon is not None:
@@ -569,8 +568,8 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
             
             if keys[pygame.K_q]:
-                  for te in enemies:
-                    te.indicator_rect.y -= 1
+                  for enemy in enemies:
+                    enemy.indicator_rect.y -= 1
 
             if keys[pygame.K_q]:
                 self.melee()
@@ -669,11 +668,11 @@ class Player:
                 o += game.fov / game.ray_density
         _xvel, _yvel = angle_to_vel(self.angle)
 
-        for te in enemies:
-            dy = te.indicator_rect.centery - self.rect.centery
-            dx = te.indicator_rect.centerx - self.rect.centerx
-            te.angle = degrees(atan2(dy, dx))
-            te.dist_px = hypot(dy, dx)
+        for enemy in enemies:
+            dy = enemy.indicator_rect.centery - self.rect.centery
+            dx = enemy.indicator_rect.centerx - self.rect.centerx
+            enemy.angle = degrees(atan2(dy, dx))
+            enemy.dist_px = hypot(dy, dx)
         self.enemies_to_render = sorted(enemies, key=lambda te: te.dist_px, reverse=True)
 
         # map ofc
@@ -694,7 +693,7 @@ class Player:
                     mouses = pygame.mouse.get_pressed()
                     shoot_auto = mouses[0]
                 else:
-                    if player.weapon is not None:
+                    if self.weapon is not None:
                         if shoot_auto or self.process_shot:
                             if self.mag == 0:
                                 self.reload()
@@ -712,10 +711,10 @@ class Player:
             self.weapon_anim = 1
             channel.play(sound)
 
-            for te in enemies:
-                if te.rendering and not te.regenerating:
-                    if te.rect.collidepoint(display.center):
-                        te.hit()
+            for enemy in enemies:
+                if enemy.rendering and not enemy.regenerating:
+                    if enemy.rect.collidepoint(display.center):
+                        enemy.hit()
 
             self.last_shot = ticks()
             self.mag -= 1
@@ -866,6 +865,7 @@ class Player:
                 "x": self.arrow_rect.x + game.mo,
                 "y": self.arrow_rect.y + game.mo,
                 "angle": self.angle,
+                "health": self.health,
             }
         })
         client_udp.req(data)
@@ -908,7 +908,7 @@ class Player:
         # updates
         ...
 
-        # Thread(client_tcp.req, args=(self.health,)).start()
+
         for data in self.rays:
             ray, _ = data
             p1 = (ray[0][0] + game.mo, ray[0][1] + game.mo)
@@ -941,7 +941,7 @@ class EnemyPlayer:
         self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
-        self.hp = 1
+        self.health = 100
 
     def draw(self):
         if game.multiplayer:
@@ -953,6 +953,7 @@ class EnemyPlayer:
                 self.indicator_rect.x = message[self.id_]["x"]
                 self.indicator_rect.y = message[self.id_]["y"]
                 self.angle = message[self.id_]["angle"]
+                self.health = message[self.id_]["health"]
 
         self.rendering = False
         draw_rect(Colors.RED, self.indicator_rect)
@@ -962,9 +963,9 @@ class EnemyPlayer:
         if game.multiplayer:
             if (
                 client_tcp.current_message == f"kill-{self.id_}"
-                or self.hp == 0
+                or self.health <= 0
             ):
-                if self.hp == 0:
+                if self.health <= 0:
                     print(f"requesting to kill {self.id_}")
                     client_tcp.req(f"kill-{self.id_}")
 
@@ -1004,8 +1005,10 @@ class EnemyPlayer:
         self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
-        self.hp -= 1
-        if self.hp <= 0:
+        damage = weapon_data[player.weapon]["damage"]
+        client_tcp.req(f"damage-{self.id_}-{damage}")
+        self.health -= damage
+        if self.health <= 0:
             self.update() # for dying
 
     def die(self):
@@ -1023,7 +1026,7 @@ gtex = GlobalTextures()
 enemies = []
 enemy_addresses = []
 clock = pygame.time.Clock()
-joystick = None
+joystick: pygame.joystick.JoystickType = None
 
 crosshair_tex = imgload("client", "assets", "images", "hud", "crosshair.png", scale=3)
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))

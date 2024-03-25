@@ -2,7 +2,7 @@ from enum import Enum
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
 from pathlib import Path
 from types import FunctionType, LambdaType
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, TypeAlias
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
 from time import perf_counter
@@ -22,6 +22,9 @@ SERVER_ADDRESS, SERVER_PORT = (
 )
 
 pygame.init()
+
+
+Color: TypeAlias = tuple[Literal[255], Literal[255], Literal[255], Literal[255]]
 
 
 class Colors:
@@ -94,29 +97,32 @@ class UserInput:
         self.color = color
 
     def process_event(self, event):
-            if event.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
-            elif event.key != pygame.K_BACKSPACE:
-                self.text += event.unicode 
+        if event.key == pygame.K_BACKSPACE:
+            self.text = self.text[:-1]
+        elif event.key != pygame.K_BACKSPACE:
+            self.text += event.unicode
 
     def update(self):
         if self.text != "":
             write(
-                "topleft", 
-                self.text, 
-                v_fonts[self.font_size], 
+                "topleft",
+                self.text,
+                v_fonts[self.font_size],
                 self.color,
                 self.x,
                 self.y,
             )
-            draw_rect(Colors.RED, write(
-                "topleft", 
-                self.text, 
-                v_fonts[self.font_size], 
-                self.color,
-                self.x,
-                self.y,
-            )[1])
+            draw_rect(
+                Colors.RED,
+                write(
+                    "topleft",
+                    self.text,
+                    v_fonts[self.font_size],
+                    self.color,
+                    self.x,
+                    self.y,
+                )[1],
+            )
 
 
 class Display:
@@ -126,8 +132,13 @@ class Display:
             self.height = pygame.display.Info().current_h
         else:
             self.width, self.height = width, height
+
         self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height), title=title)
+
+        if fullscreen:
+            self.window.set_fullscreen()
+
         self.renderer = Renderer(self.window, vsync=vsync)
 
 
@@ -168,7 +179,7 @@ class Button:
         height: Optional[int] = None,
         action_arg: Any = None,
         font_size: int = 32,
-        color: tuple[Literal[255], Literal[255], Literal[255], Literal[255]] = Colors.WHITE,
+        color: Color = Colors.WHITE,
         should_background: bool = False,
         anchor: str = "topleft",
         is_slider: bool = False,
@@ -299,7 +310,7 @@ class Client(socket.socket):
             socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
         )
         self.target_server = (SERVER_ADDRESS, SERVER_PORT)
-        self.current_message = None
+        self.current_message: str = None
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
@@ -448,7 +459,7 @@ def write(
     anchor: str,
     content: str | int,
     font: pygame.Font,
-    color: tuple,
+    color: Color,
     x: int,
     y: int,
     alpha=255,
@@ -503,8 +514,8 @@ def angle_diff(angle1, angle2):
 
 cursor = Cursor()
 
-client_udp = None
-client_tcp = None
+client_udp: Client = None
+client_tcp: Client = None
 
 weapon_costs = {
     "1": 1200,

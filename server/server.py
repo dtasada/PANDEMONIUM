@@ -60,9 +60,12 @@ def receive_udp():
 def receive_tcp(client, client_addr):
     try:
         while True:
-            data = client.recv(2**12).decode()
-            verb = data.split("-")[0]
-            target = data.split("-")[1]
+            request = client.recv(2**12).decode().split("-")
+            verb = request[0]
+            target = request[1]
+            # coef = None
+            # if len(request) == 3:
+            #     coef = request[2]
 
             try:
                 match verb:
@@ -80,6 +83,10 @@ def receive_tcp(client, client_addr):
                                 clients.remove(client_)
 
                         del addresses[client_addr]
+
+                    case "damage":
+                        print("health:", addresses[client_addr]["health"])
+                        # addresses[client_addr]["health"] -= int(coef)
 
             except BaseException as err:
                 print(
