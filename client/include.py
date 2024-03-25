@@ -9,7 +9,6 @@ import csv
 import pygame
 import socket
 import sys
-from pprint import pprint
 import os
 import json
 
@@ -213,11 +212,8 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
-            self.left_slider_rect = self.left_slider_tex.get_rect()
-            setattr(
-                self.left_slider_rect,
-                "midleft",
-                (self.rect.right + 4, self.rect.midright[1]),
+            self.left_slider_rect = self.left_slider_tex.get_rect(
+                midleft=(self.rect.right + 4, self.rect.midright[1])
             )
 
             self.right_slider_tex = Texture.from_surface(
@@ -242,8 +238,6 @@ class Button:
             )[1]
 
     def process_event(self, event):
-        if self.content not in ("Resolution", "Unleash PANDEMONIUM"):
-            return
         if self.action is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -252,6 +246,7 @@ class Button:
                             self.action(-self.action_arg)
                         if self.right_slider_rect.collidepoint(pygame.mouse.get_pos()):
                             self.action(self.action_arg)
+
                     elif self.rect.collidepoint(pygame.mouse.get_pos()):
                         self.action()
 
@@ -449,10 +444,7 @@ def angle_to_vel(angle, speed=1):
 def load_map_from_csv(path_, int_=True):
     with open(path_, "r") as f:
         reader = csv.reader(f)
-        return [
-            [int(x) if int_ else x.lstrip() for x in line]
-            for line in reader
-        ]
+        return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
 def write(
