@@ -7,9 +7,9 @@ from pprint import pprint
 
 
 class Colors:
-    ANSI_GREEN = "\033[1;32m"
-    ANSI_RED = "\033[1;31;31m"
-    ANSI_RESET = "\033[0m"
+    GREEN = "\033[1;32m"
+    RED = "\033[1;31;31m"
+    RESET = "\033[0m"
 
 
 SERVER_ADDRESS, SERVER_PORT = socket.gethostbyname(socket.gethostname()), 6969
@@ -18,12 +18,10 @@ try:
     server_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_udp.bind((SERVER_ADDRESS, SERVER_PORT))
     print(
-        f"{Colors.ANSI_GREEN}UDP server is listening at {SERVER_ADDRESS}:{SERVER_PORT}{Colors.ANSI_RESET}"
+        f"{Colors.GREEN}UDP server is listening at {SERVER_ADDRESS}:{SERVER_PORT}{Colors.RESET}"
     )
 except Exception as err:
-    sys.exit(
-        f"{Colors.ANSI_RED}UDP server failed to initialize: {Colors.ANSI_RESET}{err}"
-    )
+    sys.exit(f"{Colors.RED}UDP server failed to initialize: {Colors.RESET}{err}")
 
 
 try:
@@ -31,29 +29,28 @@ try:
     server_tcp.bind((SERVER_ADDRESS, SERVER_PORT))
     server_tcp.listen(10)
     print(
-        f"{Colors.ANSI_GREEN}TCP server is listening at {SERVER_ADDRESS}:{SERVER_PORT}{Colors.ANSI_RESET}"
+        f"{Colors.GREEN}TCP server is listening at {SERVER_ADDRESS}:{SERVER_PORT}{Colors.RESET}"
     )
 except Exception as err:
-    sys.exit(
-        f"{Colors.ANSI_RED}TCP server failed to initialize: {Colors.ANSI_RESET}{err}"
-    )
+    sys.exit(f"{Colors.RED}TCP server failed to initialize: {Colors.RESET}{err}")
 
 
-addresses = {}
+udp_data = {}  # keys are tcp id and values are x, y, angle,
+tcp_data = {}  # keys are tcp id and values are health, color and name
 clients = []
-player_data = {}
 
 
 def receive_udp():
     while True:
         request, addr = server_udp.recvfrom(2**12)
         request = json.loads(request)
-        addresses[request["tcp_id"]] = request["body"]
+        udp_data[request["tcp_id"]] = request["body"]
+        udp_data[request["tcp_id"]][
+            "udp_id"
+        ] = addr  # careful, this is a tuple, not a string
 
-        addresses[request["tcp_id"]]["udp_id"] = addr
-
-        for tcp_id, content in addresses.items():
-            response = {k: v for k, v in addresses.items() if k != tcp_id}
+        for tcp_id, content in udp_data.items():
+            response = {k: v for k, v in udp_data.items() if k != tcp_id}
             response = json.dumps(response)
             server_udp.sendto(response.encode(), content["udp_id"])
 
@@ -64,47 +61,60 @@ def receive_tcp(client, client_addr):
             request = client.recv(2**12).decode().split("-")
             verb = request[0]
             target = request[1]
-            arg = None
-            if len(request) == 3:
-                arg = request[2]
+            args = []
+            if len(request) >= 3:
+                args = request[2:]
 
             try:
                 match verb:
                     case "init_player":
-                        client.send(json.dumps(player_data).encode())
-                        player_data[str(client_addr)] = arg
+                        try:
+                            client.send(json.dumps(tcp_data).encode())
+                            tcp_data[str(client_addr)] = json.loads(args[0])
+                            print("Initialized player:", tcp_data)
+                        except BaseException as e:
+                            print(
+                                f"{Colors.RED}Could not init_player{Colors.RESET}: {e}"
+                            )
 
                     case "quit":
-                        del addresses[target]
-                        clients.remove(client)
+                        print("Player quitting...")
+                        del udp_data[str(client_addr)]
+                        del tcp_data[str(client_addr)]
+                        break
 
                     case "kill":
-                        for client_ in clients:
-                            if client_ != client:
-                                print(f"sending sig to kill {target}")
-                                client_.send(f"kill-{target}".encode())
+                        try:
+                            for client_ in clients:
+                                if client_ != client:
+                                    print(f"sending sig to kill {target}")
+                                    client_.send(f"kill-{target}".encode())
 
-                            if client_.getpeername() == client_addr:
-                                clients.remove(client_)
+                                if client_.getpeername() == client_addr:
+                                    clients.remove(client_)
 
-                        del addresses[target]
+                            del udp_data[target]
+                            del tcp_data[target]
+                        except BaseException as e:
+                            print("could not kill:", e)
 
                     case "damage":
+                        print("tcp_data:", tcp_data)
                         try:
-                            print("health:", player_data[client_addr]["health"])
-                            player_data[client_addr]["health"] -= int(arg)
-                        except:
-                            print("Couldn't")
+                            tcp_data[client_addr]["health"] -= int(args[0])
+
+                            for client_ in clients:
+                                if target == str(client_addr):
+                                    client_.send(f"take_damage-{args[0]}".encode())
+
+                        except BaseException as e:
+                            print("could not damage:", e)
 
             except BaseException as err:
-                print(
-                    f"{Colors.ANSI_RED}Error sending TCP message:{Colors.ANSI_RESET} {err}"
-                )
+                print(f"{Colors.RED}Error sending TCP message:{Colors.RESET} {err}")
 
     except BaseException as err:
-        print(
-            f"{Colors.ANSI_RED}Could not handle client {client_addr}:{Colors.ANSI_RESET} {err}"
-        )
+        print(f"{Colors.RED}Could not handle client {client_addr}:{Colors.RESET} {err}")
 
     client.close()
     print(f"Closed connection with {client_addr}")
@@ -122,7 +132,7 @@ while True:
         Thread(target=receive_tcp, args=(client, client_addr)).start()
 
     except ConnectionAbortedError:
-        print(f"{Colors.ANSI_RED}Connection aborted!{Colors.ANSI_RESET}")
+        print(f"{Colors.RED}Connection aborted!{Colors.RESET}")
         break
 
     except BaseException:

@@ -9,33 +9,46 @@ from pygame._sdl2.video import Texture, Image
 from threading import Thread
 
 from .include import *
+import atexit
 
 
-class ExitHandler:
-    def quit(self):
-        json_save = {
-            "resolution": game.resolution,
-            "fov": game.fov,
-            "sens": game.sens,
-        }
-        with open(Path("client", "settings.json"), "w") as f:
-            json.dump(json_save, f)
+def quit():
+    game.running = False
+    if game.multiplayer:
+        if client_tcp: client_tcp.req(f"quit")
+        pygame.quit()
+        sys.exit()
+
+    json_save = {
+        "resolution": game.resolution,
+        "fov": game.fov,
+        "sens": game.sens,
+    }
+    with open(Path("client", "settings.json"), "w") as f:
+        json.dump(json_save, f)
+
+atexit.register(quit)
 
 
 class Game:
     def __init__(self):
         # settings values
-        # if os.path.isfile(Path("client", "settings.json")):
-        #     with open(Path("client", "settings.json"), "r") as f:
-        #         json_load = json.load(f)
-        #         self.sens = json_load["sens"]
-        #         self.fov = json_load["fov"]
-        #         self.resolution = json_load["resolution"]
-        # else:
-        #     open(Path("client", "settings.json"), "w").close()
-        self.sens = 50
-        self.fov = 60
-        self.resolution = 2
+        try:
+            if os.path.isfile(Path("client", "settings.json")):
+                with open(Path("client", "settings.json"), "r") as f:
+                    json_load = json.load(f)
+                    self.sens = json_load["sens"]
+                    self.fov = json_load["fov"]
+                    self.resolution = json_load["resolution"]
+            else:
+                open(Path("client", "settings.json"), "w").close()
+                self.sens = 50
+                self.fov = 60
+                self.resolution = 2
+        except:
+            self.sens = 50
+            self.fov = 60
+            self.resolution = 2
 
         self.ray_density = int(display.width * (self.resolution / 4))
         self.resolutions_list = [
@@ -44,7 +57,8 @@ class Game:
         # misc.
         self.running = True
         self.multiplayer = None
-        self.state = self.previous_state = States.MAIN_MENU
+        self.state = States.MAIN_MENU
+        self.previous_state = States.LAUNCH
         self.fps = 60
         
         self.target_zoom = self.zoom = 0
@@ -120,25 +134,28 @@ class Game:
         self.running = False
 
     def set_state(self, state):
-        self.previous_state = self.state
-        self.state = state
-
-        global current_buttons
-        current_buttons = all_buttons[self.state]
-        if state == States.PLAY:
-            # All PLAY requirements
-            cursor.disable()
-            msg = {
-                "health": player.health,
-                "color": player_selector.color,
-                "name": username_input.text,
-            }
+        if self.previous_state == States.LAUNCH:
+            # All launch & init requirements
+            msg = json.dumps({
+                'health': player.health,
+                'color': player_selector.color,
+                'name': username_input.text,
+            })
+            print("msg:", msg)
             player_data = json.loads(client_tcp.req_res(f"init_player-{player.tcp_id}-{msg}"))
 
             print("player_data:", player_data)
             # for id, data in player_data.items():
             #     for enemy in enemies:
             #         print(id, enemy.id_)
+
+        self.previous_state = self.state
+        self.state = state
+
+        global current_buttons
+        current_buttons = all_buttons[self.state]
+        if state == States.PLAY:
+            cursor.disable()
         else:
             cursor.enable()
 
@@ -873,12 +890,11 @@ class Player:
 
     def send_location(self):
         client_udp.req(json.dumps({
-            "tcp_id": str(player.tcp_id),
+            "tcp_id": str(self.tcp_id),
             "body": {
                 "x": self.arrow_rect.x + game.mo,
                 "y": self.arrow_rect.y + game.mo,
                 "angle": self.angle,
-                "health": self.health,
             }
         }))
 
@@ -907,10 +923,17 @@ class Player:
     def update(self):
         if game.multiplayer:
             self.send_location()
-            if client_tcp.current_message == f"kill-{self.tcp_id}":
-                print(f"received signal to kill self")
-                game.set_state(States.MAIN_MENU)
-                return
+            if client_tcp.current_message:
+                if client_tcp.current_message.split("-")[0] == f"take_damage":
+                    self.health -= int(client_tcp.current_message.split("-")[1])
+
+                    if self.health <= 0:
+                        client_tcp.req(f"kill-{self.tcp_id}")
+
+                if client_tcp.current_message == f"kill-{self.tcp_id}":
+                    print(f"received signal to kill self")
+                    game.set_state(States.MAIN_MENU)
+                    return
 
         self.rays = []
         self.walls_to_render = []
@@ -965,7 +988,6 @@ class EnemyPlayer:
                 self.indicator_rect.x = message[self.id_]["x"]
                 self.indicator_rect.y = message[self.id_]["y"]
                 self.angle = message[self.id_]["angle"]
-                self.health = message[self.id_]["health"]
 
         self.rendering = False
         draw_rect(Colors.RED, self.indicator_rect)
@@ -1033,7 +1055,6 @@ enemies = []
 hud = HUD()
 player = Player()
 player_selector = PlayerSelector()
-exit_handler = ExitHandler()
 gtex = GlobalTextures()
 enemies = []
 enemy_addresses = []
@@ -1150,8 +1171,6 @@ all_buttons = {
     States.PLAY: [],
 }
 
-game.set_state(States.MAIN_MENU)
-
 
 class Hue:
     def __init__(self, color, alpha):
@@ -1208,6 +1227,8 @@ def main(multiplayer):
         Thread(target=client_tcp.receive, daemon=True).start()
         player.tcp_id = client_tcp.getsockname()
 
+    game.set_state(States.MAIN_MENU)
+
     while game.running:
         clock.tick(game.fps)
         player.process_shot = False
@@ -1215,11 +1236,7 @@ def main(multiplayer):
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
-                    game.running = False
-                    if game.multiplayer:
-                        client_tcp.req(f"quit-{player.tcp_id}")
-                        pygame.quit()
-                        sys.exit()
+                    quit()
 
                 case pygame.MOUSEMOTION:
                     if cursor.should_wrap:

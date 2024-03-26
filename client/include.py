@@ -48,10 +48,11 @@ class Colors:
 
 
 class States(Enum):
-    MAIN_MENU = 0
-    MAIN_SETTINGS = 1
-    PLAY = 2
-    PLAY_SETTINGS = 3
+    LAUNCH = 0
+    MAIN_MENU = 1
+    MAIN_SETTINGS = 2
+    PLAY = 3
+    PLAY_SETTINGS = 4
 
 
 class Directions(Enum):
