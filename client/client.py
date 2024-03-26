@@ -126,7 +126,19 @@ class Game:
         global current_buttons
         current_buttons = all_buttons[self.state]
         if state == States.PLAY:
+            # All PLAY requirements
             cursor.disable()
+            msg = {
+                "health": player.health,
+                "color": player_selector.color,
+                "name": username_input.text,
+            }
+            player_data = json.loads(client_tcp.req_res(f"init_player-{player.tcp_id}-{msg}"))
+
+            print("player_data:", player_data)
+            # for id, data in player_data.items():
+            #     for enemy in enemies:
+            #         print(id, enemy.id_)
         else:
             cursor.enable()
 
@@ -350,6 +362,7 @@ class PlayerSelector:
         self.image = imgload("client", "assets", "images", "3d", "player.png", frames=4, scale=4)[0]
         self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
         self.color = 0
+        self.name = None
         self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
         self.color_keys = list(self.colors.keys())
         self.color_values = list(self.colors.values())
@@ -859,7 +872,7 @@ class Player:
                     )
 
     def send_location(self):
-        data = json.dumps({
+        client_udp.req(json.dumps({
             "tcp_id": str(player.tcp_id),
             "body": {
                 "x": self.arrow_rect.x + game.mo,
@@ -867,8 +880,7 @@ class Player:
                 "angle": self.angle,
                 "health": self.health,
             }
-        })
-        client_udp.req(data)
+        }))
 
     def set_weapon(self, weapon):
         weapon = int(weapon)

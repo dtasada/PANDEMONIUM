@@ -330,7 +330,7 @@ class Client(socket.socket):
         if self.conn_type == "tcp":
             self.send(str(message).encode())
 
-    def req_res(self, *messages) -> str:
+    def req_res(self, *messages: str) -> str:
         """
         send message to server and wait for response
         """

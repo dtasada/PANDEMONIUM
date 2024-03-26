@@ -41,6 +41,7 @@ except Exception as err:
 
 addresses = {}
 clients = []
+player_data = {}
 
 
 def receive_udp():
@@ -63,12 +64,16 @@ def receive_tcp(client, client_addr):
             request = client.recv(2**12).decode().split("-")
             verb = request[0]
             target = request[1]
-            # coef = None
-            # if len(request) == 3:
-            #     coef = request[2]
+            arg = None
+            if len(request) == 3:
+                arg = request[2]
 
             try:
                 match verb:
+                    case "init_player":
+                        client.send(json.dumps(player_data).encode())
+                        player_data[str(client_addr)] = arg
+
                     case "quit":
                         del addresses[target]
                         clients.remove(client)
@@ -82,11 +87,14 @@ def receive_tcp(client, client_addr):
                             if client_.getpeername() == client_addr:
                                 clients.remove(client_)
 
-                        del addresses[client_addr]
+                        del addresses[target]
 
                     case "damage":
-                        print("health:", addresses[client_addr]["health"])
-                        # addresses[client_addr]["health"] -= int(coef)
+                        try:
+                            print("health:", player_data[client_addr]["health"])
+                            player_data[client_addr]["health"] -= int(arg)
+                        except:
+                            print("Couldn't")
 
             except BaseException as err:
                 print(
