@@ -1,6 +1,7 @@
 {
     "1": {
         "name": "revolver",
+		"damage": 50,
         "cost": 1000,
         "ammo": 60,
         "mag": 6,

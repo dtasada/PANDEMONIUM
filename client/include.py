@@ -1,6 +1,8 @@
 from enum import Enum
 from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
 from pathlib import Path
+from types import FunctionType, LambdaType
+from typing import Any, Literal, Optional, TypeAlias
 from pygame._sdl2.video import Window, Renderer, Texture, Image
 from random import randint as rand
 from time import perf_counter
@@ -20,6 +22,9 @@ SERVER_ADDRESS, SERVER_PORT = (
 )
 
 pygame.init()
+
+
+Color: TypeAlias = tuple[Literal[255], Literal[255], Literal[255], Literal[255]]
 
 
 class Colors:
@@ -43,10 +48,11 @@ class Colors:
 
 
 class States(Enum):
-    MAIN_MENU = 0
-    MAIN_SETTINGS = 1
-    PLAY = 2
-    PLAY_SETTINGS = 3
+    LAUNCH = 0
+    MAIN_MENU = 1
+    MAIN_SETTINGS = 2
+    PLAY = 3
+    PLAY_SETTINGS = 4
 
 
 class Directions(Enum):
@@ -68,6 +74,7 @@ class Joymap:
     RIGHT_JOYSTICK_VER = 3
     LEFT_TRIGGER = 4
     RIGHT_TRIGGER = 5
+
     # buttons
     CROSS = 0
     CIRCLE = 1
@@ -91,29 +98,32 @@ class UserInput:
         self.color = color
 
     def process_event(self, event):
-            if event.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
-            elif event.key != pygame.K_BACKSPACE:
-                self.text += event.unicode 
+        if event.key == pygame.K_BACKSPACE:
+            self.text = self.text[:-1]
+        elif event.key != pygame.K_BACKSPACE:
+            self.text += event.unicode
 
     def update(self):
         if self.text != "":
             write(
-                "topleft", 
-                self.text, 
-                v_fonts[self.font_size], 
+                "topleft",
+                self.text,
+                v_fonts[self.font_size],
                 self.color,
                 self.x,
                 self.y,
             )
-            draw_rect(Colors.RED, write(
-                "topleft", 
-                self.text, 
-                v_fonts[self.font_size], 
-                self.color,
-                self.x,
-                self.y,
-            )[1])
+            draw_rect(
+                Colors.RED,
+                write(
+                    "topleft",
+                    self.text,
+                    v_fonts[self.font_size],
+                    self.color,
+                    self.x,
+                    self.y,
+                )[1],
+            )
 
 
 class Display:
@@ -123,8 +133,13 @@ class Display:
             self.height = pygame.display.Info().current_h
         else:
             self.width, self.height = width, height
+
         self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height), title=title)
+
+        if fullscreen:
+            self.window.set_fullscreen()
+
         self.renderer = Renderer(self.window, vsync=vsync)
 
 
@@ -157,19 +172,19 @@ class Cursor:
 class Button:
     def __init__(
         self,
-        x,
-        y,
-        content,
-        action,
-        action_arg=None,
-        width=None,
-        height=None,
-        font_size=32,
-        color=Colors.WHITE,
-        should_background=False,
-        anchor="topleft",
-        is_slider=False,
-        slider_display=None,
+        x: int,
+        y: int,
+        content: str,
+        action: LambdaType,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        action_arg: Any = None,
+        font_size: int = 32,
+        color: Color = Colors.WHITE,
+        should_background: bool = False,
+        anchor: str = "topleft",
+        is_slider: bool = False,
+        slider_display: Optional[str] = None,
     ):
         self.content = content
         self.color = self.initial_color = color
@@ -296,7 +311,7 @@ class Client(socket.socket):
             socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
         )
         self.target_server = (SERVER_ADDRESS, SERVER_PORT)
-        self.current_message = None
+        self.current_message: str = None
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
@@ -316,7 +331,7 @@ class Client(socket.socket):
         if self.conn_type == "tcp":
             self.send(str(message).encode())
 
-    def req_res(self, *messages):
+    def req_res(self, *messages: str) -> str:
         """
         send message to server and wait for response
         """
@@ -327,7 +342,7 @@ class Client(socket.socket):
             if self.conn_type == "tcp":
                 self.send(str(message).encode())
 
-            response = None
+            response = ""
             while not response:
                 data, addr = self.recvfrom(2**12)
                 if data:
@@ -454,7 +469,7 @@ def write(
     anchor: str,
     content: str | int,
     font: pygame.Font,
-    color: tuple,
+    color: Color,
     x: int,
     y: int,
     alpha: int=255,
@@ -513,8 +528,8 @@ def angle_diff(angle1: float, angle2: float) -> float:
 
 cursor = Cursor()
 
-client_udp = None
-client_tcp = None
+client_udp: Client = None
+client_tcp: Client = None
 
 weapon_costs = {
     "1": 1200,
