@@ -90,12 +90,13 @@ v_fonts = [
 
 
 class UserInput:
-    def __init__(self, x, y, font_size, color):
+    def __init__(self, x, y, font_size, color, anchor="center"):
         self.x = x
         self.y = y
         self.text = ""
         self.font_size = font_size
         self.color = color
+        self.anchor = anchor
 
     def process_event(self, event):
         if event.key == pygame.K_BACKSPACE:
@@ -106,7 +107,7 @@ class UserInput:
     def update(self):
         if self.text != "":
             write(
-                "topleft",
+                self.anchor,
                 self.text,
                 v_fonts[self.font_size],
                 self.color,
@@ -116,7 +117,7 @@ class UserInput:
             draw_rect(
                 Colors.RED,
                 write(
-                    "topleft",
+                    self.anchor,
                     self.text,
                     v_fonts[self.font_size],
                     self.color,

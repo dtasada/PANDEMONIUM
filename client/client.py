@@ -142,8 +142,10 @@ class Game:
                 'name': username_input.text,
             })
             print("msg:", msg)
-            player_data = json.loads(client_tcp.req_res(f"init_player-{player.tcp_id}-{msg}"))
-
+            if game.multiplayer:
+                player_data = json.loads(client_tcp.req_res(f"init_player-{player.tcp_id}-{msg}"))
+            else:
+                player_data = msg
             print("player_data:", player_data)
             # for id, data in player_data.items():
             #     for enemy in enemies:
@@ -398,7 +400,7 @@ class PlayerSelector:
     
     def update(self):
         o = 30
-        outline = pygame.Rect(self.rect.x - o, self.rect.y - o, self.rect.width + o * 2, self.rect.height + o * 4)
+        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 3, self.rect.width + o * 2, self.rect.height + o * 7)
         fill_rect(Colors.GRAY, outline)
         draw_rect(Colors.WHITE, outline)
         display.renderer.blit(self.image, self.rect)
@@ -1075,9 +1077,9 @@ title = Button(
 )
 
 username_input = UserInput(
-    display.width - 450,
-    325,
-    32,
+    player_selector.rect.centerx,
+    player_selector.rect.y - 40,
+    40,
     Colors.WHITE        
 )
 
@@ -1321,8 +1323,8 @@ def main(multiplayer):
 
         if game.state == States.MAIN_MENU:
             fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
-            username_input.update()
             player_selector.update()
+            username_input.update()
         else:
             if multiplayer:
                 player.send_location()
@@ -1383,6 +1385,5 @@ def main(multiplayer):
 
         display.renderer.present()
 
-    exit_handler.quit()
     pygame.quit()
     sys.exit()
