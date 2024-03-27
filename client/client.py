@@ -350,6 +350,7 @@ class PlayerSelector:
         self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
         self.color_keys = list(self.colors.keys())
         self.color_values = list(self.colors.values())
+        self.set_skin(0)
     
     def get_skin(self):
         return self.color
