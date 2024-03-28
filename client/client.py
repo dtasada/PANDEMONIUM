@@ -347,31 +347,63 @@ class HUD:
 
 class PlayerSelector:
     def __init__(self):
-        self.image = imgload("client", "assets", "images", "3d", "player.png", frames=4, scale=4)[0]
+        self.image = pygame.image.load(Path("client", "assets", "images", "3d", "player.png"))
+        self.image = pygame.transform.scale_by(self.image, (4, 4))
+        self.tex = Texture.from_surface(display.renderer, self.image)
         self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
-        self.color = 0
+        self.prim_color = 0
+        self.sec_color = 0
         self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
         self.color_keys = list(self.colors.keys())
         self.color_values = list(self.colors.values())
+        self.prim_colorkey = Colors.WHITE
+        self.sec_colorkey = Colors.RED
     
-    def get_skin(self):
-        return self.color
+    def get_prim_skin(self):
+        return self.prim_color
 
-    def set_skin(self, amount):
-        self.color += amount
-        if self.color == len(self.color_values):
-            self.color = 0
-        elif self.color == -1:
-            self.color = len(self.color_values) - 1
-        self.image.color = self.color_values[self.color]
+    def get_sec_skin(self):
+        return self.sec_color
+
+    def set_prim_skin(self, amount):
+        self.prim_color += amount
+        if self.prim_color == len(self.color_values):
+            self.prim_color = 0
+        elif self.prim_color == -1:
+            self.prim_color = len(self.color_values) - 1
+
+        rgba = getattr(Colors, self.color_keys[self.prim_color])
+        for y in range(self.image.get_height()):
+            for x in range(self.image.get_width()):
+                if self.image.get_at((x, y)) == self.prim_colorkey:
+                    self.image.set_at((x, y), rgba)
+        self.prim_colorkey = rgba
+        self.tex = Texture.from_surface(display.renderer, self.image)
+        
+    def set_sec_skin(self, amount):
+        self.sec_color += amount
+        if self.sec_color == len(self.color_values):
+            self.sec_color = 0
+        elif self.sec_color == -1:
+            self.sec_color = len(self.color_values) - 1
+
+        rgba = getattr(Colors, self.color_keys[self.sec_color])
+        for y in range(self.image.get_height()):
+            for x in range(self.image.get_width()):
+                if self.image.get_at((x, y)) == self.sec_colorkey:
+                    self.image.set_at((x, y), rgba)
+        self.sec_colorkey = rgba
+        print(self.sec_colorkey)
+        self.tex = Texture.from_surface(display.renderer, self.image)
+
     
     def update(self):
         o = 30
         outline = pygame.Rect(self.rect.x - o, self.rect.y - o, self.rect.width + o * 2, self.rect.height + o * 4)
         fill_rect(Colors.GRAY, outline)
         draw_rect(Colors.WHITE, outline)
-        display.renderer.blit(self.image, self.rect)
-        write("midtop", self.color_keys[self.color].replace("_", " "), v_fonts[64], Colors.WHITE, self.rect.centerx, self.rect.bottom + 30)
+        display.renderer.blit(self.tex, self.rect)
+        #write("midtop", self.color_keys[self.color].replace("_", " "), v_fonts[64], Colors.WHITE, self.rect.centerx, self.rect.bottom + 30)
 
 
 class Player:
@@ -1112,11 +1144,20 @@ all_buttons = {
             player_selector.rect.centerx,
             player_selector.rect.bottom + 10,
             "Skin",
-            player_selector.set_skin,
+            player_selector.set_prim_skin,
             action_arg=1,
             is_slider=True,
-            slider_display=player_selector.get_skin,
-        )
+            slider_display=player_selector.get_prim_skin,
+        ),
+        Button(
+            player_selector.rect.centerx,
+            player_selector.rect.bottom + 50,
+            "Skin",
+            player_selector.set_sec_skin,
+            action_arg=1,
+            is_slider=True,
+            slider_display=player_selector.get_sec_skin,
+        ),
     ],
     States.MAIN_SETTINGS: main_settings_buttons,
     States.PLAY_SETTINGS: [
