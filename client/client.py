@@ -138,7 +138,7 @@ class Game:
             # All launch & init requirements
             msg = json.dumps({
                 'health': player.health,
-                'color': player_selector.color,
+                'color': player_selector.prim_color,
                 'name': username_input.text,
             })
             print("msg:", msg)
@@ -161,13 +161,11 @@ class Game:
         else:
             cursor.enable()
 
-
     def get_fov(self):
         return self.fov
 
     def set_fov(self, amount):
         self.fov += amount
-
         self.fov = min(self.fov, 120)
         self.fov = max(self.fov, 30)
 
@@ -378,8 +376,11 @@ class HUD:
 
 class PlayerSelector:
     def __init__(self):
-        self.image = pygame.image.load(Path("client", "assets", "images", "3d", "player.png"))
-        self.image = pygame.transform.scale_by(self.image, (4, 4))
+        self.database = {
+            os.path.splitext(file)[0]: pygame.image.load(Path("client", "assets", "images", "player_skins", file)) for file in os.listdir(Path("client", "assets", "images", "player_skins"))
+        }
+        self.image = self.database["WHITE_RED"]
+        # self.image = pygame.transform.scale_by(self.image, (4, 4))
         self.tex = Texture.from_surface(display.renderer, self.image)
         self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
         self.prim_color = 0
@@ -389,6 +390,17 @@ class PlayerSelector:
         self.color_values = list(self.colors.values())
         self.prim_colorkey = Colors.WHITE
         self.sec_colorkey = Colors.RED
+        self.set_skin()
+    
+    def update(self):
+        o = 30
+        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 3, self.rect.width + o * 2, self.rect.height + o * 7)
+        fill_rect(Colors.GRAY, outline)
+        draw_rect(Colors.WHITE, outline)
+        display.renderer.blit(self.tex, self.rect)
+        draw_rect(Colors.RED, self.rect)
+        write("midleft", self.color_keys[self.prim_color].replace("_", " "), v_fonts[50], Colors.WHITE, self.rect.centerx + 160, self.rect.bottom + 40)
+        write("midleft", self.color_keys[self.sec_color].replace("_", " "), v_fonts[50], Colors.WHITE, self.rect.centerx + 160, self.rect.bottom + 70)
     
     def get_prim_skin(self):
         return self.prim_color
@@ -398,43 +410,76 @@ class PlayerSelector:
 
     def set_prim_skin(self, amount):
         self.prim_color += amount
-        if self.prim_color == len(self.color_values):
+        if self.prim_color == len(self.color_keys):
             self.prim_color = 0
-        elif self.prim_color == -1:
-            self.prim_color = len(self.color_values) - 1
-
-        rgba = getattr(Colors, self.color_keys[self.prim_color])
-        for y in range(self.image.get_height()):
-            for x in range(self.image.get_width()):
-                if self.image.get_at((x, y)) == self.prim_colorkey:
-                    self.image.set_at((x, y), rgba)
-        self.prim_colorkey = rgba
-        self.tex = Texture.from_surface(display.renderer, self.image)
-        
+        elif self.prim_color < 0:
+            self.prim_color = len(self.color_keys) - 1
+        self.set_skin()
+    
     def set_sec_skin(self, amount):
         self.sec_color += amount
-        if self.sec_color == len(self.color_values):
+        if self.sec_color == len(self.color_keys):
             self.sec_color = 0
-        elif self.sec_color == -1:
-            self.sec_color = len(self.color_values) - 1
-
-        rgba = getattr(Colors, self.color_keys[self.sec_color])
-        for y in range(self.image.get_height()):
-            for x in range(self.image.get_width()):
-                if self.image.get_at((x, y)) == self.sec_colorkey:
-                    self.image.set_at((x, y), rgba)
-        self.sec_colorkey = rgba
-        print(self.sec_colorkey)
+        elif self.sec_color < 0:
+            self.sec_color = len(self.color_keys) - 1
+        self.set_skin()
+    
+    def set_skin(self):
+        prim = self.color_keys[self.prim_color]
+        sec = self.color_keys[self.sec_color]
+        name = f"{prim}_{sec}"
+        self.image = self.database[name]
+        self.image = self.image.subsurface((0, 0, self.image.get_width() / 4, self.image.get_height()))
+        self.rect = self.image.get_rect(topleft=self.rect.topleft)
         self.tex = Texture.from_surface(display.renderer, self.image)
 
+    # def set_prim_skin(self, amount):
+    #     self.prim_color += amount
+    #     if self.prim_color == len(self.color_values):
+    #         self.prim_color = 0
+    #     elif self.prim_color == -1:
+    #         self.prim_color = len(self.color_values) - 1
+        
+    #     rgba = getattr(Colors, self.color_keys[self.prim_color])
+    #     for y in range(self.image.get_height()):
+    #         for x in range(self.image.get_width()):
+    #             if self.image.get_at((x, y)) == self.prim_colorkey:
+    #                 self.image.set_at((x, y), rgba)
+    #     self.prim_colorkey = rgba
+    #     self.tex = Texture.from_surface(display.renderer, self.image)
+        
+    # def set_sec_skin(self, amount):
+    #     self.sec_color += amount
+    #     if self.sec_color == len(self.color_values):
+    #         self.sec_color = 0
+    #     elif self.sec_color == -1:
+    #         self.sec_color = len(self.color_values) - 1
+
+    #     rgba = getattr(Colors, self.color_keys[self.sec_color])
+    #     for y in range(self.image.get_height()):
+    #         for x in range(self.image.get_width()):
+    #             if self.image.get_at((x, y)) == self.sec_colorkey:
+    #                 self.image.set_at((x, y), rgba)
+    #     self.sec_colorkey = rgba
+    #     print(self.sec_colorkey)
+    #     self.tex = Texture.from_surface(display.renderer, self.image)
     
-    def update(self):
-        o = 30
-        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 3, self.rect.width + o * 2, self.rect.height + o * 7)
-        fill_rect(Colors.GRAY, outline)
-        draw_rect(Colors.WHITE, outline)
-        display.renderer.blit(self.tex, self.rect)
-        #write("midtop", self.color_keys[self.color].replace("_", " "), v_fonts[64], Colors.WHITE, self.rect.centerx, self.rect.bottom + 30)
+    def set_all_skins(self):
+        self.image_copy = self.image.copy()
+        i = 0
+        imax = len(self.color_keys) ** 2
+        for name, rgba in self.colors.items():
+            for iname, irgba in self.colors.items():
+                if name != iname or True:
+                    for y in range(self.image.get_height()):
+                        for x in range(self.image.get_width()):
+                            if self.image_copy.get_at((x, y)) == Colors.WHITE:
+                                self.image.set_at((x, y), rgba)
+                            elif self.image_copy.get_at((x, y)) == Colors.RED:
+                                self.image.set_at((x, y), irgba)
+                    pygame.image.save(self.image, Path("client", "assets", "images", "player_skins", f"{name}_{iname}.png"))
+                    i += 1
+                    print(f"{i}/{imax}")
 
 
 class Player:
@@ -1058,9 +1103,17 @@ class EnemyPlayer:
             centery = display.height / 2 + player.bob
             height = game.projection_dist / self.dist_px * display.height / 2  # maths
             width = height / self.image.height * self.image.width
+            # rects
+            og_width, og_height = 232, 400
+            head_w_ratio = 84 / og_width
+            head_h_ratio = 88 / og_height
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
+            self.head_rect = pygame.Rect(0, 0, head_w_ratio * width, head_h_ratio * height)
+            self.head_rect.midtop = (self.rect.centerx, self.rect.top)
             display.renderer.blit(self.image, self.rect)
+            draw_rect(Colors.YELLOW, self.rect)
+            draw_rect(Colors.ORANGE, self.head_rect)
             self.rendering = True
 
     def regenerate(self):
@@ -1088,6 +1141,7 @@ enemies = []
 hud = HUD()
 player = Player()
 player_selector = PlayerSelector()
+# player_selector.set_all_skins()
 gtex = GlobalTextures()
 enemies = []
 enemy_addresses = []
@@ -1182,6 +1236,7 @@ all_buttons = {
             action_arg=1,
             is_slider=True,
             slider_display=player_selector.get_prim_skin,
+            font_size=50,
         ),
         Button(
             player_selector.rect.centerx,
@@ -1191,6 +1246,7 @@ all_buttons = {
             action_arg=1,
             is_slider=True,
             slider_display=player_selector.get_sec_skin,
+            font_size=50,
         ),
     ],
     States.MAIN_SETTINGS: main_settings_buttons,
@@ -1270,7 +1326,6 @@ def main(multiplayer):
         player.tcp_id = client_tcp.getsockname()
 
     game.set_state(States.MAIN_MENU)
-
     while game.running:
         clock.tick(game.fps)
         player.process_shot = False
