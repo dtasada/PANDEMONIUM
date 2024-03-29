@@ -13,12 +13,6 @@ import atexit
 
 
 def quit():
-    game.running = False
-    if game.multiplayer:
-        if client_tcp: client_tcp.req(f"quit")
-        pygame.quit()
-        sys.exit()
-
     json_save = {
         "resolution": game.resolution,
         "fov": game.fov,
@@ -26,6 +20,13 @@ def quit():
     }
     with open(Path("client", "settings.json"), "w") as f:
         json.dump(json_save, f)
+
+    game.running = False
+    if game.multiplayer:
+        if client_tcp: client_tcp.req(f"quit")
+        pygame.quit()
+        sys.exit()
+
 
 atexit.register(quit)
 
@@ -1382,6 +1383,4 @@ def main(multiplayer):
 
         display.renderer.present()
 
-    exit_handler.quit()
-    pygame.quit()
-    sys.exit()
+    quit()
