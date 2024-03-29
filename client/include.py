@@ -90,12 +90,13 @@ v_fonts = [
 
 
 class UserInput:
-    def __init__(self, x, y, font_size, color):
+    def __init__(self, x, y, font_size, color, anchor="center"):
         self.x = x
         self.y = y
         self.text = ""
         self.font_size = font_size
         self.color = color
+        self.anchor = anchor
 
     def process_event(self, event):
         if event.key == pygame.K_BACKSPACE:
@@ -106,7 +107,7 @@ class UserInput:
     def update(self):
         if self.text != "":
             write(
-                "topleft",
+                self.anchor,
                 self.text,
                 v_fonts[self.font_size],
                 self.color,
@@ -116,7 +117,7 @@ class UserInput:
             draw_rect(
                 Colors.RED,
                 write(
-                    "topleft",
+                    self.anchor,
                     self.text,
                     v_fonts[self.font_size],
                     self.color,
@@ -180,7 +181,7 @@ class Button:
         height: Optional[int] = None,
         action_arg: Any = None,
         font_size: int = 32,
-        color: Color = Colors.WHITE,
+        color: tuple[int, int, int] = Colors.WHITE,
         should_background: bool = False,
         anchor: str = "topleft",
         is_slider: bool = False,
@@ -362,20 +363,23 @@ class Client(socket.socket):
                 self.current_message = data.decode()
 
 
-def normalize_angle(angle):
+def normalize_angle(angle: float) -> float:
+    """ Normaliseert de gegeven hoek tussen 0 en 360 graden """
     angle = positive_angle(angle)
     while angle > 180:
         angle -= 360
     return angle
 
 
-def positive_angle(angle):
+def positive_angle(angle: float) -> float:
+    """ Zorgt ervoor dat de gegeven hoek een positieve hoek is """
     while angle < 0:
         angle += 360
     return angle
 
 
-def is_angle_between(a, testAngle, b):
+def is_angle_between(a: float, testAngle: float, b: float) -> bool:
+    """ Controleert of de gegeven hoet (testAngle) tussen de hoeken a en b ligt  """
     a -= testAngle
     b -= testAngle
     a = normalize_angle(a)
@@ -387,15 +391,16 @@ def is_angle_between(a, testAngle, b):
 
 def imgload(
     *path_,
-    colorkey=None,
-    frames=None,
-    whitespace=0,
-    frame_pause=0,
-    end_frame=None,
-    scale=1,
-    to_tex=True,
-    return_rect=False,
-):
+    colorkey: tuple[int, int, int] = None,
+    frames: int = None,
+    whitespace: int=0,
+    frame_pause: int=0,
+    end_frame: int=None,
+    scale: int=1,
+    to_tex: bool=True,
+    return_rect: bool=False,
+) -> list[Texture, pygame.Rect]:
+    """ De globale image loading functie voor ons project """
     # init
     ret = []
     img = pygame.image.load(Path(*path_))
@@ -431,26 +436,31 @@ def imgload(
     return ret
 
 
-def fill_rect(color, rect):
+def fill_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
+    """ Een primitieve rectangle drawing functie, maar gevuld """
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
 
 
-def draw_rect(color, rect):
+def draw_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
+    """ Een primitieve rectangle drawing functie, maar dan alleen de randen"""
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
 
 
-def draw_line(color, p1, p2):
+def draw_line(color: tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]) -> None:
+    """ Teken een lijn tussen twee punten """
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
 
 
-def angle_to_vel(angle, speed=1):
+def angle_to_vel(angle: float, speed: float = 1) -> tuple[float, float]:
+    """ Convert een richting naar twee snelheidsvectoren """
     return cos(angle) * speed, sin(angle) * speed
 
 
-def load_map_from_csv(path_, int_=True):
+def load_map_from_csv(path_: str, int_: bool=True) -> list[list[int]]:
+    """ Load een 2D map van een csv bestand """
     with open(path_, "r") as f:
         reader = csv.reader(f)
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
@@ -460,15 +470,16 @@ def write(
     anchor: str,
     content: str | int,
     font: pygame.Font,
-    color: Color,
+    color: tuple[int, int, int],
     x: int,
     y: int,
-    alpha=255,
-    blit=True,
-    border=None,
-    special_flags=0,
-    tex=True,
-):
+    alpha: int=255,
+    blit: bool=True,
+    border: tuple[int, int, int]=None,
+    special_flags: int=0,
+    tex: bool=True,
+) -> list[Texture, pygame.Rect]:
+    """ De universele text rendering functie """
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
@@ -491,8 +502,9 @@ def write(
     return tex, rect
 
 
-def borderize(img, color, thickness=1):
-    mask = pygame.mask.from_surface(img)
+def borderize(img: pygame.Surface, color: tuple[int, int, int], thickness: int=1) -> pygame.Surface:
+    """ Returns a borderized version of a surface with the given color and thickness """
+    mask = pygame.mask.from_surface(img) 
     mask_surf = mask.to_surface(setcolor=color)
     mask_surf.set_colorkey(Colors.BLACK)
     surf = pygame.Surface(
@@ -505,11 +517,13 @@ def borderize(img, color, thickness=1):
     return surf
 
 
-def pi2pi(angle):
+def pi2pi(angle: float) -> float:
+    """ Normalize the angle in radians to 2 * pi """
     return atan2(sin(angle), cos(angle))
 
 
-def angle_diff(angle1, angle2):
+def angle_diff(angle1: float, angle2: float) -> float:
+    """ Returns the smallest possible difference in given angles """
     return min((angle1 - angle2 + 360) % 360, (angle2 - angle1 + 360) % 360)
 
 
