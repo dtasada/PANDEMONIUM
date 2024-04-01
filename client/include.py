@@ -1,16 +1,13 @@
 from enum import Enum
-from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
+from math import sin, cos, atan2
 from pathlib import Path
-from types import FunctionType, LambdaType
+from types import LambdaType
 from typing import Any, Literal, Optional, TypeAlias
-from pygame._sdl2.video import Window, Renderer, Texture, Image
-from random import randint as rand
-from time import perf_counter
+from pygame._sdl2.video import Window, Renderer, Texture
 import csv
 import pygame
 import socket
 import sys
-import os
 import json
 
 
@@ -364,7 +361,7 @@ class Client(socket.socket):
 
 
 def normalize_angle(angle: float) -> float:
-    """ Normaliseert de gegeven hoek tussen 0 en 360 graden """
+    """Normaliseert de gegeven hoek tussen 0 en 360 graden"""
     angle = positive_angle(angle)
     while angle > 180:
         angle -= 360
@@ -372,14 +369,14 @@ def normalize_angle(angle: float) -> float:
 
 
 def positive_angle(angle: float) -> float:
-    """ Zorgt ervoor dat de gegeven hoek een positieve hoek is """
+    """Zorgt ervoor dat de gegeven hoek een positieve hoek is"""
     while angle < 0:
         angle += 360
     return angle
 
 
 def is_angle_between(a: float, testAngle: float, b: float) -> bool:
-    """ Controleert of de gegeven hoet (testAngle) tussen de hoeken a en b ligt  """
+    """Controleert of de gegeven hoet (testAngle) tussen de hoeken a en b ligt"""
     a -= testAngle
     b -= testAngle
     a = normalize_angle(a)
@@ -393,14 +390,14 @@ def imgload(
     *path_,
     colorkey: tuple[int, int, int] = None,
     frames: int = None,
-    whitespace: int=0,
-    frame_pause: int=0,
-    end_frame: int=None,
-    scale: int=1,
-    to_tex: bool=True,
-    return_rect: bool=False,
+    whitespace: int = 0,
+    frame_pause: int = 0,
+    end_frame: int = None,
+    scale: int = 1,
+    to_tex: bool = True,
+    return_rect: bool = False,
 ) -> list[Texture, pygame.Rect]:
-    """ De globale image loading functie voor ons project """
+    """De globale image loading functie voor ons project"""
     # init
     ret = []
     img = pygame.image.load(Path(*path_))
@@ -437,30 +434,32 @@ def imgload(
 
 
 def fill_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
-    """ Een primitieve rectangle drawing functie, maar gevuld """
+    """Een primitieve rectangle drawing functie, maar gevuld"""
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
 
 
 def draw_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
-    """ Een primitieve rectangle drawing functie, maar dan alleen de randen"""
+    """Een primitieve rectangle drawing functie, maar dan alleen de randen"""
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
 
 
-def draw_line(color: tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]) -> None:
-    """ Teken een lijn tussen twee punten """
+def draw_line(
+    color: tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]
+) -> None:
+    """Teken een lijn tussen twee punten"""
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
 
 
 def angle_to_vel(angle: float, speed: float = 1) -> tuple[float, float]:
-    """ Convert een richting naar twee snelheidsvectoren """
+    """Convert een richting naar twee snelheidsvectoren"""
     return cos(angle) * speed, sin(angle) * speed
 
 
-def load_map_from_csv(path_: str, int_: bool=True) -> list[list[int]]:
-    """ Load een 2D map van een csv bestand """
+def load_map_from_csv(path_: str, int_: bool = True) -> list[list[int]]:
+    """Load een 2D map van een csv bestand"""
     with open(path_, "r") as f:
         reader = csv.reader(f)
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
@@ -473,13 +472,13 @@ def write(
     color: tuple[int, int, int],
     x: int,
     y: int,
-    alpha: int=255,
-    blit: bool=True,
-    border: tuple[int, int, int]=None,
-    special_flags: int=0,
-    tex: bool=True,
+    alpha: int = 255,
+    blit: bool = True,
+    border: tuple[int, int, int] = None,
+    special_flags: int = 0,
+    tex: bool = True,
 ) -> list[Texture, pygame.Rect]:
-    """ De universele text rendering functie """
+    """De universele text rendering functie"""
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
@@ -502,9 +501,11 @@ def write(
     return tex, rect
 
 
-def borderize(img: pygame.Surface, color: tuple[int, int, int], thickness: int=1) -> pygame.Surface:
-    """ Returns a borderized version of a surface with the given color and thickness """
-    mask = pygame.mask.from_surface(img) 
+def borderize(
+    img: pygame.Surface, color: tuple[int, int, int], thickness: int = 1
+) -> pygame.Surface:
+    """Returns a borderized version of a surface with the given color and thickness"""
+    mask = pygame.mask.from_surface(img)
     mask_surf = mask.to_surface(setcolor=color)
     mask_surf.set_colorkey(Colors.BLACK)
     surf = pygame.Surface(
@@ -518,12 +519,12 @@ def borderize(img: pygame.Surface, color: tuple[int, int, int], thickness: int=1
 
 
 def pi2pi(angle: float) -> float:
-    """ Normalize the angle in radians to 2 * pi """
+    """Normalize the angle in radians to 2 * pi"""
     return atan2(sin(angle), cos(angle))
 
 
 def angle_diff(angle1: float, angle2: float) -> float:
-    """ Returns the smallest possible difference in given angles """
+    """Returns the smallest possible difference in given angles"""
     return min((angle1 - angle2 + 360) % 360, (angle2 - angle1 + 360) % 360)
 
 

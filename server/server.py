@@ -3,7 +3,6 @@ import sys
 import socket
 import json
 from threading import Thread
-from pprint import pprint
 
 
 class Colors:
@@ -58,7 +57,7 @@ def receive_udp():
 def receive_tcp(client, client_addr):
     try:
         while True:
-            request = client.recv(2**12).decode().split("-")
+            request = client.recv(2**12).decode().split("|")
             verb = request[0]
             target = request[1]
             args = []
@@ -78,37 +77,36 @@ def receive_tcp(client, client_addr):
                             )
 
                     case "quit":
-                        print("Player quitting...")
                         del udp_data[str(client_addr)]
                         del tcp_data[str(client_addr)]
-                        break
 
                     case "kill":
                         try:
-                            for client_ in clients:
-                                if client_ != client:
-                                    print(f"sending sig to kill {target}")
-                                    client_.send(f"kill-{target}".encode())
+                            try:
+                                del udp_data[target]
+                                del tcp_data[target]
+                            except:
+                                print("here pt2")
 
-                                if client_.getpeername() == client_addr:
-                                    clients.remove(client_)
+                            try:
+                                for client_ in clients:
+                                    if client_ != client:
+                                        print(f"sending sig to kill {target}")
+                                        client_.send(f"kill|{target}".encode())
 
-                            del udp_data[target]
-                            del tcp_data[target]
+                                    if client_.getpeername() == client_addr:
+                                        clients.remove(client_)
+                            except:
+                                print("here pt3")
                         except BaseException as e:
                             print("could not kill:", e)
 
                     case "damage":
-                        print("tcp_data:", tcp_data)
-                        try:
-                            tcp_data[client_addr]["health"] -= int(args[0])
+                        tcp_data[str(client_addr)]["health"] -= int(args[0])
 
-                            for client_ in clients:
-                                if target == str(client_addr):
-                                    client_.send(f"take_damage-{args[0]}".encode())
-
-                        except BaseException as e:
-                            print("could not damage:", e)
+                        for client_ in clients:
+                            if target == str(client_addr):
+                                client_.send(f"take_damage|{args[0]}".encode())
 
             except BaseException as err:
                 print(f"{Colors.RED}Error sending TCP message:{Colors.RESET} {err}")
