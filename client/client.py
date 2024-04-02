@@ -3,22 +3,17 @@ import sys
 import json
 import os
 
-from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt
+from math import sin, cos, tan, atan2, pi, radians, degrees, sqrt, hypot
 from pathlib import Path
 from pygame._sdl2.video import Texture, Image
 from threading import Thread
+from random import randint as rand
 
 from .include import *
-import atexit
+import signal
 
 
-def quit():
-    game.running = False
-    if game.multiplayer:
-        if client_tcp: client_tcp.req(f"quit")
-        pygame.quit()
-        sys.exit()
-
+def quit(sig=None, frame=None):
     json_save = {
         "resolution": game.resolution,
         "fov": game.fov,
@@ -27,7 +22,14 @@ def quit():
     with open(Path("client", "settings.json"), "w") as f:
         json.dump(json_save, f)
 
-atexit.register(quit)
+    game.running = False
+    if game.multiplayer:
+        if client_tcp: client_tcp.req(f"quit")
+        pygame.quit()
+        sys.exit()
+
+
+signal.signal(signal.SIGINT, quit)
 
 
 class Game:
@@ -141,9 +143,8 @@ class Game:
                 'color': player_selector.prim_color,
                 'name': username_input.text,
             })
-            print("msg:", msg)
             if game.multiplayer:
-                player_data = json.loads(client_tcp.req_res(f"init_player-{player.tcp_id}-{msg}"))
+                player_data = json.loads(client_tcp.req_res(f"init_player|{player.tcp_id}|{msg}"))
             else:
                 player_data = msg
             print("player_data:", player_data)
@@ -1008,13 +1009,16 @@ class Player:
         if game.multiplayer:
             self.send_location()
             if client_tcp.current_message:
-                if client_tcp.current_message.split("-")[0] == f"take_damage":
-                    self.health -= int(client_tcp.current_message.split("-")[1])
+                if client_tcp.current_message.split("|")[0] == f"take_damage":
+                    self.health -= int(client_tcp.current_message.split("|")[1])
 
                     if self.health <= 0:
-                        client_tcp.req(f"kill-{self.tcp_id}")
+                        client_tcp.req(f"kill|{self.tcp_id}")
+                        game.set_state(States.MAIN_MENU)
+                        return
 
-                if client_tcp.current_message == f"kill-{self.tcp_id}":
+
+                if client_tcp.current_message == f"kill|{self.tcp_id}":
                     print(f"received signal to kill self")
                     game.set_state(States.MAIN_MENU)
                     return
@@ -1080,14 +1084,14 @@ class EnemyPlayer:
     def update(self):
         if game.multiplayer:
             if (
-                client_tcp.current_message == f"kill-{self.id_}"
+                client_tcp.current_message == f"kill|{self.id_}"
                 or self.health <= 0
             ):
                 if self.health <= 0:
                     print(f"requesting to kill {self.id_}")
-                    client_tcp.req(f"kill-{self.id_}")
+                    client_tcp.req(f"kill|{self.id_}")
 
-                if client_tcp.current_message == f"kill-{self.id_}":
+                if client_tcp.current_message == f"kill|{self.id_}":
                     print(f"killing {self.id_}")
                 self.die()
                 return
@@ -1161,8 +1165,11 @@ class EnemyPlayer:
             self.update() # for dying
 
     def die(self):
-        enemies.remove(self)
-        enemy_addresses.remove(self.id_)
+        try:
+            enemies.remove(self)
+            enemy_addresses.remove(self.id_)
+        except:
+            pass
 
 cursor.enable()
 game = Game()
@@ -1449,9 +1456,6 @@ def main(multiplayer):
             player_selector.update()
             username_input.update()
         else:
-            if multiplayer:
-                player.send_location()
-
             if game.state in (States.PLAY, States.PLAY_SETTINGS):
                 fill_rect(
                     Colors.DARK_GRAY,
@@ -1508,5 +1512,4 @@ def main(multiplayer):
 
         display.renderer.present()
 
-    pygame.quit()
-    sys.exit()
+    quit()
