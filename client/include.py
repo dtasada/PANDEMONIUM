@@ -11,11 +11,12 @@ import sys
 import json
 
 
-SERVER_ADDRESS, SERVER_PORT = (
+SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
     socket.gethostbyname(
         socket.gethostname()
     ),  # Only when developing and playing on same machine
     6969,
+    4200,
 )
 
 pygame.init()
@@ -44,6 +45,23 @@ class Colors:
     ANSI_RESET = "\033[0m"
 
 
+class Joymap:
+    # axes
+    LEFT_JOYSTICK_HOR = 0
+    LEFT_JOYSTICK_VER = 1
+    RIGHT_JOYSTICK_HOR = 2
+    RIGHT_JOYSTICK_VER = 3
+    LEFT_TRIGGER = 4
+    RIGHT_TRIGGER = 5
+
+    # buttons
+    CROSS = 0
+    CIRCLE = 1
+    SQUARE = 2
+    TRIANGLE = 3
+    LEFT_JOYSTICK_CLICK = 7
+
+
 class States(Enum):
     LAUNCH = 0
     MAIN_MENU = 1
@@ -61,23 +79,6 @@ class Directions(Enum):
     DOWN_LEFT = 5
     LEFT = 6
     UP_LEFT = 7
-
-
-class Joymap:
-    # axes
-    LEFT_JOYSTICK_HOR = 0
-    LEFT_JOYSTICK_VER = 1
-    RIGHT_JOYSTICK_HOR = 2
-    RIGHT_JOYSTICK_VER = 3
-    LEFT_TRIGGER = 4
-    RIGHT_TRIGGER = 5
-
-    # buttons
-    CROSS = 0
-    CIRCLE = 1
-    SQUARE = 2
-    TRIANGLE = 3
-    LEFT_JOYSTICK_CLICK = 7
 
 
 v_fonts = [
@@ -98,6 +99,8 @@ class UserInput:
     def process_event(self, event):
         if event.key == pygame.K_BACKSPACE:
             self.text = self.text[:-1]
+        elif event.key == pygame.K_RETURN:
+            pass
         elif event.key != pygame.K_BACKSPACE:
             self.text += event.unicode
 
@@ -304,12 +307,26 @@ display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
-        super().__init__(
-            socket.AF_INET,
-            socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
-        )
-        self.target_server = (SERVER_ADDRESS, SERVER_PORT)
-        self.current_message: str = None
+        if self.conn_type == "tcp":
+            super().__init__(
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+            )
+            self.target_server = (
+                SERVER_ADDRESS,
+                SERVER_TCP_PORT,
+            )
+        elif self.conn_type == "udp":
+            super().__init__(
+                socket.AF_INET,
+                socket.SOCK_DGRAM,
+            )
+            self.target_server = (
+                SERVER_ADDRESS,
+                SERVER_UDP_PORT,
+            )
+
+        self.current_message: str = ""
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
@@ -319,7 +336,7 @@ class Client(socket.socket):
                     f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}"
                 )
 
-    def req(self, message):
+    def req(self, message) -> None:
         """
         send message to server without waiting for response
         """
@@ -361,7 +378,9 @@ class Client(socket.socket):
 
 
 def normalize_angle(angle: float) -> float:
-    """Normaliseert de gegeven hoek tussen 0 en 360 graden"""
+    """
+    Normalizes given angle to 0 - 360 degrees
+    """
     angle = positive_angle(angle)
     while angle > 180:
         angle -= 360
@@ -369,14 +388,18 @@ def normalize_angle(angle: float) -> float:
 
 
 def positive_angle(angle: float) -> float:
-    """Zorgt ervoor dat de gegeven hoek een positieve hoek is"""
+    """
+    Makes angle positive
+    """
     while angle < 0:
         angle += 360
     return angle
 
 
 def is_angle_between(a: float, testAngle: float, b: float) -> bool:
-    """Controleert of de gegeven hoet (testAngle) tussen de hoeken a en b ligt"""
+    """
+    Checks if testAngle is between a and b
+    """
     a -= testAngle
     b -= testAngle
     a = normalize_angle(a)
@@ -397,7 +420,6 @@ def imgload(
     to_tex: bool = True,
     return_rect: bool = False,
 ) -> list[Texture, pygame.Rect]:
-    """De globale image loading functie voor ons project"""
     # init
     ret = []
     img = pygame.image.load(Path(*path_))
@@ -446,7 +468,7 @@ def draw_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
 
 
 def draw_line(
-    color: tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]
+    color: Color | tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]
 ) -> None:
     """Teken een lijn tussen twee punten"""
     display.renderer.draw_color = color
@@ -469,15 +491,15 @@ def write(
     anchor: str,
     content: str | int,
     font: pygame.Font,
-    color: tuple[int, int, int],
+    color: Color | tuple[int, int, int],
     x: int,
     y: int,
     alpha: int = 255,
     blit: bool = True,
-    border: tuple[int, int, int] = None,
+    border: Optional[tuple[int, int, int]] = None,
     special_flags: int = 0,
     tex: bool = True,
-) -> list[Texture, pygame.Rect]:
+) -> tuple[Texture, pygame.Rect]:
     """De universele text rendering functie"""
     if border is not None:
         bc, bw = border, 1

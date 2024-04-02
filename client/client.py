@@ -10,10 +10,10 @@ from threading import Thread
 from random import randint as rand
 
 from .include import *
-import signal
+import atexit
 
 
-def quit(sig=None, frame=None):
+def quit():
     json_save = {
         "resolution": game.resolution,
         "fov": game.fov,
@@ -22,14 +22,15 @@ def quit(sig=None, frame=None):
     with open(Path("client", "settings.json"), "w") as f:
         json.dump(json_save, f)
 
+    if game.multiplayer and client_tcp:
+        client_tcp.req("quit")
+
     game.running = False
-    if game.multiplayer:
-        if client_tcp: client_tcp.req(f"quit")
-        pygame.quit()
-        sys.exit()
+    print("Exited successfully")
+    pygame.quit()
 
 
-signal.signal(signal.SIGINT, quit)
+atexit.register(quit)
 
 
 class Game:
@@ -136,6 +137,7 @@ class Game:
         self.running = False
 
     def set_state(self, state):
+        global player, enemies
         if self.previous_state == States.LAUNCH:
             # All launch & init requirements
             msg = json.dumps({
@@ -143,14 +145,11 @@ class Game:
                 'color': player_selector.prim_color,
                 'name': username_input.text,
             })
-            if game.multiplayer:
-                player_data = json.loads(client_tcp.req_res(f"init_player|{player.tcp_id}|{msg}"))
-            else:
-                player_data = msg
-            print("player_data:", player_data)
-            # for id, data in player_data.items():
-            #     for enemy in enemies:
-            #         print(id, enemy.id_)
+            client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
+        elif state == States.MAIN_MENU:
+            # Reset global variables
+            player = Player()
+            enemies = []
 
         self.previous_state = self.state
         self.state = state
@@ -510,6 +509,7 @@ class Player:
         self.reload_direc = 1
         self.weapon_yoffset = 0
         self.health = 100
+        hud.update_health(self)
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
@@ -520,9 +520,6 @@ class Player:
 
         self.bob = 0
         self.to_equip = None
-        # weapon
-
-        hud.update_health(self)
 
     @property
     def weapon(self):
@@ -1009,19 +1006,36 @@ class Player:
         if game.multiplayer:
             self.send_location()
             if client_tcp.current_message:
-                if client_tcp.current_message.split("|")[0] == f"take_damage":
-                    self.health -= int(client_tcp.current_message.split("|")[1])
+                if client_tcp.current_message.startswith("take_damage"):
+                    self.health = max(
+                        self.health - int(client_tcp.current_message.split("|")[1]), 0
+                    )
+                    hud.update_health(self)
 
                     if self.health <= 0:
                         client_tcp.req(f"kill|{self.tcp_id}")
                         game.set_state(States.MAIN_MENU)
                         return
-
+                    
+                    client_tcp.current_message = ""
 
                 if client_tcp.current_message == f"kill|{self.tcp_id}":
-                    print(f"received signal to kill self")
                     game.set_state(States.MAIN_MENU)
+
+                    client_tcp.current_message = ""
                     return
+                
+                if client_tcp.current_message.startswith("init_player"):
+                    msg = client_tcp.current_message.split("|")
+                    for enemy in enemies:
+
+                        if enemy.id_ == msg[1]:
+                            data = json.loads(msg[2])
+                            enemy.health = data["health"]
+                            enemy.image.color = data["color"]
+                            enemy.name = data["name"]
+
+                    client_tcp.current_message = ""
 
         self.rays = []
         self.walls_to_render = []
@@ -1043,7 +1057,7 @@ class Player:
 
 class EnemyPlayer:
     def __init__(self, id_=None):
-        self.id_ = id_
+        self.id_: str = id_
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
@@ -1065,6 +1079,7 @@ class EnemyPlayer:
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
         self.health = 100
+        self.name: str = None
 
     def draw(self):
         if game.multiplayer:
@@ -1091,9 +1106,8 @@ class EnemyPlayer:
                     print(f"requesting to kill {self.id_}")
                     client_tcp.req(f"kill|{self.id_}")
 
-                if client_tcp.current_message == f"kill|{self.id_}":
-                    print(f"killing {self.id_}")
                 self.die()
+                client_tcp.current_message = ""
                 return
 
         self.draw()
@@ -1158,9 +1172,8 @@ class EnemyPlayer:
         self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
-        damage = weapon_data[player.weapon]["damage"] * mult
-        client_tcp.req(f"damage-{self.id_}-{damage}")
-        self.health -= damage
+        damage = int(weapon_data[player.weapon]["damage"] * mult)
+        client_tcp.req(f"damage|{self.id_}|{damage}")
         if self.health <= 0:
             self.update() # for dying
 
@@ -1173,14 +1186,13 @@ class EnemyPlayer:
 
 cursor.enable()
 game = Game()
-enemies = []
 hud = HUD()
 player = Player()
 player_selector = PlayerSelector()
 # player_selector.set_all_skins()
 gtex = GlobalTextures()
-enemies = []
-enemy_addresses = []
+enemies: list[EnemyPlayer] = []
+enemy_addresses: list[str] = []
 clock = pygame.time.Clock()
 joystick: pygame.joystick.JoystickType = None
 
@@ -1330,9 +1342,8 @@ def check_new_players():
         message = json.loads(client_udp.current_message)
         for addr in message:
             if (
-                addr not in enemy_addresses # enemy already exists
-                and addr != player.tcp_id # enemy is not self
-                and addr != "id"
+                addr not in enemy_addresses # enemy already in enemies
+                # and addr != player.tcp_id # enemy is not self (shouldn't be necessary)
             ):
                 enemy_addresses.append(addr)
                 enemies.append(EnemyPlayer(addr))
@@ -1369,7 +1380,7 @@ def main(multiplayer):
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
-                    quit()
+                    sys.exit()
 
                 case pygame.MOUSEMOTION:
                     if cursor.should_wrap:
@@ -1512,4 +1523,4 @@ def main(multiplayer):
 
         display.renderer.present()
 
-    quit()
+    sys.exit()
