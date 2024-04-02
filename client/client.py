@@ -137,8 +137,11 @@ class Game:
         self.running = False
 
     def set_state(self, state):
-        global player, enemies
-        if self.previous_state == States.LAUNCH:
+        global player
+
+        if self.previous_state == States.LAUNCH or state == States.MAIN_MENU:
+            player = Player()
+
             # All launch & init requirements
             msg = json.dumps({
                 'health': player.health,
@@ -146,10 +149,6 @@ class Game:
                 'name': username_input.text,
             })
             client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
-        elif state == States.MAIN_MENU:
-            # Reset global variables
-            player = Player()
-            enemies = []
 
         self.previous_state = self.state
         self.state = state
@@ -433,36 +432,38 @@ class PlayerSelector:
         self.rect = self.image.get_rect(topleft=self.rect.topleft)
         self.tex = Texture.from_surface(display.renderer, self.image)
 
-    # def set_prim_skin(self, amount):
-    #     self.prim_color += amount
-    #     if self.prim_color == len(self.color_values):
-    #         self.prim_color = 0
-    #     elif self.prim_color == -1:
-    #         self.prim_color = len(self.color_values) - 1
+    """
+    def set_prim_skin(self, amount):
+        self.prim_color += amount
+        if self.prim_color == len(self.color_values):
+            self.prim_color = 0
+        elif self.prim_color == -1:
+            self.prim_color = len(self.color_values) - 1
         
-    #     rgba = getattr(Colors, self.color_keys[self.prim_color])
-    #     for y in range(self.image.get_height()):
-    #         for x in range(self.image.get_width()):
-    #             if self.image.get_at((x, y)) == self.prim_colorkey:
-    #                 self.image.set_at((x, y), rgba)
-    #     self.prim_colorkey = rgba
-    #     self.tex = Texture.from_surface(display.renderer, self.image)
+        rgba = getattr(Colors, self.color_keys[self.prim_color])
+        for y in range(self.image.get_height()):
+            for x in range(self.image.get_width()):
+                if self.image.get_at((x, y)) == self.prim_colorkey:
+                    self.image.set_at((x, y), rgba)
+        self.prim_colorkey = rgba
+        self.tex = Texture.from_surface(display.renderer, self.image)
         
-    # def set_sec_skin(self, amount):
-    #     self.sec_color += amount
-    #     if self.sec_color == len(self.color_values):
-    #         self.sec_color = 0
-    #     elif self.sec_color == -1:
-    #         self.sec_color = len(self.color_values) - 1
+    def set_sec_skin(self, amount):
+        self.sec_color += amount
+        if self.sec_color == len(self.color_values):
+            self.sec_color = 0
+        elif self.sec_color == -1:
+            self.sec_color = len(self.color_values) - 1
 
-    #     rgba = getattr(Colors, self.color_keys[self.sec_color])
-    #     for y in range(self.image.get_height()):
-    #         for x in range(self.image.get_width()):
-    #             if self.image.get_at((x, y)) == self.sec_colorkey:
-    #                 self.image.set_at((x, y), rgba)
-    #     self.sec_colorkey = rgba
-    #     print(self.sec_colorkey)
-    #     self.tex = Texture.from_surface(display.renderer, self.image)
+        rgba = getattr(Colors, self.color_keys[self.sec_color])
+        for y in range(self.image.get_height()):
+            for x in range(self.image.get_width()):
+                if self.image.get_at((x, y)) == self.sec_colorkey:
+                    self.image.set_at((x, y), rgba)
+        self.sec_colorkey = rgba
+        print(self.sec_colorkey)
+        self.tex = Texture.from_surface(display.renderer, self.image)
+    """
     
     def set_all_skins(self):
         self.image_copy = self.image.copy()
@@ -488,7 +489,7 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
-        self.tcp_id = None
+        self.tcp_id = client_tcp.getsockname()
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -515,11 +516,11 @@ class Player:
         self.last_shot = ticks()
 
         self.melee_anim = 1
-        self.process_shot = None
+        self.process_shot: bool | None = None
         self.last_melee = ticks()
 
         self.bob = 0
-        self.to_equip = None
+        self.to_equip: tuple[tuple[int, int], int] | None = None
 
     @property
     def weapon(self):
@@ -1015,20 +1016,17 @@ class Player:
                     if self.health <= 0:
                         client_tcp.req(f"kill|{self.tcp_id}")
                         game.set_state(States.MAIN_MENU)
-                        return
                     
                     client_tcp.current_message = ""
 
                 if client_tcp.current_message == f"kill|{self.tcp_id}":
-                    game.set_state(States.MAIN_MENU)
-
                     client_tcp.current_message = ""
+                    game.set_state(States.MAIN_MENU)
                     return
                 
                 if client_tcp.current_message.startswith("init_player"):
                     msg = client_tcp.current_message.split("|")
                     for enemy in enemies:
-
                         if enemy.id_ == msg[1]:
                             data = json.loads(msg[2])
                             enemy.health = data["health"]
@@ -1078,7 +1076,7 @@ class EnemyPlayer:
         self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
-        self.health = 100
+        self.health = 100  # currently not being updated
         self.name: str = None
 
     def draw(self):
@@ -1098,18 +1096,16 @@ class EnemyPlayer:
 
     def update(self):
         if game.multiplayer:
-            if (
-                client_tcp.current_message == f"kill|{self.id_}"
-                or self.health <= 0
-            ):
-                if self.health <= 0:
-                    print(f"requesting to kill {self.id_}")
-                    client_tcp.req(f"kill|{self.id_}")
+            if self.health <= 0:
+                print(f"requesting to kill {self.id_}")
+                client_tcp.req(f"kill|{self.id_}")
 
-                self.die()
+            if client_tcp.current_message == f"kill|{self.id_}":
                 client_tcp.current_message = ""
+                self.die()
                 return
 
+        # print("enemy health:", self.health)
         self.draw()
         self.regenerate()
 
@@ -1187,10 +1183,10 @@ class EnemyPlayer:
 cursor.enable()
 game = Game()
 hud = HUD()
-player = Player()
 player_selector = PlayerSelector()
 # player_selector.set_all_skins()
 gtex = GlobalTextures()
+player: Player = None # initialization is in game.set_state
 enemies: list[EnemyPlayer] = []
 enemy_addresses: list[str] = []
 clock = pygame.time.Clock()
@@ -1330,6 +1326,11 @@ class Hue:
 darken_game = Hue(Colors.BLACK, 80)
 redden_game = Hue(Colors.RED, 20)
 
+menu_wall_texs = imgload(
+    "client", "assets", "images", "menu", "wallpaper", "wall.jpg", scale=1, frames=8
+)
+menu_wall_index = 0
+
 floor_tex = imgload("client", "assets", "images", "3d", "floor.png")
 joystick_button_sprs = imgload(
     "client", "assets", "images", "hud", "buttons.png", scale=4, frames=4
@@ -1341,10 +1342,7 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if (
-                addr not in enemy_addresses # enemy already in enemies
-                # and addr != player.tcp_id # enemy is not self (shouldn't be necessary)
-            ):
+            if addr not in enemy_addresses:
                 enemy_addresses.append(addr)
                 enemies.append(EnemyPlayer(addr))
 
@@ -1370,7 +1368,6 @@ def main(multiplayer):
         client_tcp = Client("tcp")
         Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
-        player.tcp_id = client_tcp.getsockname()
 
     game.set_state(States.MAIN_MENU)
     while game.running:
@@ -1463,7 +1460,8 @@ def main(multiplayer):
         display.renderer.clear()
 
         if game.state == States.MAIN_MENU:
-            fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
+            # fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
+            display.renderer.blit(menu_wall_texs[0])
             player_selector.update()
             username_input.update()
         else:
@@ -1496,15 +1494,14 @@ def main(multiplayer):
             display.renderer.blit(redden_game.tex, redden_game.rect)
 
             if game.state == States.PLAY:
-                # zoom
                 game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
-
                 display.renderer.blit(crosshair_tex, crosshair_rect)
 
         if game.state == States.MAIN_SETTINGS:
             fill_rect((0, 0, 0, 255), (0, 0, display.width, display.height))
         elif game.state == States.PLAY_SETTINGS:
             display.renderer.blit(darken_game.tex, darken_game.rect)
+
 
         for button in current_buttons:
             button.update()
