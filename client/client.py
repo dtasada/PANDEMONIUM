@@ -822,7 +822,13 @@ class Player:
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
                     if enemy.rect.collidepoint(display.center):
-                        enemy.hit()
+                        # the body in general is hit
+                        mult = 1
+                        if enemy.head_rect.collidepoint(display.center):
+                            mult = 1.4
+                        elif enemy.legs_rect.collidepoint(display.center) or enemy.shoulder1_rect.collidepoint(display.center) or enemy.shoulder2_rect.collidepoint(display.center):
+                            mult = 0.5
+                        enemy.hit(mult)
 
             self.last_shot = ticks()
             self.mag -= 1
@@ -1107,13 +1113,36 @@ class EnemyPlayer:
             og_width, og_height = 232, 400
             head_w_ratio = 84 / og_width
             head_h_ratio = 88 / og_height
+            torso_w_ratio = 92 / og_width
+            torso_h_ratio = 148 / og_height
+            legs_w_ratio = 100 / og_width
+            legs_h_ratio = 168 / og_height
+            shoulder_w_ratio = 28 / og_width
+            shoulder_h_ratio = 84 / og_height
+            # whole body
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
+            # head
             self.head_rect = pygame.Rect(0, 0, head_w_ratio * width, head_h_ratio * height)
             self.head_rect.midtop = (self.rect.centerx, self.rect.top)
+            # torso
+            self.torso_rect = pygame.Rect(0, 0, torso_w_ratio * width, torso_h_ratio * height)
+            self.torso_rect.midtop = (self.rect.centerx, self.head_rect.bottom)
+            # legs
+            self.legs_rect = pygame.Rect(0, 0, legs_w_ratio * width, legs_h_ratio * height)
+            self.legs_rect.midtop = (self.rect.centerx, self.torso_rect.bottom)
+            # shoulders
+            self.shoulder1_rect = pygame.Rect(0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height)
+            self.shoulder1_rect.topright = self.torso_rect.topleft
+            self.shoulder2_rect = pygame.Rect(0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height)
+            self.shoulder2_rect.topleft = self.torso_rect.topright
+            # rest
             display.renderer.blit(self.image, self.rect)
             draw_rect(Colors.YELLOW, self.rect)
             draw_rect(Colors.ORANGE, self.head_rect)
+            draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
+            draw_rect(Colors.GREEN, self.shoulder1_rect)
+            draw_rect(Colors.GREEN, self.shoulder2_rect)
             self.rendering = True
 
     def regenerate(self):
@@ -1121,11 +1150,11 @@ class EnemyPlayer:
             self.regenerating = False
             self.image.color = self.color
 
-    def hit(self):
+    def hit(self, mult):
         self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
-        damage = weapon_data[player.weapon]["damage"]
+        damage = weapon_data[player.weapon]["damage"] * mult
         client_tcp.req(f"damage-{self.id_}-{damage}")
         self.health -= damage
         if self.health <= 0:
