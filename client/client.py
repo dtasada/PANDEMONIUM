@@ -382,7 +382,7 @@ class PlayerSelector:
         # self.image = pygame.transform.scale_by(self.image, (4, 4))
         self.tex = Texture.from_surface(display.renderer, self.image)
         self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
-        self.prim_color = 0
+        self.prim_color = 1
         self.sec_color = 0
         self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
         del self.colors["GRAY"]
