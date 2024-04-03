@@ -17,7 +17,7 @@ SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
         socket.gethostname()
     ),  # Only when developing and playing on same machine
     6969,
-    420,
+    4200,
 )
 
 pygame.init()

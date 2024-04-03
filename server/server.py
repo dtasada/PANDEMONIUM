@@ -15,7 +15,7 @@ class Colors:
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
     socket.gethostbyname(socket.gethostname()),
     6969,
-    420,
+    4200,
 )
 
 

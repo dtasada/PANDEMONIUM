@@ -26,8 +26,8 @@ def quit():
         client_tcp.req("quit")
 
     game.running = False
-    print("Exited successfully")
     pygame.quit()
+    print("Exited successfully")
 
 
 atexit.register(quit)
@@ -382,7 +382,7 @@ class PlayerSelector:
         # self.image = pygame.transform.scale_by(self.image, (4, 4))
         self.tex = Texture.from_surface(display.renderer, self.image)
         self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
-        self.prim_color = 0
+        self.prim_color = 1
         self.sec_color = 0
         self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
         del self.colors["GRAY"]
@@ -1479,7 +1479,12 @@ def main(multiplayer):
 
         if game.state == States.MAIN_MENU:
             # fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
-            display.renderer.blit(menu_wall_texs[0])
+            global menu_wall_index
+            display.renderer.blit(menu_wall_texs[int(menu_wall_index)])
+            menu_wall_index += 8 / game.fps
+            if menu_wall_index > 7:
+                menu_wall_index = 0
+
             player_selector.update()
             username_input.update()
         else:
