@@ -299,7 +299,7 @@ class HUD:
             pygame.image.load(Path("client", "assets", "images", "hud", "heart.png")),
         )
         self.heart_rect = self.heart_tex.get_rect(
-            bottomright=(140, display.height - 12)
+            bottomright=(150, display.height - 12)
         )
 
     def update(self):
@@ -1344,10 +1344,10 @@ class Hue:
 darken_game = Hue(Colors.BLACK, 80)
 redden_game = Hue(Colors.RED, 20)
 
-menu_wall_texs = imgload(
-    "client", "assets", "images", "menu", "wallpaper", "wall.jpg", scale=1, frames=8
-)
 menu_wall_index = 0
+menu_wall_texs = imgload(
+    "client", "assets", "images", "menu", "wallpaper", "wallpaper.png", scale=1, frames=8
+)
 
 floor_tex = imgload("client", "assets", "images", "3d", "floor.png")
 joystick_button_sprs = imgload(
@@ -1480,7 +1480,7 @@ def main(multiplayer):
         if game.state == States.MAIN_MENU:
             # fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
             global menu_wall_index
-            display.renderer.blit(menu_wall_texs[int(menu_wall_index)])
+            display.renderer.blit(menu_wall_texs[int(menu_wall_index)], pygame.Rect(0, 0, display.width, display.height))
             menu_wall_index += 8 / game.fps
             if menu_wall_index > 7:
                 menu_wall_index = 0

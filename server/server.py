@@ -49,6 +49,11 @@ udp_data: Dict[str, dict[str, Any]] = {}  # values are x, y, angle
 clients: list[socket.socket] = []
 
 
+def feed(msg: str) -> None:
+    for client in clients.copy():
+        client.send(f"feed|msg.encode()".encode())
+
+
 def receive_udp():
     while True:
         request, addr = server_udp.recvfrom(2**12)
@@ -94,10 +99,20 @@ def receive_tcp(client, client_addr):
                             alert("Could not init_player", e)
 
                     case "quit":
-                        del udp_data[str(client_addr)]
-                        del tcp_data[str(client_addr)]
+                        try:
+                            del udp_data[target]
+                            del tcp_data[target]
 
-                        # TODO: finish quitting
+                            for client_ in clients.copy():
+                                if client_ != client:
+                                    print(f"sending sig to quit {target}")
+                                    client_.send(f"quit|{target}".encode())
+
+                                if client_.getpeername() == client_addr:
+                                    clients.remove(client_)
+
+                        except BaseException as e:
+                            alert("Failed to quit player", e)
 
                     case "kill":
                         try:
