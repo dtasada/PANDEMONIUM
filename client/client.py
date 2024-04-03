@@ -1523,31 +1523,32 @@ def main(multiplayer):
         player.process_shot = False
 
         # Global TCP events
-        match client_tcp.current_message.split("|")[0]:
-            case "init_player":
-                msg = client_tcp.current_message.split("|")
-                for enemy in enemies:
-                    print(str(enemy.id), msg[1], type(enemy.id))
-                    if str(enemy.id) == msg[1]:
-                        data = json.loads(msg[2])
-                        print("Got new player:", data)
-                        enemy.health = data["health"]
-                        enemy.image.color = data["color"]
-                        enemy.name = data["name"] # This isn't working yet
+        if game.multiplayer:
+            match client_tcp.current_message.split("|")[0]:
+                case "init_player":
+                    msg = client_tcp.current_message.split("|")
+                    for enemy in enemies:
+                        print(str(enemy.id), msg[1], type(enemy.id))
+                        if str(enemy.id) == msg[1]:
+                            data = json.loads(msg[2])
+                            print("Got new player:", data)
+                            enemy.health = data["health"]
+                            enemy.image.color = data["color"]
+                            enemy.name = data["name"] # This isn't working yet
 
-                client_tcp.current_message = ""
+                    client_tcp.current_message = ""
 
-            case "feed":
-                global feed
-                message = Texture.from_surface(
-                    display.renderer,
-                    v_fonts[32].render(
-                        client_tcp.current_message.split("|")[1], True, Colors.WHITE
-                    ),
-                )
-                feed.append((message, ticks()))
+                case "feed":
+                    global feed
+                    message = Texture.from_surface(
+                        display.renderer,
+                        v_fonts[32].render(
+                            client_tcp.current_message.split("|")[1], True, Colors.WHITE
+                        ),
+                    )
+                    feed.append((message, ticks()))
 
-                client_tcp.current_message = ""
+                    client_tcp.current_message = ""
 
         for event in pygame.event.get():
             match event.type:
