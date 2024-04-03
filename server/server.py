@@ -82,7 +82,6 @@ def receive_tcp(client, client_addr):
             args = []  # every item after the target is an arg, like a damage coef
             if len(request) >= 3:
                 args = request[2:]
-
             try:
                 match verb:
                     case "init_player":

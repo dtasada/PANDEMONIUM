@@ -124,17 +124,17 @@ class UserInput:
             self.x,
             self.y,
             )
-        draw_rect(
-            Colors.RED,
-            write(
-                self.anchor,
-                text,
-                font,
-                self.color,
-                self.x,
-                self.y,
-            )[1],
-        )
+        # draw_rect(
+        #     Colors.RED,
+        #     write(
+        #         self.anchor,
+        #         text,
+        #         font,
+        #         self.color,
+        #         self.x,
+        #         self.y,
+        #     )[1],
+        # )
 
 
 class Display:

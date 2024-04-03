@@ -7,5 +7,13 @@
         "mag": 6,
         "fire_pause": 300,
         "auto": false
+    },
+    "2": {
+        "name": "knife",
+        "damage": 100,
+        "cost": null,
+        "ammo": null,
+        "fire_pause": null,
+        "auto": false
     }
 }
