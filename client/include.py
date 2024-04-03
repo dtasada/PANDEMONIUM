@@ -588,16 +588,25 @@ with open(Path("client", "assets", "weapon_data.json"), "r") as f:
 weapon_names = [None] + [v["name"] for k, v in weapon_data.items()]
 
 ticks = pygame.time.get_ticks
-sound = pygame.mixer.Sound(
-    Path(
-        "client",
-        "assets",
-        "sounds",
-        "gun_sounds_2",
-        "Full Sounds",
-        ".308 (7.62x51)",
-        "MP3",
-        "308 Single.mp3",
+
+
+class Sounds:
+    GUN = pygame.mixer.Sound(
+        Path(
+            "client",
+            "assets",
+            "sounds",
+            "gun_sounds_2",
+            "Full Sounds",
+            ".308 (7.62x51)",
+            "MP3",
+            "308 Single.mp3",
+        )
     )
-)
+    MAIN_MENU = pygame.mixer.Sound(
+        Path("client", "assets", "sounds", "music", "tristram.mp3")
+    )
+    PLAY = pygame.mixer.Sound(Path("client", "assets", "sounds", "music", "doom.mp3"))
+
+
 channel = pygame.mixer.Channel(0)
