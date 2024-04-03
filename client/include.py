@@ -1,8 +1,7 @@
 from enum import Enum
 from math import sin, cos, atan2
 from pathlib import Path
-from types import LambdaType
-from typing import Any, Literal, Optional, TypeAlias
+from typing import Any, Optional, TypeAlias
 from pygame._sdl2.video import Window, Renderer, Texture
 import csv
 import pygame
@@ -11,37 +10,59 @@ import sys
 import json
 
 
-SERVER_ADDRESS, SERVER_PORT = (
+SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
     socket.gethostbyname(
         socket.gethostname()
     ),  # Only when developing and playing on same machine
     6969,
+    4200,
 )
 
 pygame.init()
 
 
-Color: TypeAlias = tuple[Literal[255], Literal[255], Literal[255], Literal[255]]
+Color: TypeAlias = tuple[int, int, int, int] | tuple[int, int, int]
 
 
 class Colors:
     BLACK = (0, 0, 0, 255)
     BLUE = (0, 0, 255, 255)
+    BROWN = (97, 54, 19)
     DARK_GRAY = (40, 40, 40, 255)
     GRAY = (150, 150, 150, 255)
-    LIGHT_GRAY = (220, 220, 220, 255)
     GREEN = (0, 255, 0, 255)
-    BROWN = (97, 54, 19)
+    LIGHT_BLUE = (0, 150, 255)
+    LIGHT_GRAY = (220, 220, 220, 255)
     ORANGE = (255, 140, 0, 255)
+    PINK = (152, 0, 136, 255)
     RED = (255, 0, 0, 255)
     WHITE = (255, 255, 255, 255)
     YELLOW = (255, 255, 0, 255)
-    LIGHT_BLUE = (0, 150, 255)
-    PINK = (152, 0, 136, 255)
 
     ANSI_GREEN = "\033[1;32m"
     ANSI_RED = "\033[1;31;31m"
     ANSI_RESET = "\033[0m"
+
+    ANSI_BOLD = "\u001b[1m"
+    ANSI_ITALIC = "\u001b[3m"
+    ANSI_UNDERLINE = "\u001b[4m"
+
+
+class Joymap:
+    # axes
+    LEFT_JOYSTICK_HOR = 0
+    LEFT_JOYSTICK_VER = 1
+    RIGHT_JOYSTICK_HOR = 2
+    RIGHT_JOYSTICK_VER = 3
+    LEFT_TRIGGER = 4
+    RIGHT_TRIGGER = 5
+
+    # buttons
+    CROSS = 0
+    CIRCLE = 1
+    SQUARE = 2
+    TRIANGLE = 3
+    LEFT_JOYSTICK_CLICK = 7
 
 
 class States(Enum):
@@ -63,25 +84,14 @@ class Directions(Enum):
     UP_LEFT = 7
 
 
-class Joymap:
-    # axes
-    LEFT_JOYSTICK_HOR = 0
-    LEFT_JOYSTICK_VER = 1
-    RIGHT_JOYSTICK_HOR = 2
-    RIGHT_JOYSTICK_VER = 3
-    LEFT_TRIGGER = 4
-    RIGHT_TRIGGER = 5
-
-    # buttons
-    CROSS = 0
-    CIRCLE = 1
-    SQUARE = 2
-    TRIANGLE = 3
-    LEFT_JOYSTICK_CLICK = 7
-
-
 v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
+    for i in range(101)
+]
+vi_fonts = [
+    pygame.font.Font(
+        Path("client", "assets", "fonts", "VT323-Regular.ttf", italic=True), i
+    )
     for i in range(101)
 ]
 
@@ -98,30 +108,37 @@ class UserInput:
     def process_event(self, event):
         if event.key == pygame.K_BACKSPACE:
             self.text = self.text[:-1]
+        elif event.key == pygame.K_RETURN:
+            pass
         elif event.key != pygame.K_BACKSPACE:
             self.text += event.unicode
 
     def update(self):
-        if self.text != "":
-            write(
-                self.anchor,
-                self.text,
-                v_fonts[self.font_size],
-                self.color,
-                self.x,
-                self.y,
-            )
-            draw_rect(
-                Colors.RED,
-                write(
-                    self.anchor,
-                    self.text,
-                    v_fonts[self.font_size],
-                    self.color,
-                    self.x,
-                    self.y,
-                )[1],
-            )
+        if self.text == "":
+            text = "enter name"
+            font = vi_fonts[self.font_size - 8]
+        else:
+            text = self.text
+            font = v_fonts[self.font_size]
+        write(
+            self.anchor,
+            text,
+            font,
+            self.color,
+            self.x,
+            self.y,
+        )
+        # draw_rect(
+        #     Colors.RED,
+        #     write(
+        #         self.anchor,
+        #         text,
+        #         font,
+        #         self.color,
+        #         self.x,
+        #         self.y,
+        #     )[1],
+        # )
 
 
 class Display:
@@ -173,16 +190,17 @@ class Button:
         x: int,
         y: int,
         content: str,
-        action: LambdaType,
+        action: callable,
         width: Optional[int] = None,
         height: Optional[int] = None,
         action_arg: Any = None,
         font_size: int = 32,
-        color: tuple[int, int, int] = Colors.WHITE,
+        color: Color = Colors.WHITE,
         should_background: bool = False,
         anchor: str = "topleft",
         is_slider: bool = False,
         slider_display: Optional[str] = None,
+        grayed_out_when: Optional[callable] = None,
     ):
         self.content = content
         self.color = self.initial_color = color
@@ -200,6 +218,7 @@ class Button:
 
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         setattr(self.rect, self.anchor, (x, y))
+        self.grayed_out_when = grayed_out_when
 
         if action is not None:
             self.hover_tex = Texture.from_surface(
@@ -219,8 +238,9 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
+
             self.left_slider_rect = self.left_slider_tex.get_rect(
-                midleft=(self.rect.right + 4, self.rect.midright[1])
+                midleft=(self.rect.right + 4, self.rect.centery)
             )
 
             self.right_slider_tex = Texture.from_surface(
@@ -235,14 +255,9 @@ class Button:
             )
             self.right_slider_rect = self.right_slider_tex.get_rect()
 
-            self.slider_display_rect = write(
-                self.anchor,
-                self.slider_display(),
-                v_fonts[self.font_size],
-                Colors.WHITE,
-                self.left_slider_rect.x + 16,
-                self.rect.y,
-            )[1]
+    @property
+    def grayed_out(self):
+        return self.grayed_out_when is not None and self.grayed_out_when()
 
     def process_event(self, event):
         if self.action is not None:
@@ -255,13 +270,15 @@ class Button:
                             self.action(self.action_arg)
 
                     elif self.rect.collidepoint(pygame.mouse.get_pos()):
-                        self.action()
+                        if not self.grayed_out:
+                            self.action()
 
     def update(self):
         if (
             self.rect.collidepoint(pygame.mouse.get_pos())
             and not self.is_slider
             and self.action is not None
+            and not self.grayed_out
         ):
             display.renderer.blit(self.hover_tex, self.hover_rect)
         if self.should_background:
@@ -269,56 +286,87 @@ class Button:
         if self.is_slider:
             display.renderer.blit(self.left_slider_tex, self.left_slider_rect)
             display.renderer.blit(self.right_slider_tex, self.right_slider_rect)
-
             self.slider_display_rect = write(
-                self.anchor,
+                "center",
                 self.slider_display(),
                 v_fonts[self.font_size],
                 Colors.WHITE,
-                self.left_slider_rect.x + 16,
-                self.rect.y,
+                self.rect.right + 45,
+                self.rect.centery,
             )[1]
 
             setattr(
                 self.right_slider_rect,
-                self.anchor,
+                "midleft",
                 (
-                    self.slider_display_rect.right,
-                    self.rect.y + 8,
+                    self.rect.right + 15 + 40 + 15,
+                    self.rect.centery,
                 ),
             )
-        write(
+            setattr(
+                self.left_slider_rect,
+                "center",
+                (
+                    self.rect.right + 15,
+                    self.rect.centery,
+                ),
+            )
+        tex, rect = write(
             "topleft",
             self.content,
             v_fonts[self.font_size],
             self.color,
             self.rect.x,
             self.rect.y,
-            tex=False,
+            blit=False,
         )
+        if self.grayed_out:
+            tex.color = (80, 80, 80, 255)
+        display.renderer.blit(tex, rect)
 
 
-display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
+display = Display(
+    1280,
+    720,
+    "PANDEMONIUM",
+    fullscreen=False if "--no-fullscreen" else True,
+    vsync=False if "--no-vsync" else True,
+)
 
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn
-        super().__init__(
-            socket.AF_INET,
-            socket.SOCK_DGRAM if self.conn_type == "udp" else socket.SOCK_STREAM,
-        )
-        self.target_server = (SERVER_ADDRESS, SERVER_PORT)
-        self.current_message: str = None
+        if self.conn_type == "tcp":
+            super().__init__(
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+            )
+            self.target_server = (
+                SERVER_ADDRESS,
+                SERVER_TCP_PORT,
+            )
+        elif self.conn_type == "udp":
+            super().__init__(
+                socket.AF_INET,
+                socket.SOCK_DGRAM,
+            )
+            self.target_server = (
+                SERVER_ADDRESS,
+                SERVER_UDP_PORT,
+            )
+
+        self.current_message: str = ""
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
                 print(f"{Colors.ANSI_GREEN}Connected to the server!{Colors.ANSI_RESET}")
             except ConnectionRefusedError as err:
                 sys.exit(
-                    f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}"
+                    f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}\n"
+                    + f"{Colors.ANSI_BOLD}Use the {Colors.ANSI_ITALIC}--no-multiplayer{Colors.ANSI_RESET}{Colors.ANSI_BOLD} flag to run the game offline"
                 )
 
-    def req(self, message):
+    def req(self, message) -> None:
         """
         send message to server without waiting for response
         """
@@ -360,7 +408,9 @@ class Client(socket.socket):
 
 
 def normalize_angle(angle: float) -> float:
-    """Normaliseert de gegeven hoek tussen 0 en 360 graden"""
+    """
+    Normalizes given angle to 0 - 360 degrees
+    """
     angle = positive_angle(angle)
     while angle > 180:
         angle -= 360
@@ -368,14 +418,18 @@ def normalize_angle(angle: float) -> float:
 
 
 def positive_angle(angle: float) -> float:
-    """Zorgt ervoor dat de gegeven hoek een positieve hoek is"""
+    """
+    Makes angle positive
+    """
     while angle < 0:
         angle += 360
     return angle
 
 
 def is_angle_between(a: float, testAngle: float, b: float) -> bool:
-    """Controleert of de gegeven hoet (testAngle) tussen de hoeken a en b ligt"""
+    """
+    Checks if testAngle is between a and b
+    """
     a -= testAngle
     b -= testAngle
     a = normalize_angle(a)
@@ -395,8 +449,7 @@ def imgload(
     scale: int = 1,
     to_tex: bool = True,
     return_rect: bool = False,
-) -> list[Texture, pygame.Rect]:
-    """De globale image loading functie voor ons project"""
+) -> tuple[Texture, pygame.Rect]:
     # init
     ret = []
     img = pygame.image.load(Path(*path_))
@@ -432,22 +485,17 @@ def imgload(
     return ret
 
 
-def fill_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
-    """Een primitieve rectangle drawing functie, maar gevuld"""
+def fill_rect(color: Color, rect: pygame.Rect) -> None:
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
 
 
-def draw_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
-    """Een primitieve rectangle drawing functie, maar dan alleen de randen"""
+def draw_rect(color: Color, rect: pygame.Rect) -> None:
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
 
 
-def draw_line(
-    color: tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]
-) -> None:
-    """Teken een lijn tussen twee punten"""
+def draw_line(color: Color, p1: tuple[int, int], p2: tuple[int, int]) -> None:
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
 
@@ -468,16 +516,15 @@ def write(
     anchor: str,
     content: str | int,
     font: pygame.Font,
-    color: tuple[int, int, int],
+    color: Color,
     x: int,
     y: int,
     alpha: int = 255,
     blit: bool = True,
-    border: tuple[int, int, int] = None,
+    border: Optional[tuple[int, int, int]] = None,
     special_flags: int = 0,
-    tex: bool = True,
-) -> list[Texture, pygame.Rect]:
-    """De universele text rendering functie"""
+    convert_to_tex: bool = True,
+) -> tuple[Texture, pygame.Rect]:
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
@@ -485,7 +532,7 @@ def write(
         write(anchor, content, font, bc, x - bw, y + bw)
         write(anchor, content, font, bc, x + bw, y + bw)
     tex = font.render(str(content), True, color)
-    if tex:
+    if convert_to_tex:
         tex = Texture.from_surface(display.renderer, tex)
         tex.alpha = alpha
     else:
@@ -540,16 +587,25 @@ with open(Path("client", "assets", "weapon_data.json"), "r") as f:
 weapon_names = [None] + [v["name"] for k, v in weapon_data.items()]
 
 ticks = pygame.time.get_ticks
-sound = pygame.mixer.Sound(
-    Path(
-        "client",
-        "assets",
-        "sounds",
-        "gun_sounds_2",
-        "Full Sounds",
-        ".308 (7.62x51)",
-        "MP3",
-        "308 Single.mp3",
+
+
+class Sounds:
+    GUN = pygame.mixer.Sound(
+        Path(
+            "client",
+            "assets",
+            "sounds",
+            "gun_sounds_2",
+            "Full Sounds",
+            ".308 (7.62x51)",
+            "MP3",
+            "308 Single.mp3",
+        )
     )
-)
+    MAIN_MENU = pygame.mixer.Sound(
+        Path("client", "assets", "sounds", "music", "tristram.mp3")
+    )
+    PLAY = pygame.mixer.Sound(Path("client", "assets", "sounds", "music", "doom.mp3"))
+
+
 channel = pygame.mixer.Channel(0)

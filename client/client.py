@@ -10,26 +10,28 @@ from threading import Thread
 from random import randint as rand
 
 from .include import *
-import signal
+import atexit
 
 
-def quit(sig=None, frame=None):
+def quit():
     json_save = {
         "resolution": game.resolution,
         "fov": game.fov,
         "sens": game.sens,
+        "volume": game.get_volume(),
     }
     with open(Path("client", "settings.json"), "w") as f:
         json.dump(json_save, f)
 
+    if game.multiplayer and client_tcp:
+        client_tcp.req("quit")
+
     game.running = False
-    if game.multiplayer:
-        if client_tcp: client_tcp.req(f"quit")
-        pygame.quit()
-        sys.exit()
+    pygame.quit()
+    print("Exited successfully")
 
 
-signal.signal(signal.SIGINT, quit)
+atexit.register(quit)
 
 
 class Game:
@@ -62,7 +64,7 @@ class Game:
         self.state = States.MAIN_MENU
         self.previous_state = States.LAUNCH
         self.fps = 60
-        
+
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
         self.projection_dist = 32 / tan(radians(self.fov / 2))
@@ -135,32 +137,49 @@ class Game:
     def stop_running(self):
         self.running = False
 
-    def set_state(self, state):
-        if self.previous_state == States.LAUNCH:
+    def set_state(self, target_state):
+        global player
+
+        if self.previous_state == States.LAUNCH or target_state == States.MAIN_MENU:
+            player = Player()
+
+        if (
+            (target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS)
+            or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU)
+        ):
+            channel.play(Sounds.MAIN_MENU)
+        elif (
+            (target_state == States.PLAY and self.state != States.PLAY_SETTINGS)
+            or (target_state == States.PLAY_SETTINGS and self.state != States.PLAY)
+        ):
+            channel.play(Sounds.PLAY)
+
+        if (
+            game.multiplayer
+            and target_state == States.PLAY
+            and self.state == States.MAIN_MENU
+        ):
             # All launch & init requirements
-            msg = json.dumps({
-                'health': player.health,
-                'color': player_selector.prim_color,
-                'name': username_input.text,
-            })
-            if game.multiplayer:
-                player_data = json.loads(client_tcp.req_res(f"init_player|{player.tcp_id}|{msg}"))
-            else:
-                player_data = msg
-            print("player_data:", player_data)
-            # for id, data in player_data.items():
-            #     for enemy in enemies:
-            #         print(id, enemy.id_)
+                msg = json.dumps(
+                    {
+                        "health": player.health,
+                        "color": player_selector.prim_color,
+                        "name": username_input.text,
+                    }
+                )
+                client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
 
         self.previous_state = self.state
-        self.state = state
+        self.state = target_state
 
-        global current_buttons
-        current_buttons = all_buttons[self.state]
-        if state == States.PLAY:
+        if self.state == States.PLAY:
             cursor.disable()
         else:
             cursor.enable()
+
+        global current_buttons
+        current_buttons = all_buttons[self.state]
+
 
     def get_fov(self):
         return self.fov
@@ -187,6 +206,11 @@ class Game:
 
         self.ray_density = self.resolutions_list[self.resolution - 1]
 
+    def set_volume(self, amount):
+        channel.set_volume(0.05 * round((channel.get_volume() + amount / 100) / 0.05))
+
+    def get_volume(self):
+        return int(5 * round(channel.get_volume() / 0.05))
 
 class GlobalTextures:
     def __init__(self):
@@ -223,12 +247,11 @@ class GlobalTextures:
         self.object_textures = [
             (
                 imgload("client", "assets", "images", "objects", file_name + ".png")
-                if file_name is not None
+                if file_name is not None and file_name != "knife"
                 else None
             )
             for file_name in weapon_names
         ]
-
         self.highlighted_object_textures = [
             (
                 Texture.from_surface(
@@ -246,7 +269,7 @@ class GlobalTextures:
                         Colors.YELLOW,
                     ),
                 )
-                if file_name is not None
+                if file_name is not None and file_name != "knife"
                 else None
             )
             for file_name in weapon_names
@@ -254,7 +277,7 @@ class GlobalTextures:
 
         self.mask_object_textures = []
         for file_name_with_ext in weapon_names:
-            if file_name_with_ext is None:
+            if file_name_with_ext is None or file_name_with_ext == "knife":
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
@@ -301,7 +324,7 @@ class HUD:
             pygame.image.load(Path("client", "assets", "images", "hud", "heart.png")),
         )
         self.heart_rect = self.heart_tex.get_rect(
-            bottomright=(140, display.height - 12)
+            bottomright=(150, display.height - 12)
         )
 
     def update(self):
@@ -329,6 +352,15 @@ class HUD:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
         display.renderer.blit(self.heart_tex, self.heart_rect)
+        for message in feed:
+            if ticks() - 5000 > message[1]:
+                feed.remove(message)
+            else:
+                tex = message[0]
+                display.renderer.blit(
+                    tex,
+                    tex.get_rect(topright=(display.width - 16, 16 + 32 * (len(feed) - 1))),
+                )
 
     def update_weapon_general(self, player):
         self.update_weapon_tex(player)
@@ -378,31 +410,78 @@ class HUD:
 class PlayerSelector:
     def __init__(self):
         self.database = {
-            os.path.splitext(file)[0]: pygame.image.load(Path("client", "assets", "images", "player_skins", file)) for file in os.listdir(Path("client", "assets", "images", "player_skins"))
+            os.path.splitext(file)[0]: pygame.image.load(
+                Path("client", "assets", "images", "player_skins", file)
+            )
+            for file in os.listdir(Path("client", "assets", "images", "player_skins"))
         }
         self.image = self.database["WHITE_RED"]
         # self.image = pygame.transform.scale_by(self.image, (4, 4))
         self.tex = Texture.from_surface(display.renderer, self.image)
-        self.rect = self.image.get_rect(midright=(display.width - 120, display.height / 2))
-        self.prim_color = 0
+        self.rect = self.image.get_rect(
+            midright=(display.width - 120, display.height / 2)
+        )
+        self.prim_color = 1
         self.sec_color = 0
-        self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
+        self.colors = {
+            color: getattr(Colors, color)
+            for color in vars(Colors)
+            if not color.startswith("ANSI_") and not color.startswith("__")
+        }
+        del self.colors["GRAY"]
         self.color_keys = list(self.colors.keys())
         self.color_values = list(self.colors.values())
         self.prim_colorkey = Colors.WHITE
         self.sec_colorkey = Colors.RED
+        self.colors_equal = False
         self.set_skin()
-    
+        # surf
+        o = 10
+        self.outline = pygame.Rect(
+            self.rect.x - o,
+            self.rect.y - o * 5,
+            self.rect.width + o * 2,
+            self.rect.height + o * 7,
+        )
+        #
+        self.black_surf = pygame.Surface(self.outline.size, pygame.SRCALPHA)
+        self.black_surf.fill((0, 0, 0, 120))
+        self.black_tex = Texture.from_surface(display.renderer, self.black_surf)
+
+    def init(self):
+        self.menu_bg_surf = pygame.Surface(
+            (unleash_button.rect.width + 40, 180), pygame.SRCALPHA
+        )
+        self.menu_bg_surf.fill((0, 0, 0, 120))
+        self.menu_bg_tex = Texture.from_surface(display.renderer, self.menu_bg_surf)
+        self.menu_bg_rect = self.menu_bg_surf.get_rect(
+            topleft=(unleash_button.rect.x - 20, unleash_button.rect.y - 20)
+        )
+
     def update(self):
-        o = 30
-        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 3, self.rect.width + o * 2, self.rect.height + o * 7)
-        fill_rect(Colors.GRAY, outline)
-        draw_rect(Colors.WHITE, outline)
+        # fill_rect((0, 0, 0, 120), outline)
+        display.renderer.blit(self.black_tex, self.outline)
+        display.renderer.blit(self.menu_bg_tex, self.menu_bg_rect)
+        # draw_rect(Colors.WHITE, self.outline)
         display.renderer.blit(self.tex, self.rect)
-        draw_rect(Colors.RED, self.rect)
-        write("midleft", self.color_keys[self.prim_color].replace("_", " "), v_fonts[50], Colors.WHITE, self.rect.centerx + 160, self.rect.bottom + 40)
-        write("midleft", self.color_keys[self.sec_color].replace("_", " "), v_fonts[50], Colors.WHITE, self.rect.centerx + 160, self.rect.bottom + 70)
-    
+        # draw_rect(Colors.RED, self.rect)
+        write(
+            "midleft",
+            self.color_keys[self.prim_color].replace("_", " "),
+            v_fonts[50],
+            Colors.WHITE,
+            prim_skin_button.rect.right + 100,
+            prim_skin_button.rect.centery,
+        )
+        write(
+            "midleft",
+            self.color_keys[self.sec_color].replace("_", " "),
+            v_fonts[50],
+            Colors.WHITE,
+            sec_skin_button.rect.right + 100,
+            sec_skin_button.rect.centery,
+        )
+
     def get_prim_skin(self):
         return self.prim_color
 
@@ -416,7 +495,7 @@ class PlayerSelector:
         elif self.prim_color < 0:
             self.prim_color = len(self.color_keys) - 1
         self.set_skin()
-    
+
     def set_sec_skin(self, amount):
         self.sec_color += amount
         if self.sec_color == len(self.color_keys):
@@ -424,47 +503,53 @@ class PlayerSelector:
         elif self.sec_color < 0:
             self.sec_color = len(self.color_keys) - 1
         self.set_skin()
-    
+
     def set_skin(self):
         prim = self.color_keys[self.prim_color]
         sec = self.color_keys[self.sec_color]
         name = f"{prim}_{sec}"
+        self.colors_equal = prim == sec
         self.image = self.database[name]
-        self.image = self.image.subsurface((0, 0, self.image.get_width() / 4, self.image.get_height()))
+        self.image = self.image.subsurface(
+            (0, 0, self.image.get_width() / 4, self.image.get_height())
+        )
         self.rect = self.image.get_rect(topleft=self.rect.topleft)
+        self.rect.topright = (display.width - 135, 200)
         self.tex = Texture.from_surface(display.renderer, self.image)
 
-    # def set_prim_skin(self, amount):
-    #     self.prim_color += amount
-    #     if self.prim_color == len(self.color_values):
-    #         self.prim_color = 0
-    #     elif self.prim_color == -1:
-    #         self.prim_color = len(self.color_values) - 1
+    """
+    def set_prim_skin(self, amount):
+        self.prim_color += amount
+        if self.prim_color == len(self.color_values):
+            self.prim_color = 0
+        elif self.prim_color == -1:
+            self.prim_color = len(self.color_values) - 1
         
-    #     rgba = getattr(Colors, self.color_keys[self.prim_color])
-    #     for y in range(self.image.get_height()):
-    #         for x in range(self.image.get_width()):
-    #             if self.image.get_at((x, y)) == self.prim_colorkey:
-    #                 self.image.set_at((x, y), rgba)
-    #     self.prim_colorkey = rgba
-    #     self.tex = Texture.from_surface(display.renderer, self.image)
+        rgba = getattr(Colors, self.color_keys[self.prim_color])
+        for y in range(self.image.get_height()):
+            for x in range(self.image.get_width()):
+                if self.image.get_at((x, y)) == self.prim_colorkey:
+                    self.image.set_at((x, y), rgba)
+        self.prim_colorkey = rgba
+        self.tex = Texture.from_surface(display.renderer, self.image)
         
-    # def set_sec_skin(self, amount):
-    #     self.sec_color += amount
-    #     if self.sec_color == len(self.color_values):
-    #         self.sec_color = 0
-    #     elif self.sec_color == -1:
-    #         self.sec_color = len(self.color_values) - 1
+    def set_sec_skin(self, amount):
+        self.sec_color += amount
+        if self.sec_color == len(self.color_values):
+            self.sec_color = 0
+        elif self.sec_color == -1:
+            self.sec_color = len(self.color_values) - 1
 
-    #     rgba = getattr(Colors, self.color_keys[self.sec_color])
-    #     for y in range(self.image.get_height()):
-    #         for x in range(self.image.get_width()):
-    #             if self.image.get_at((x, y)) == self.sec_colorkey:
-    #                 self.image.set_at((x, y), rgba)
-    #     self.sec_colorkey = rgba
-    #     print(self.sec_colorkey)
-    #     self.tex = Texture.from_surface(display.renderer, self.image)
-    
+        rgba = getattr(Colors, self.color_keys[self.sec_color])
+        for y in range(self.image.get_height()):
+            for x in range(self.image.get_width()):
+                if self.image.get_at((x, y)) == self.sec_colorkey:
+                    self.image.set_at((x, y), rgba)
+        self.sec_colorkey = rgba
+        print(self.sec_colorkey)
+        self.tex = Texture.from_surface(display.renderer, self.image)
+    """
+
     def set_all_skins(self):
         self.image_copy = self.image.copy()
         i = 0
@@ -478,7 +563,16 @@ class PlayerSelector:
                                 self.image.set_at((x, y), rgba)
                             elif self.image_copy.get_at((x, y)) == Colors.RED:
                                 self.image.set_at((x, y), irgba)
-                    pygame.image.save(self.image, Path("client", "assets", "images", "player_skins", f"{name}_{iname}.png"))
+                    pygame.image.save(
+                        self.image,
+                        Path(
+                            "client",
+                            "assets",
+                            "images",
+                            "player_skins",
+                            f"{name}_{iname}.png",
+                        ),
+                    )
                     i += 1
                     print(f"{i}/{imax}")
 
@@ -489,7 +583,6 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
-        self.tcp_id = None
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -510,19 +603,21 @@ class Player:
         self.reload_direc = 1
         self.weapon_yoffset = 0
         self.health = 100
+        self.meleing = False
+        hud.update_health(self)
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
 
         self.melee_anim = 1
-        self.process_shot = None
+        self.process_shot: bool | None = None
         self.last_melee = ticks()
 
         self.bob = 0
-        self.to_equip = None
-        # weapon
+        self.to_equip: tuple[tuple[int, int], int] | None = None
 
-        hud.update_health(self)
+        if game.multiplayer:
+            self.tcp_id = client_tcp.getsockname()
 
     @property
     def weapon(self):
@@ -554,8 +649,8 @@ class Player:
         self.ammos[self.weapon_index] = value
 
     def display_weapon(self):
-        if self.weapon is not None:
-            weapon_data = gtex.weapon_textures[self.weapon]
+        if self.weapon is not None or self.meleing:
+            weapon_data = gtex.weapon_textures["2" if self.meleing else self.weapon]
             if self.shooting:
                 self.weapon_anim += 0.2
             try:
@@ -563,6 +658,8 @@ class Player:
             except IndexError:
                 self.shooting = False
                 self.weapon_anim = 1
+                if self.meleing:
+                    self.meleing = False
             weapon_tex = weapon_data[int(self.weapon_anim)][0]
             weapon_rect = weapon_data[int(self.weapon_anim)][1]
             weapon_rect.midbottom = (
@@ -675,9 +772,9 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
-            
+
             if keys[pygame.K_q]:
-                  for enemy in enemies:
+                for enemy in enemies:
                     enemy.indicator_rect.y -= 1
 
             if keys[pygame.K_q]:
@@ -782,7 +879,9 @@ class Player:
             dx = enemy.indicator_rect.centerx - self.rect.centerx
             enemy.angle = degrees(atan2(dy, dx))
             enemy.dist_px = hypot(dy, dx)
-        self.enemies_to_render = sorted(enemies, key=lambda te: te.dist_px, reverse=True)
+        self.enemies_to_render = sorted(
+            enemies, key=lambda te: te.dist_px, reverse=True
+        )
 
         # map ofc
         self.render_map()
@@ -814,11 +913,11 @@ class Player:
             m = 6
             self.weapon_yoffset += self.reload_direc * m
 
-    def shoot(self):
+    def shoot(self, melee=False):
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
-            channel.play(sound)
+            channel.play(Sounds.GUN)
 
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
@@ -827,7 +926,11 @@ class Player:
                         mult = 1
                         if enemy.head_rect.collidepoint(display.center):
                             mult = 1.4
-                        elif enemy.legs_rect.collidepoint(display.center) or enemy.shoulder1_rect.collidepoint(display.center) or enemy.shoulder2_rect.collidepoint(display.center):
+                        elif (
+                            enemy.legs_rect.collidepoint(display.center)
+                            or enemy.shoulder1_rect.collidepoint(display.center)
+                            or enemy.shoulder2_rect.collidepoint(display.center)
+                        ):
                             mult = 0.5
                         enemy.hit(mult)
 
@@ -843,6 +946,11 @@ class Player:
                 self.new_mag = weapon_data[self.weapon]["mag"]
                 self.mag_diff = self.new_mag - self.mag
                 self.new_ammo = self.ammo - self.mag_diff
+
+    def melee(self):
+        self.meleing = True
+        self.shooting = True
+        self.weapon_anim = 0
 
     def cast_ray(
         self, deg_offset, index, start_x=None, start_y=None, abs_angle=False
@@ -974,14 +1082,18 @@ class Player:
                     )
 
     def send_location(self):
-        client_udp.req(json.dumps({
-            "tcp_id": str(self.tcp_id),
-            "body": {
-                "x": self.arrow_rect.x + game.mo,
-                "y": self.arrow_rect.y + game.mo,
-                "angle": self.angle,
-            }
-        }))
+        client_udp.req(
+            json.dumps(
+                {
+                    "tcp_id": str(self.tcp_id),
+                    "body": {
+                        "x": self.arrow_rect.x + game.mo,
+                        "y": self.arrow_rect.y + game.mo,
+                        "angle": self.angle,
+                    },
+                }
+            )
+        )
 
     def set_weapon(self, weapon):
         weapon = int(weapon)
@@ -1009,18 +1121,21 @@ class Player:
         if game.multiplayer:
             self.send_location()
             if client_tcp.current_message:
-                if client_tcp.current_message.split("|")[0] == f"take_damage":
-                    self.health -= int(client_tcp.current_message.split("|")[1])
+                if client_tcp.current_message.startswith("take_damage|"):
+                    self.health = max(
+                        self.health - int(client_tcp.current_message.split("|")[1]), 0
+                    )
+                    hud.update_health(self)
 
                     if self.health <= 0:
                         client_tcp.req(f"kill|{self.tcp_id}")
                         game.set_state(States.MAIN_MENU)
-                        return
 
+                    client_tcp.current_message = ""
 
                 if client_tcp.current_message == f"kill|{self.tcp_id}":
-                    print(f"received signal to kill self")
                     game.set_state(States.MAIN_MENU)
+                    client_tcp.current_message = ""
                     return
 
         self.rays = []
@@ -1039,10 +1154,9 @@ class Player:
         player.display_weapon()
 
 
-
 class EnemyPlayer:
-    def __init__(self, id_=None):
-        self.id_ = id_
+    def __init__(self, id=None):
+        self.id: str = id
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
@@ -1063,18 +1177,19 @@ class EnemyPlayer:
         self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
-        self.health = 100
+        self.health = 100  # currently not being updated
+        self.name: str = None # this doesn't work yet
 
     def draw(self):
         if game.multiplayer:
             if client_udp.current_message:
                 message = json.loads(client_udp.current_message)
-                if self.id_ not in message:
+                if self.id not in message:
                     self.die()
                     return
-                self.indicator_rect.x = message[self.id_]["x"]
-                self.indicator_rect.y = message[self.id_]["y"]
-                self.angle = message[self.id_]["angle"]
+                self.indicator_rect.x = message[self.id]["x"]
+                self.indicator_rect.y = message[self.id]["y"]
+                self.angle = message[self.id]["angle"]
 
         self.rendering = False
         draw_rect(Colors.RED, self.indicator_rect)
@@ -1082,19 +1197,17 @@ class EnemyPlayer:
 
     def update(self):
         if game.multiplayer:
-            if (
-                client_tcp.current_message == f"kill|{self.id_}"
-                or self.health <= 0
-            ):
-                if self.health <= 0:
-                    print(f"requesting to kill {self.id_}")
-                    client_tcp.req(f"kill|{self.id_}")
+            if self.health <= 0:
+                print(f"requesting to kill {self.id}")
+                client_tcp.req(f"kill|{self.id}")
 
-                if client_tcp.current_message == f"kill|{self.id_}":
-                    print(f"killing {self.id_}")
+            if client_tcp.current_message in (f"kill|{self.id}", f"quit|{self.id}"):
                 self.die()
+
+                client_tcp.current_message = ""
                 return
 
+        # print("enemy health:", self.health)
         self.draw()
         self.regenerate()
 
@@ -1122,23 +1235,44 @@ class EnemyPlayer:
             legs_h_ratio = 168 / og_height
             shoulder_w_ratio = 28 / og_width
             shoulder_h_ratio = 84 / og_height
+            arm_w_ratio = 11 / og_width
+            arm_h_ratio = 50 / og_height
             # whole body
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
             # head
-            self.head_rect = pygame.Rect(0, 0, head_w_ratio * width, head_h_ratio * height)
+            self.head_rect = pygame.Rect(
+                0, 0, head_w_ratio * width, head_h_ratio * height
+            )
             self.head_rect.midtop = (self.rect.centerx, self.rect.top)
             # torso
-            self.torso_rect = pygame.Rect(0, 0, torso_w_ratio * width, torso_h_ratio * height)
+            self.torso_rect = pygame.Rect(
+                0, 0, torso_w_ratio * width, torso_h_ratio * height
+            )
             self.torso_rect.midtop = (self.rect.centerx, self.head_rect.bottom)
             # legs
-            self.legs_rect = pygame.Rect(0, 0, legs_w_ratio * width, legs_h_ratio * height)
+            self.legs_rect = pygame.Rect(
+                0, 0, legs_w_ratio * width, legs_h_ratio * height
+            )
             self.legs_rect.midtop = (self.rect.centerx, self.torso_rect.bottom)
             # shoulders
-            self.shoulder1_rect = pygame.Rect(0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height)
+            self.shoulder1_rect = pygame.Rect(
+                0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height
+            )
             self.shoulder1_rect.topright = self.torso_rect.topleft
-            self.shoulder2_rect = pygame.Rect(0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height)
+            self.shoulder2_rect = pygame.Rect(
+                0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height
+            )
             self.shoulder2_rect.topleft = self.torso_rect.topright
+            # arms
+            self.arm1_rect = pygame.Rect(
+                0, 0, arm_w_ratio * width, arm_h_ratio * height
+            )
+            self.arm1_rect.topright = self.shoulder1_rect.topleft
+            self.arm2_rect = pygame.Rect(
+                0, 0, arm_w_ratio * width, arm_h_ratio * height
+            )
+            self.arm2_rect.topleft = self.shoulder2_rect.topleft
             # rest
             display.renderer.blit(self.image, self.rect)
             draw_rect(Colors.YELLOW, self.rect)
@@ -1146,6 +1280,8 @@ class EnemyPlayer:
             draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
             draw_rect(Colors.GREEN, self.shoulder1_rect)
             draw_rect(Colors.GREEN, self.shoulder2_rect)
+            draw_rect(Colors.BLUE, self.arm1_rect)
+            draw_rect(Colors.BLUE, self.arm2_rect)
             self.rendering = True
 
     def regenerate(self):
@@ -1157,29 +1293,28 @@ class EnemyPlayer:
         self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
-        damage = weapon_data[player.weapon]["damage"] * mult
-        client_tcp.req(f"damage-{self.id_}-{damage}")
-        self.health -= damage
+        damage = int(weapon_data[player.weapon]["damage"] * mult)
+        client_tcp.req(f"damage|{self.id}|{damage}")
         if self.health <= 0:
-            self.update() # for dying
+            self.update()  # for dying
 
     def die(self):
         try:
             enemies.remove(self)
-            enemy_addresses.remove(self.id_)
+            enemy_addresses.remove(self.id)
         except:
             pass
 
+
 cursor.enable()
 game = Game()
-enemies = []
 hud = HUD()
-player = Player()
-player_selector = PlayerSelector()
 # player_selector.set_all_skins()
 gtex = GlobalTextures()
-enemies = []
-enemy_addresses = []
+player: Player = None  # initialization is in game.set_state
+enemies: list[EnemyPlayer] = []
+enemy_addresses: list[str] = []
+feed: list[tuple[Texture, int]] = []
 clock = pygame.time.Clock()
 joystick: pygame.joystick.JoystickType = None
 
@@ -1195,13 +1330,7 @@ title = Button(
     anchor="center",
 )
 
-username_input = UserInput(
-    player_selector.rect.centerx,
-    player_selector.rect.y - 40,
-    40,
-    Colors.WHITE        
-)
-
+player_selector = PlayerSelector()
 main_settings_buttons = [
     title,
     Button(
@@ -1234,6 +1363,15 @@ main_settings_buttons = [
     Button(
         80,
         display.height / 2 + 48 * 3,
+        "Volume",
+        game.set_volume,
+        action_arg=5,
+        is_slider=True,
+        slider_display=game.get_volume,
+    ),
+    Button(
+        80,
+        display.height / 2 + 48 * 4,
         "Back",
         lambda: game.set_state(game.previous_state),
         font_size=48,
@@ -1250,6 +1388,8 @@ all_buttons = {
             lambda: game.set_state(States.PLAY),
             font_size=48,
             color=Colors.RED,
+            grayed_out_when=lambda: player_selector.colors_equal
+            or username_input.text == "",
         ),
         Button(
             80,
@@ -1264,38 +1404,40 @@ all_buttons = {
             game.stop_running,
         ),
         Button(
-            player_selector.rect.centerx,
-            player_selector.rect.bottom + 10,
+            player_selector.rect.centerx - 98,
+            player_selector.rect.bottom + 20,
             "Skin",
             player_selector.set_prim_skin,
             action_arg=1,
             is_slider=True,
             slider_display=player_selector.get_prim_skin,
             font_size=50,
+            anchor="midtop",
         ),
         Button(
-            player_selector.rect.centerx,
-            player_selector.rect.bottom + 50,
+            player_selector.rect.centerx - 98,
+            player_selector.rect.bottom + 60,
             "Skin",
             player_selector.set_sec_skin,
             action_arg=1,
             is_slider=True,
             slider_display=player_selector.get_sec_skin,
             font_size=50,
+            anchor="midtop",
         ),
     ],
     States.MAIN_SETTINGS: main_settings_buttons,
     States.PLAY_SETTINGS: [
-        *main_settings_buttons[0:4],
+        *main_settings_buttons[0:5],
         Button(
             80,
-            display.height / 2 + 48 * 3,
+            display.height / 2 + 48 * 4,
             "Return to main menu",
             lambda: game.set_state(States.MAIN_MENU),
         ),
         Button(
             80,
-            display.height / 2 + 48 * 4,
+            display.height / 2 + 48 * 5,
             "Back",
             lambda: game.set_state(game.previous_state),
             font_size=48,
@@ -1303,6 +1445,14 @@ all_buttons = {
     ],
     States.PLAY: [],
 }
+prim_skin_button = all_buttons[States.MAIN_MENU][4]
+sec_skin_button = all_buttons[States.MAIN_MENU][5]
+unleash_button = all_buttons[States.MAIN_MENU][1]
+player_selector.init()
+
+username_input = UserInput(
+    player_selector.rect.centerx, player_selector.rect.y - 30, 40, Colors.WHITE
+)
 
 
 class Hue:
@@ -1317,6 +1467,18 @@ class Hue:
 darken_game = Hue(Colors.BLACK, 80)
 redden_game = Hue(Colors.RED, 20)
 
+menu_wall_index = 0
+menu_wall_texs = imgload(
+    "client",
+    "assets",
+    "images",
+    "menu",
+    "wallpaper",
+    "wallpaper.png",
+    scale=1,
+    frames=8,
+)
+
 floor_tex = imgload("client", "assets", "images", "3d", "floor.png")
 joystick_button_sprs = imgload(
     "client", "assets", "images", "hud", "buttons.png", scale=4, frames=4
@@ -1328,11 +1490,7 @@ def check_new_players():
     if client_udp.current_message:
         message = json.loads(client_udp.current_message)
         for addr in message:
-            if (
-                addr not in enemy_addresses # enemy already exists
-                and addr != player.tcp_id # enemy is not self
-                and addr != "id"
-            ):
+            if addr not in enemy_addresses:
                 enemy_addresses.append(addr)
                 enemies.append(EnemyPlayer(addr))
 
@@ -1358,17 +1516,43 @@ def main(multiplayer):
         client_tcp = Client("tcp")
         Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
-        player.tcp_id = client_tcp.getsockname()
 
     game.set_state(States.MAIN_MENU)
     while game.running:
         clock.tick(game.fps)
         player.process_shot = False
 
+        # Global TCP events
+        match client_tcp.current_message.split("|")[0]:
+            case "init_player":
+                msg = client_tcp.current_message.split("|")
+                for enemy in enemies:
+                    print(str(enemy.id), msg[1], type(enemy.id))
+                    if str(enemy.id) == msg[1]:
+                        data = json.loads(msg[2])
+                        print("Got new player:", data)
+                        enemy.health = data["health"]
+                        enemy.image.color = data["color"]
+                        enemy.name = data["name"] # This isn't working yet
+
+                client_tcp.current_message = ""
+
+            case "feed":
+                global feed
+                message = Texture.from_surface(
+                    display.renderer,
+                    v_fonts[32].render(
+                        client_tcp.current_message.split("|")[1], True, Colors.WHITE
+                    ),
+                )
+                feed.append((message, ticks()))
+
+                client_tcp.current_message = ""
+
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
-                    quit()
+                    sys.exit()
 
                 case pygame.MOUSEMOTION:
                     if cursor.should_wrap:
@@ -1450,8 +1634,18 @@ def main(multiplayer):
 
         display.renderer.clear()
 
+        if game.state in (States.MAIN_MENU, States.MAIN_SETTINGS):
+            # fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
+            global menu_wall_index
+            display.renderer.blit(
+                menu_wall_texs[int(menu_wall_index)],
+                pygame.Rect(0, 0, display.width, display.height),
+            )
+            menu_wall_index += 8 / game.fps
+            if menu_wall_index > 7:
+                menu_wall_index = 0
+
         if game.state == States.MAIN_MENU:
-            fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
             player_selector.update()
             username_input.update()
         else:
@@ -1480,18 +1674,14 @@ def main(multiplayer):
 
                 hud.update()
 
-            display.renderer.blit(crosshair_tex, crosshair_rect)
-            display.renderer.blit(redden_game.tex, redden_game.rect)
+                display.renderer.blit(crosshair_tex, crosshair_rect)
+                display.renderer.blit(redden_game.tex, redden_game.rect)
 
             if game.state == States.PLAY:
-                # zoom
                 game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
-
                 display.renderer.blit(crosshair_tex, crosshair_rect)
 
-        if game.state == States.MAIN_SETTINGS:
-            fill_rect((0, 0, 0, 255), (0, 0, display.width, display.height))
-        elif game.state == States.PLAY_SETTINGS:
+        if game.state == States.PLAY_SETTINGS:
             display.renderer.blit(darken_game.tex, darken_game.rect)
 
         for button in current_buttons:
@@ -1502,7 +1692,7 @@ def main(multiplayer):
 
         write(
             "topright",
-            str(int(clock.get_fps())),
+            f"{int(clock.get_fps())} FPS",
             v_fonts[20],
             Colors.WHITE,
             display.width - 5,
@@ -1511,4 +1701,4 @@ def main(multiplayer):
 
         display.renderer.present()
 
-    quit()
+    sys.exit()
