@@ -1,7 +1,6 @@
 from enum import Enum
 from math import sin, cos, atan2
 from pathlib import Path
-from types import LambdaType
 from typing import Any, Optional, TypeAlias
 from pygame._sdl2.video import Window, Renderer, Texture
 import csv
@@ -9,7 +8,6 @@ import pygame
 import socket
 import sys
 import json
-from pprint import pprint
 
 
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
@@ -29,21 +27,25 @@ Color: TypeAlias = tuple[int, int, int, int] | tuple[int, int, int]
 class Colors:
     BLACK = (0, 0, 0, 255)
     BLUE = (0, 0, 255, 255)
+    BROWN = (97, 54, 19)
     DARK_GRAY = (40, 40, 40, 255)
     GRAY = (150, 150, 150, 255)
-    LIGHT_GRAY = (220, 220, 220, 255)
     GREEN = (0, 255, 0, 255)
-    BROWN = (97, 54, 19)
+    LIGHT_BLUE = (0, 150, 255)
+    LIGHT_GRAY = (220, 220, 220, 255)
     ORANGE = (255, 140, 0, 255)
+    PINK = (152, 0, 136, 255)
     RED = (255, 0, 0, 255)
     WHITE = (255, 255, 255, 255)
     YELLOW = (255, 255, 0, 255)
-    LIGHT_BLUE = (0, 150, 255)
-    PINK = (152, 0, 136, 255)
 
     ANSI_GREEN = "\033[1;32m"
     ANSI_RED = "\033[1;31;31m"
     ANSI_RESET = "\033[0m"
+
+    ANSI_BOLD = "\u001b[1m"
+    ANSI_ITALIC = "\u001b[3m"
+    ANSI_UNDERLINE = "\u001b[4m"
 
 
 class Joymap:
@@ -87,7 +89,9 @@ v_fonts = [
     for i in range(101)
 ]
 vi_fonts = [
-    pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf", italic=True), i)
+    pygame.font.Font(
+        Path("client", "assets", "fonts", "VT323-Regular.ttf", italic=True), i
+    )
     for i in range(101)
 ]
 
@@ -123,7 +127,7 @@ class UserInput:
             self.color,
             self.x,
             self.y,
-            )
+        )
         # draw_rect(
         #     Colors.RED,
         #     write(
@@ -234,7 +238,7 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
-            
+
             self.left_slider_rect = self.left_slider_tex.get_rect(
                 midleft=(self.rect.right + 4, self.rect.centery)
             )
@@ -250,7 +254,7 @@ class Button:
                 ),
             )
             self.right_slider_rect = self.right_slider_tex.get_rect()
-        
+
     @property
     def grayed_out(self):
         return self.grayed_out_when is not None and self.grayed_out_when()
@@ -321,7 +325,13 @@ class Button:
         display.renderer.blit(tex, rect)
 
 
-display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
+display = Display(
+    1280,
+    720,
+    "PANDEMONIUM",
+    fullscreen=False if "--no-fullscreen" else True,
+    vsync=False if "--no-vsync" else True,
+)
 
 
 class Client(socket.socket):
@@ -353,7 +363,8 @@ class Client(socket.socket):
                 print(f"{Colors.ANSI_GREEN}Connected to the server!{Colors.ANSI_RESET}")
             except ConnectionRefusedError as err:
                 sys.exit(
-                    f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}"
+                    f"{Colors.ANSI_RED}Could not connect to the server: {Colors.ANSI_RESET}{err}\n"
+                    + f"{Colors.ANSI_BOLD}Use the {Colors.ANSI_ITALIC}--no-multiplayer{Colors.ANSI_RESET}{Colors.ANSI_BOLD} flag to run the game offline"
                 )
 
     def req(self, message) -> None:

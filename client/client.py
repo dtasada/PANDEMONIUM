@@ -143,12 +143,13 @@ class Game:
             player = Player()
 
             # All launch & init requirements
-            msg = json.dumps({
-                'health': player.health,
-                'color': player_selector.prim_color,
-                'name': username_input.text,
-            })
-            client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
+            if game.multiplayer:
+                msg = json.dumps({
+                    'health': player.health,
+                    'color': player_selector.prim_color,
+                    'name': username_input.text,
+                })
+                client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
 
         self.previous_state = self.state
         self.state = state
@@ -505,7 +506,6 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
-        self.tcp_id = client_tcp.getsockname()
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -538,6 +538,8 @@ class Player:
 
         self.bob = 0
         self.to_equip: tuple[tuple[int, int], int] | None = None
+
+        if game.multiplayer: self.tcp_id = client_tcp.getsockname()
 
     @property
     def weapon(self):
