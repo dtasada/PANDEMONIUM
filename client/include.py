@@ -1,12 +1,8 @@
 from enum import Enum
 from math import sin, cos, atan2
 from pathlib import Path
-<<<<<<< HEAD
-from typing import Any, Literal, Optional, TypeAlias
-=======
 from types import LambdaType
 from typing import Any, Optional, TypeAlias
->>>>>>> 5ddd8451675ad81283ecd489b9b303b00936d09c
 from pygame._sdl2.video import Window, Renderer, Texture
 import csv
 import pygame
@@ -190,11 +186,7 @@ class Button:
         x: int,
         y: int,
         content: str,
-<<<<<<< HEAD
         action: callable,
-=======
-        action: Optional[LambdaType],
->>>>>>> 5ddd8451675ad81283ecd489b9b303b00936d09c
         width: Optional[int] = None,
         height: Optional[int] = None,
         action_arg: Any = None,
@@ -242,13 +234,10 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
-<<<<<<< HEAD
-            self.left_slider_rect = self.left_slider_tex.get_rect()
-=======
+            
             self.left_slider_rect = self.left_slider_tex.get_rect(
                 midleft=(self.rect.right + 4, self.rect.centery)
             )
->>>>>>> 5ddd8451675ad81283ecd489b9b303b00936d09c
 
             self.right_slider_tex = Texture.from_surface(
                 display.renderer,
