@@ -1,7 +1,12 @@
 from enum import Enum
 from math import sin, cos, atan2
 from pathlib import Path
+<<<<<<< HEAD
 from typing import Any, Literal, Optional, TypeAlias
+=======
+from types import LambdaType
+from typing import Any, Optional, TypeAlias
+>>>>>>> 5ddd8451675ad81283ecd489b9b303b00936d09c
 from pygame._sdl2.video import Window, Renderer, Texture
 import csv
 import pygame
@@ -16,13 +21,13 @@ SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
         socket.gethostname()
     ),  # Only when developing and playing on same machine
     6969,
-    4200,
+    420,
 )
 
 pygame.init()
 
 
-Color: TypeAlias = tuple[Literal[255], Literal[255], Literal[255], Literal[255]]
+Color: TypeAlias = tuple[int, int, int, int] | tuple[int, int, int]
 
 
 class Colors:
@@ -185,12 +190,16 @@ class Button:
         x: int,
         y: int,
         content: str,
+<<<<<<< HEAD
         action: callable,
+=======
+        action: Optional[LambdaType],
+>>>>>>> 5ddd8451675ad81283ecd489b9b303b00936d09c
         width: Optional[int] = None,
         height: Optional[int] = None,
         action_arg: Any = None,
         font_size: int = 32,
-        color: tuple[int, int, int] = Colors.WHITE,
+        color: Color = Colors.WHITE,
         should_background: bool = False,
         anchor: str = "topleft",
         is_slider: bool = False,
@@ -233,7 +242,13 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
+<<<<<<< HEAD
             self.left_slider_rect = self.left_slider_tex.get_rect()
+=======
+            self.left_slider_rect = self.left_slider_tex.get_rect(
+                midleft=(self.rect.right + 4, self.rect.centery)
+            )
+>>>>>>> 5ddd8451675ad81283ecd489b9b303b00936d09c
 
             self.right_slider_tex = Texture.from_surface(
                 display.renderer,
@@ -435,7 +450,7 @@ def imgload(
     scale: int = 1,
     to_tex: bool = True,
     return_rect: bool = False,
-) -> list[Texture, pygame.Rect]:
+) -> tuple[Texture, pygame.Rect]:
     # init
     ret = []
     img = pygame.image.load(Path(*path_))
@@ -471,22 +486,17 @@ def imgload(
     return ret
 
 
-def fill_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
-    """Een primitieve rectangle drawing functie, maar gevuld"""
+def fill_rect(color: Color, rect: pygame.Rect) -> None:
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
 
 
-def draw_rect(color: tuple[int, int, int], rect: pygame.Rect) -> None:
-    """Een primitieve rectangle drawing functie, maar dan alleen de randen"""
+def draw_rect(color: Color, rect: pygame.Rect) -> None:
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
 
 
-def draw_line(
-    color: Color | tuple[int, int, int], p1: tuple[int, int], p2: tuple[int, int]
-) -> None:
-    """Teken een lijn tussen twee punten"""
+def draw_line(color: Color, p1: tuple[int, int], p2: tuple[int, int]) -> None:
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
 
@@ -507,7 +517,7 @@ def write(
     anchor: str,
     content: str | int,
     font: pygame.Font,
-    color: Color | tuple[int, int, int],
+    color: Color,
     x: int,
     y: int,
     alpha: int = 255,
@@ -516,7 +526,6 @@ def write(
     special_flags: int = 0,
     convert_to_tex: bool = True,
 ) -> tuple[Texture, pygame.Rect]:
-    """De universele text rendering functie"""
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
