@@ -26,8 +26,8 @@ def quit():
         client_tcp.req("quit")
 
     game.running = False
-    print("Exited successfully")
     pygame.quit()
+    print("Exited successfully")
 
 
 atexit.register(quit)
@@ -1461,7 +1461,12 @@ def main(multiplayer):
 
         if game.state == States.MAIN_MENU:
             # fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
-            display.renderer.blit(menu_wall_texs[0])
+            global menu_wall_index
+            display.renderer.blit(menu_wall_texs[int(menu_wall_index)])
+            menu_wall_index += 8 / game.fps
+            if menu_wall_index > 7:
+                menu_wall_index = 0
+
             player_selector.update()
             username_input.update()
         else:
