@@ -300,7 +300,6 @@ class Button:
 
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
 
-
 class Client(socket.socket):
     def __init__(self, conn):
         self.conn_type = conn

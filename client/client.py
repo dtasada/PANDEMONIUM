@@ -1031,7 +1031,6 @@ class Player:
         # updates
         ...
 
-
         for data in self.rays:
             ray, _ = data
             p1 = (ray[0][0] + game.mo, ray[0][1] + game.mo)
