@@ -1,7 +1,6 @@
 from enum import Enum
 from math import sin, cos, atan2
 from pathlib import Path
-from types import LambdaType
 from typing import Any, Literal, Optional, TypeAlias
 from pygame._sdl2.video import Window, Renderer, Texture
 import csv
@@ -9,6 +8,7 @@ import pygame
 import socket
 import sys
 import json
+from pprint import pprint
 
 
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
@@ -85,6 +85,10 @@ v_fonts = [
     pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf"), i)
     for i in range(101)
 ]
+vi_fonts = [
+    pygame.font.Font(Path("client", "assets", "fonts", "VT323-Regular.ttf", italic=True), i)
+    for i in range(101)
+]
 
 
 class UserInput:
@@ -105,26 +109,31 @@ class UserInput:
             self.text += event.unicode
 
     def update(self):
-        if self.text != "":
+        if self.text == "":
+            text = "enter name"
+            font = vi_fonts[self.font_size - 8]
+        else:
+            text = self.text
+            font = v_fonts[self.font_size]
+        write(
+            self.anchor,
+            text,
+            font,
+            self.color,
+            self.x,
+            self.y,
+            )
+        draw_rect(
+            Colors.RED,
             write(
                 self.anchor,
-                self.text,
-                v_fonts[self.font_size],
+                text,
+                font,
                 self.color,
                 self.x,
                 self.y,
-            )
-            draw_rect(
-                Colors.RED,
-                write(
-                    self.anchor,
-                    self.text,
-                    v_fonts[self.font_size],
-                    self.color,
-                    self.x,
-                    self.y,
-                )[1],
-            )
+            )[1],
+        )
 
 
 class Display:
@@ -176,7 +185,7 @@ class Button:
         x: int,
         y: int,
         content: str,
-        action: LambdaType,
+        action: callable,
         width: Optional[int] = None,
         height: Optional[int] = None,
         action_arg: Any = None,
@@ -186,6 +195,7 @@ class Button:
         anchor: str = "topleft",
         is_slider: bool = False,
         slider_display: Optional[str] = None,
+        grayed_out_when: Optional[callable] = None,
     ):
         self.content = content
         self.color = self.initial_color = color
@@ -203,6 +213,7 @@ class Button:
 
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         setattr(self.rect, self.anchor, (x, y))
+        self.grayed_out_when = grayed_out_when
 
         if action is not None:
             self.hover_tex = Texture.from_surface(
@@ -222,9 +233,7 @@ class Button:
                     Path("client", "assets", "images", "menu", "slider_arrow.png")
                 ),
             )
-            self.left_slider_rect = self.left_slider_tex.get_rect(
-                midleft=(self.rect.right + 4, self.rect.midright[1])
-            )
+            self.left_slider_rect = self.left_slider_tex.get_rect()
 
             self.right_slider_tex = Texture.from_surface(
                 display.renderer,
@@ -237,15 +246,10 @@ class Button:
                 ),
             )
             self.right_slider_rect = self.right_slider_tex.get_rect()
-
-            self.slider_display_rect = write(
-                self.anchor,
-                self.slider_display(),
-                v_fonts[self.font_size],
-                Colors.WHITE,
-                self.left_slider_rect.x + 16,
-                self.rect.y,
-            )[1]
+        
+    @property
+    def grayed_out(self):
+        return self.grayed_out_when is not None and self.grayed_out_when()
 
     def process_event(self, event):
         if self.action is not None:
@@ -258,13 +262,15 @@ class Button:
                             self.action(self.action_arg)
 
                     elif self.rect.collidepoint(pygame.mouse.get_pos()):
-                        self.action()
+                        if not self.grayed_out:
+                            self.action()
 
     def update(self):
         if (
             self.rect.collidepoint(pygame.mouse.get_pos())
             and not self.is_slider
             and self.action is not None
+            and not self.grayed_out
         ):
             display.renderer.blit(self.hover_tex, self.hover_rect)
         if self.should_background:
@@ -272,33 +278,43 @@ class Button:
         if self.is_slider:
             display.renderer.blit(self.left_slider_tex, self.left_slider_rect)
             display.renderer.blit(self.right_slider_tex, self.right_slider_rect)
-
             self.slider_display_rect = write(
-                self.anchor,
+                "center",
                 self.slider_display(),
                 v_fonts[self.font_size],
                 Colors.WHITE,
-                self.left_slider_rect.x + 16,
-                self.rect.y,
+                self.rect.right + 45,
+                self.rect.centery,
             )[1]
 
             setattr(
                 self.right_slider_rect,
-                self.anchor,
+                "midleft",
                 (
-                    self.slider_display_rect.right,
-                    self.rect.y + 8,
+                    self.rect.right + 15 + 40 + 15,
+                    self.rect.centery,
                 ),
             )
-        write(
+            setattr(
+                self.left_slider_rect,
+                "center",
+                (
+                    self.rect.right + 15,
+                    self.rect.centery,
+                ),
+            )
+        tex, rect = write(
             "topleft",
             self.content,
             v_fonts[self.font_size],
             self.color,
             self.rect.x,
             self.rect.y,
-            tex=False,
+            blit=False,
         )
+        if self.grayed_out:
+            tex.color = (80, 80, 80, 255)
+        display.renderer.blit(tex, rect)
 
 
 display = Display(1280, 720, "PANDEMONIUM", fullscreen=False, vsync=False)
@@ -498,7 +514,7 @@ def write(
     blit: bool = True,
     border: Optional[tuple[int, int, int]] = None,
     special_flags: int = 0,
-    tex: bool = True,
+    convert_to_tex: bool = True,
 ) -> tuple[Texture, pygame.Rect]:
     """De universele text rendering functie"""
     if border is not None:
@@ -508,7 +524,7 @@ def write(
         write(anchor, content, font, bc, x - bw, y + bw)
         write(anchor, content, font, bc, x + bw, y + bw)
     tex = font.render(str(content), True, color)
-    if tex:
+    if convert_to_tex:
         tex = Texture.from_surface(display.renderer, tex)
         tex.alpha = alpha
     else:

@@ -386,21 +386,23 @@ class PlayerSelector:
         self.prim_color = 0
         self.sec_color = 0
         self.colors = {color: getattr(Colors, color) for color in vars(Colors) if not color.startswith("ANSI_") and not color.startswith("__")}
+        del self.colors["GRAY"]
         self.color_keys = list(self.colors.keys())
         self.color_values = list(self.colors.values())
         self.prim_colorkey = Colors.WHITE
         self.sec_colorkey = Colors.RED
+        self.colors_equal = False
         self.set_skin()
     
     def update(self):
-        o = 30
-        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 3, self.rect.width + o * 2, self.rect.height + o * 7)
+        o = 10
+        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 5, self.rect.width + o * 2, self.rect.height + o * 7)
         fill_rect(Colors.GRAY, outline)
         draw_rect(Colors.WHITE, outline)
         display.renderer.blit(self.tex, self.rect)
         draw_rect(Colors.RED, self.rect)
-        write("midleft", self.color_keys[self.prim_color].replace("_", " "), v_fonts[50], Colors.WHITE, self.rect.centerx + 160, self.rect.bottom + 40)
-        write("midleft", self.color_keys[self.sec_color].replace("_", " "), v_fonts[50], Colors.WHITE, self.rect.centerx + 160, self.rect.bottom + 70)
+        write("midleft", self.color_keys[self.prim_color].replace("_", " "), v_fonts[50], Colors.WHITE, prim_skin_button.rect.right + 100, prim_skin_button.rect.centery)
+        write("midleft", self.color_keys[self.sec_color].replace("_", " "), v_fonts[50], Colors.WHITE, sec_skin_button.rect.right + 100, sec_skin_button.rect.centery)
     
     def get_prim_skin(self):
         return self.prim_color
@@ -428,9 +430,11 @@ class PlayerSelector:
         prim = self.color_keys[self.prim_color]
         sec = self.color_keys[self.sec_color]
         name = f"{prim}_{sec}"
+        self.colors_equal = prim == sec
         self.image = self.database[name]
         self.image = self.image.subsurface((0, 0, self.image.get_width() / 4, self.image.get_height()))
         self.rect = self.image.get_rect(topleft=self.rect.topleft)
+        self.rect.topright = (display.width - 135, 200)
         self.tex = Texture.from_surface(display.renderer, self.image)
 
     # def set_prim_skin(self, amount):
@@ -1137,6 +1141,8 @@ class EnemyPlayer:
             legs_h_ratio = 168 / og_height
             shoulder_w_ratio = 28 / og_width
             shoulder_h_ratio = 84 / og_height
+            arm_w_ratio = 11 / og_width
+            arm_h_ratio = 50 / og_height
             # whole body
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
@@ -1154,6 +1160,11 @@ class EnemyPlayer:
             self.shoulder1_rect.topright = self.torso_rect.topleft
             self.shoulder2_rect = pygame.Rect(0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height)
             self.shoulder2_rect.topleft = self.torso_rect.topright
+            # arms
+            self.arm1_rect = pygame.Rect(0, 0, arm_w_ratio * width, arm_h_ratio * height)
+            self.arm1_rect.topright = self.shoulder1_rect.topleft
+            self.arm2_rect = pygame.Rect(0, 0, arm_w_ratio * width, arm_h_ratio * height)
+            self.arm2_rect.topleft = self.shoulder2_rect.topleft
             # rest
             display.renderer.blit(self.image, self.rect)
             draw_rect(Colors.YELLOW, self.rect)
@@ -1161,6 +1172,8 @@ class EnemyPlayer:
             draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
             draw_rect(Colors.GREEN, self.shoulder1_rect)
             draw_rect(Colors.GREEN, self.shoulder2_rect)
+            draw_rect(Colors.BLUE, self.arm1_rect)
+            draw_rect(Colors.BLUE, self.arm2_rect)
             self.rendering = True
 
     def regenerate(self):
@@ -1263,6 +1276,7 @@ all_buttons = {
             lambda: game.set_state(States.PLAY),
             font_size=48,
             color=Colors.RED,
+            grayed_out_when=lambda: player_selector.colors_equal
         ),
         Button(
             80,
@@ -1277,24 +1291,26 @@ all_buttons = {
             game.stop_running,
         ),
         Button(
-            player_selector.rect.centerx,
-            player_selector.rect.bottom + 10,
+            player_selector.rect.centerx - 98,
+            player_selector.rect.bottom + 20,
             "Skin",
             player_selector.set_prim_skin,
             action_arg=1,
             is_slider=True,
             slider_display=player_selector.get_prim_skin,
             font_size=50,
+            anchor="midtop",
         ),
         Button(
-            player_selector.rect.centerx,
-            player_selector.rect.bottom + 50,
+            player_selector.rect.centerx - 98,
+            player_selector.rect.bottom + 60,
             "Skin",
             player_selector.set_sec_skin,
             action_arg=1,
             is_slider=True,
             slider_display=player_selector.get_sec_skin,
             font_size=50,
+            anchor="midtop",
         ),
     ],
     States.MAIN_SETTINGS: main_settings_buttons,
@@ -1316,6 +1332,8 @@ all_buttons = {
     ],
     States.PLAY: [],
 }
+prim_skin_button = all_buttons[States.MAIN_MENU][4]
+sec_skin_button = all_buttons[States.MAIN_MENU][5]
 
 
 class Hue:
