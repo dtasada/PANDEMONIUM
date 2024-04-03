@@ -19,6 +19,7 @@ def quit():
         "fov": game.fov,
         "sens": game.sens,
         "volume": game.get_volume(),
+        "max_fps_index": game.max_fps_index,
     }
     with open(Path("client", "settings.json"), "w") as f:
         json.dump(json_save, f)
@@ -37,6 +38,7 @@ atexit.register(quit)
 class Game:
     def __init__(self):
         # settings values
+        failed = False
         try:
             if os.path.isfile(Path("client", "settings.json")):
                 with open(Path("client", "settings.json"), "r") as f:
@@ -44,6 +46,7 @@ class Game:
                     self.sens = json_load["sens"]
                     self.fov = json_load["fov"]
                     self.resolution = json_load["resolution"]
+                    self.max_fps_index = json_load["max_fps_index"]
 
                     pygame.mixer.music.set_volume(json_load["volume"])
                     for channel_pair in audio_channels:
@@ -51,13 +54,14 @@ class Game:
                             channel.set_volume(json_load["volume"])
             else:
                 open(Path("client", "settings.json"), "w").close()
-                self.sens = 50
-                self.fov = 60
-                self.resolution = 2
+                failed = True
         except:
+            failed = True
+        if failed:
             self.sens = 50
             self.fov = 60
             self.resolution = 2
+            self.max_fps_index = 1
 
         self.ray_density = int(display.width * (self.resolution / 4))
         self.resolutions_list = [
@@ -134,6 +138,7 @@ class Game:
         self.map_tex = Texture.from_surface(display.renderer, self.map_surf)
         self.mo = self.tile_size * 0
         self.map_rect = self.map_tex.get_rect(topleft=(self.mo, self.mo))
+        self.fps_list = (30, 60, 120, 144, 240)
 
     @property
     def rect_list(self):
@@ -221,6 +226,13 @@ class Game:
 
     def get_volume(self):
         return int(5 * round(pygame.mixer.music.get_volume() / 0.05))
+
+    def set_max_fps(self, arg):
+        self.max_fps_index += arg
+        self.max_fps_index = max(0, min(self.max_fps_index, len(self.fps_list) - 1))
+    
+    def get_max_fps(self):
+        return self.fps_list[self.max_fps_index]
 
 
 class GlobalTextures:
@@ -518,8 +530,8 @@ class PlayerSelector:
         self.set_skin()
 
     def set_skin(self):
-        prim = self.color_keys[self.prim_color]
-        sec = self.color_keys[self.sec_color]
+        self.prim = prim = self.color_keys[self.prim_color]
+        self.sec = sec = self.color_keys[self.sec_color]
         name = f"{prim}_{sec}"
         self.colors_equal = prim == sec
         self.image = self.database[name]
@@ -625,6 +637,7 @@ class Player:
         self.melee_anim = 1
         self.process_shot: bool | None = None
         self.last_melee = ticks()
+        self.last_step = ticks()
 
         self.bob = 0
         self.to_equip: tuple[tuple[int, int], int] | None = None
@@ -665,7 +678,7 @@ class Player:
         if self.weapon is not None or self.meleing:
             weapon_data = gtex.weapon_textures["2" if self.meleing else self.weapon]
             if self.shooting:
-                self.weapon_anim += 0.2
+                self.weapon_anim += 0.2 * game.dt
             try:
                 weapon_data[int(self.weapon_anim)]
             except IndexError:
@@ -684,7 +697,7 @@ class Player:
                 if weapon_rect.y >= display.height - 180:
                     self.reload_direc = -self.reload_direc
                 # reload back up and get the ammo and magazine that was promised to you beforehand
-                if self.weapon_yoffset == 0 and self.reload_direc == -1:
+                if self.weapon_yoffset <= 0 and self.reload_direc == -1:
                     self.reloading = False
                     self.mag = self.new_mag
                     self.ammo = self.new_ammo
@@ -777,6 +790,7 @@ class Player:
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
+            mod = pygame.key.get_mods()
             if keys[pygame.K_w]:
                 xvel, yvel = angle_to_vel(self.angle, vmult)
             if keys[pygame.K_a]:
@@ -785,6 +799,17 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+            if mod == 4097:
+                xvel /= 2
+                yvel /= 2
+            xvel *= game.dt
+            yvel *= game.dt
+            if xvel or yvel:
+                if ticks() - self.last_step >= 400:
+                    # play sound perhaps?
+                    self.last_step = ticks()
+            else:
+                self.last_step = ticks()
 
             if keys[pygame.K_q]:
                 for enemy in enemies:
@@ -874,7 +899,7 @@ class Player:
                 self.surround.append((x, y))
 
         # cast the rays
-        if game.target_zoom > 0:
+        if game.target_zoom > 0 and False:
             start_x, start_y = (
                 self.rect.centerx / game.tile_size,
                 self.rect.centery / game.tile_size,
@@ -924,7 +949,7 @@ class Player:
         # check whether reloading
         if self.reloading:
             m = 6
-            self.weapon_yoffset += self.reload_direc * m
+            self.weapon_yoffset += self.reload_direc * m * game.dt
 
     def shoot(self, melee=False):
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
@@ -961,9 +986,12 @@ class Player:
                 self.new_ammo = self.ammo - self.mag_diff
 
     def melee(self):
-        self.meleing = True
-        self.shooting = True
-        self.weapon_anim = 0
+        if not self.meleing:
+            if ticks() - self.last_melee >= weapon_data["2"]["fire_pause"]:
+                self.meleing = True
+                self.shooting = True
+                self.weapon_anim = 0
+                self.last_melee = ticks()
 
     def cast_ray(
         self, deg_offset, index, start_x=None, start_y=None, abs_angle=False
@@ -1353,7 +1381,7 @@ main_settings_buttons = [
     title,
     Button(
         80,
-        display.height / 2 + 48 * 0,
+        display.height / 2 + 48 * -1,
         "Field of view",
         game.set_fov,
         action_arg=10,
@@ -1362,7 +1390,7 @@ main_settings_buttons = [
     ),
     Button(
         80,
-        display.height / 2 + 48 * 1,
+        display.height / 2 + 48 * 0,
         "Sensitivity",
         game.set_sens,
         action_arg=10,
@@ -1371,7 +1399,7 @@ main_settings_buttons = [
     ),
     Button(
         80,
-        display.height / 2 + 48 * 2,
+        display.height / 2 + 48 * 1,
         "Resolution",
         game.set_res,
         action_arg=1,
@@ -1380,12 +1408,21 @@ main_settings_buttons = [
     ),
     Button(
         80,
-        display.height / 2 + 48 * 3,
+        display.height / 2 + 48 * 2,
         "Volume",
         game.set_volume,
         action_arg=5,
         is_slider=True,
         slider_display=game.get_volume,
+    ),
+    Button(
+        80,
+        display.height / 2 + 48 * 3,
+        "Max FPS",
+        game.set_max_fps,
+        action_arg=1,
+        is_slider=True,
+        slider_display=game.get_max_fps,
     ),
     Button(
         80,
@@ -1395,6 +1432,11 @@ main_settings_buttons = [
         font_size=48,
     ),
 ]
+
+def colors_equal():
+    # print(player_selector.colors_equal, player_selector.prim, player_selector.sec, player_selector.prim == player_selector.sec)
+    return player_selector.prim == player_selector.sec
+
 
 all_buttons = {
     States.MAIN_MENU: [
@@ -1406,8 +1448,7 @@ all_buttons = {
             lambda: game.set_state(States.PLAY),
             font_size=48,
             color=Colors.RED,
-            grayed_out_when=lambda: player_selector.colors_equal
-            or username_input.text == "",
+            grayed_out_when=lambda: player_selector.colors_equal or username_input.text == "",
         ),
         Button(
             80,
@@ -1446,7 +1487,7 @@ all_buttons = {
     ],
     States.MAIN_SETTINGS: main_settings_buttons,
     States.PLAY_SETTINGS: [
-        *main_settings_buttons[0:5],
+        *main_settings_buttons[0:6],
         Button(
             80,
             display.height / 2 + 48 * 4,
@@ -1455,7 +1496,7 @@ all_buttons = {
         ),
         Button(
             80,
-            display.height / 2 + 48 * 5,
+            display.height / 2 + 48 * 6,
             "Back",
             lambda: game.set_state(game.previous_state),
             font_size=48,
@@ -1544,7 +1585,7 @@ def main(multiplayer):
 
     game.set_state(States.MAIN_MENU)
     while game.running:
-        clock.tick(game.fps)
+        game.dt = clock.tick(game.get_max_fps()) / (1 / 60 * 1000)
         player.process_shot = False
 
         # Global TCP events
@@ -1610,16 +1651,16 @@ def main(multiplayer):
                                 player.bob = max(player.bob, -display.height * 1.5)
 
                 case pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        if game.state == States.PLAY:
+                    if game.state == States.PLAY:
+                        if event.button == 1:
                             player.process_shot = True
-                            # if event.button == 1:
-                            #     game.target_zoom = 30
-                            #     game.zoom = 0
+                        if event.button == 3:
+                            game.target_zoom = 15
+                            game.zoom = 0
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
-                        if event.button == 1:
+                        if event.button == 3:
                             game.target_zoom = 0
 
                 case pygame.KEYDOWN:
@@ -1671,7 +1712,7 @@ def main(multiplayer):
                 menu_wall_texs[int(menu_wall_index)],
                 pygame.Rect(0, 0, display.width, display.height),
             )
-            menu_wall_index += 8 / game.fps
+            menu_wall_index += 0.13 * game.dt
             if menu_wall_index > 7:
                 menu_wall_index = 0
 

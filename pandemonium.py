@@ -17,5 +17,7 @@ Usage:  ./pandemonium
     else:
         from client.client import *
 
-        main(multiplayer=False if "--no-multiplayer" in argv else True)
-        # import cProfile; cProfile.run("main(multiplayer=False)", sort="cumtime")
+
+        main(multiplayer=not "--no-multiplayer" in argv)
+        # import cProfile; cProfile.run('main(multiplayer=not "--no-multiplayer" in argv)')
+

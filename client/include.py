@@ -5,8 +5,8 @@ from pygame._sdl2.video import Window, Renderer, Texture
 from typing import Any, Optional, TypeAlias
 import csv
 import json
+import os
 import pygame
-import re
 import socket
 import sys
 
@@ -614,6 +614,14 @@ class Sounds:
     )
     MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
     PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
+    FOOTSTEPS = {
+        os.path.splitext(file_with_ext)[0]: pygame.mixer.Sound(
+            Path("client", "assets", "sounds", "sfx", "footsteps", file_with_ext)
+        )
+        for file_with_ext in os.listdir(
+            Path("client", "assets", "sounds", "sfx", "footsteps")
+        )
+    }
 
 
 audio_channels = [[pygame.mixer.Channel(0), pygame.mixer.Channel(1)]]
