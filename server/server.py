@@ -53,7 +53,7 @@ clients: list[socket.socket] = []
 
 def feed(msg: str) -> None:
     for client in clients.copy():
-        client.send(f"feed|{msg}".encode())
+        client.send(f"feed|{msg}\n".encode())
 
 
 def receive_udp():
@@ -74,7 +74,7 @@ def receive_udp():
                 pass
 
 
-def receive_tcp(client, client_addr):
+def receive_tcp(client: socket.socket, client_addr):
     try:
         while True:
             raw = client.recv(2**12)
@@ -89,14 +89,18 @@ def receive_tcp(client, client_addr):
                 match verb:
                     case "init_player":
                         try:
-                            client.send(json.dumps(tcp_data).encode())
+                            client.send(
+                                ("init_res|" + json.dumps(tcp_data) + "\n").encode()
+                            )
                             tcp_data[str(client_addr)] = json.loads(args[0])
 
-                            # Introduce to all players
+                            # Introduce all enemies to player
+                            # Introduce to all other players
                             for client_ in clients.copy():
-                                client_.send(raw)
+                                if client_ != client:
+                                    client_.send(raw + b"\n")
 
-                            print("Initialized player:", tcp_data)
+                            print("Initialized player:", tcp_data[str(client_addr)])
 
                             name = tcp_data[str(client_addr)]["name"]
                             messages = [
@@ -129,7 +133,7 @@ def receive_tcp(client, client_addr):
                             for client_ in clients.copy():
                                 if client_ != client:
                                     print(f"sending sig to quit {target}")
-                                    client_.send(f"quit|{target}".encode())
+                                    client_.send(f"quit|{target}\n".encode())
 
                                 if client_.getpeername() == client_addr:
                                     clients.remove(client_)
@@ -158,7 +162,7 @@ def receive_tcp(client, client_addr):
                             for client_ in clients.copy():
                                 if client_ != client:
                                     print(f"sending sig to kill {target}")
-                                    client_.send(f"kill|{target}".encode())
+                                    client_.send(f"kill|{target}\n".encode())
 
                                 if client_.getpeername() == client_addr:
                                     clients.remove(client_)
@@ -174,7 +178,7 @@ def receive_tcp(client, client_addr):
 
                             for client_ in clients.copy():
                                 if target == str(client_.getpeername()):
-                                    client_.send(f"take_damage|{args[0]}".encode())
+                                    client_.send(f"take_damage|{args[0]}\n".encode())
                         except BaseException as e:
                             alert("Failed to damage player", e)
 
@@ -209,7 +213,10 @@ while True:
         client, client_addr = server_tcp.accept()
         clients.append(client)
         print(f"New connection from {client_addr}")
-        Thread(target=receive_tcp, args=(client, client_addr)).start()
+        Thread(
+            target=receive_tcp,
+            args=(client, client_addr),
+        ).start()
 
     except ConnectionAbortedError:
         print(f"{Colors.RED}Connection aborted!{Colors.RESET}")

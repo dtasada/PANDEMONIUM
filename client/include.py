@@ -1,13 +1,14 @@
 from enum import Enum
 from math import sin, cos, atan2
 from pathlib import Path
-from typing import Any, Optional, TypeAlias
 from pygame._sdl2.video import Window, Renderer, Texture
+from typing import Any, Optional, TypeAlias
 import csv
+import json
 import pygame
+import re
 import socket
 import sys
-import json
 
 
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
@@ -108,7 +109,11 @@ class UserInput:
     def process_event(self, event):
         if event.key == pygame.K_BACKSPACE:
             self.text = self.text[:-1]
-        elif event.key == pygame.K_RETURN:
+        elif event.key in (
+            pygame.K_RETURN,
+            pygame.K_ESCAPE,
+            pygame.K_TAB,
+        ):
             pass
         elif event.key != pygame.K_BACKSPACE:
             self.text += event.unicode
@@ -356,6 +361,7 @@ class Client(socket.socket):
                 SERVER_UDP_PORT,
             )
 
+        self.queue: list[str] = []
         self.current_message: str = ""
         if self.conn_type == "tcp":
             try:
@@ -404,8 +410,10 @@ class Client(socket.socket):
 
         elif self.conn_type == "tcp":
             while True:
-                data = self.recv(2**12)
-                self.current_message = data.decode()
+                data = self.recv(2**12).decode()
+                messages = data.split("\n")
+                if messages:
+                    self.queue.extend(messages)
 
 
 def normalize_angle(angle: float) -> float:
@@ -580,6 +588,7 @@ cursor = Cursor()
 client_udp: Client = None
 client_tcp: Client = None
 
+
 weapon_costs = {
     "1": 1200,
 }
@@ -603,10 +612,15 @@ class Sounds:
             "308 Single.mp3",
         )
     )
-    MAIN_MENU = pygame.mixer.Sound(
-        Path("client", "assets", "sounds", "music", "tristram.mp3")
-    )
-    PLAY = pygame.mixer.Sound(Path("client", "assets", "sounds", "music", "doom.mp3"))
+    MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
+    PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
 
 
-channel = pygame.mixer.Channel(0)
+audio_channels = [[pygame.mixer.Channel(0), pygame.mixer.Channel(1)]]
+"""
+audio_channels = [
+    per player: [ gun_channel, footstep_channel ]
+]
+Channel x is for local player guns
+Channel x0 for local player footsteps
+"""

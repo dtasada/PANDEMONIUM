@@ -44,6 +44,11 @@ class Game:
                     self.sens = json_load["sens"]
                     self.fov = json_load["fov"]
                     self.resolution = json_load["resolution"]
+
+                    pygame.mixer.music.set_volume(json_load["volume"])
+                    for channel_pair in audio_channels:
+                        for channel in channel_pair:
+                            channel.set_volume(json_load["volume"])
             else:
                 open(Path("client", "settings.json"), "w").close()
                 self.sens = 50
@@ -144,15 +149,15 @@ class Game:
             player = Player()
 
         if (
-            (target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS)
-            or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU)
+            target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
+        ) or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU):
+            pygame.mixer.music.load(Sounds.MAIN_MENU)
+            pygame.mixer.music.play(-1)
+        elif (target_state == States.PLAY and self.state != States.PLAY_SETTINGS) or (
+            target_state == States.PLAY_SETTINGS and self.state != States.PLAY
         ):
-            channel.play(Sounds.MAIN_MENU)
-        elif (
-            (target_state == States.PLAY and self.state != States.PLAY_SETTINGS)
-            or (target_state == States.PLAY_SETTINGS and self.state != States.PLAY)
-        ):
-            channel.play(Sounds.PLAY)
+            pygame.mixer.music.load(Sounds.PLAY)
+            pygame.mixer.music.play(-1)
 
         if (
             game.multiplayer
@@ -160,14 +165,16 @@ class Game:
             and self.state == States.MAIN_MENU
         ):
             # All launch & init requirements
-                msg = json.dumps(
-                    {
-                        "health": player.health,
-                        "color": player_selector.prim_color,
-                        "name": username_input.text,
-                    }
-                )
-                client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
+            msg = json.dumps(
+                {
+                    "health": player.health,
+                    # TODO: Implement enemy color
+                    "prim_color": player_selector.get_prim_skin(),
+                    "sec_color": player_selector.get_sec_skin(),
+                    "name": username_input.text,
+                }
+            )
+            client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
 
         self.previous_state = self.state
         self.state = target_state
@@ -179,7 +186,6 @@ class Game:
 
         global current_buttons
         current_buttons = all_buttons[self.state]
-
 
     def get_fov(self):
         return self.fov
@@ -207,10 +213,15 @@ class Game:
         self.ray_density = self.resolutions_list[self.resolution - 1]
 
     def set_volume(self, amount):
-        channel.set_volume(0.05 * round((channel.get_volume() + amount / 100) / 0.05))
+        target = 0.05 * round((pygame.mixer.music.get_volume() + amount / 100) / 0.05)
+        pygame.mixer.music.set_volume(target)
+        for channel_pair in audio_channels:
+            for channel in channel_pair:
+                channel.set_volume(target)
 
     def get_volume(self):
-        return int(5 * round(channel.get_volume() / 0.05))
+        return int(5 * round(pygame.mixer.music.get_volume() / 0.05))
+
 
 class GlobalTextures:
     def __init__(self):
@@ -359,7 +370,9 @@ class HUD:
                 tex = message[0]
                 display.renderer.blit(
                     tex,
-                    tex.get_rect(topright=(display.width - 16, 16 + 32 * (len(feed) - 1))),
+                    tex.get_rect(
+                        topright=(display.width - 16, 16 + 32 * (len(feed) - 1))
+                    ),
                 )
 
     def update_weapon_general(self, player):
@@ -917,7 +930,7 @@ class Player:
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
-            channel.play(Sounds.GUN)
+            audio_channels[0][0].play(Sounds.GUN)
 
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
@@ -1120,10 +1133,10 @@ class Player:
     def update(self):
         if game.multiplayer:
             self.send_location()
-            if client_tcp.current_message:
-                if client_tcp.current_message.startswith("take_damage|"):
+            for message in client_tcp.queue:
+                if message.startswith("take_damage|"):
                     self.health = max(
-                        self.health - int(client_tcp.current_message.split("|")[1]), 0
+                        self.health - int(message.split("|")[1]), 0
                     )
                     hud.update_health(self)
 
@@ -1131,11 +1144,12 @@ class Player:
                         client_tcp.req(f"kill|{self.tcp_id}")
                         game.set_state(States.MAIN_MENU)
 
-                    client_tcp.current_message = ""
+                    client_tcp.queue.remove(message)
 
-                if client_tcp.current_message == f"kill|{self.tcp_id}":
+                if message == f"kill|{self.tcp_id}":
                     game.set_state(States.MAIN_MENU)
-                    client_tcp.current_message = ""
+
+                    client_tcp.queue.remove(message)
                     return
 
         self.rays = []
@@ -1178,7 +1192,7 @@ class EnemyPlayer:
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
         self.health = 100  # currently not being updated
-        self.name: str = None # this doesn't work yet
+        self.name: str = None  # this doesn't work yet
 
     def draw(self):
         if game.multiplayer:
@@ -1201,11 +1215,12 @@ class EnemyPlayer:
                 print(f"requesting to kill {self.id}")
                 client_tcp.req(f"kill|{self.id}")
 
-            if client_tcp.current_message in (f"kill|{self.id}", f"quit|{self.id}"):
-                self.die()
+            for message in client_tcp.queue:
+                if message in (f"kill|{self.id}", f"quit|{self.id}"):
+                    self.die()
 
-                client_tcp.current_message = ""
-                return
+                    client_tcp.queue.remove(message)
+                    return
 
         # print("enemy health:", self.health)
         self.draw()
@@ -1275,6 +1290,7 @@ class EnemyPlayer:
             self.arm2_rect.topleft = self.shoulder2_rect.topleft
             # rest
             display.renderer.blit(self.image, self.rect)
+            """
             draw_rect(Colors.YELLOW, self.rect)
             draw_rect(Colors.ORANGE, self.head_rect)
             draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
@@ -1282,6 +1298,7 @@ class EnemyPlayer:
             draw_rect(Colors.GREEN, self.shoulder2_rect)
             draw_rect(Colors.BLUE, self.arm1_rect)
             draw_rect(Colors.BLUE, self.arm2_rect)
+            """
             self.rendering = True
 
     def regenerate(self):
@@ -1294,7 +1311,8 @@ class EnemyPlayer:
         self.last_hit = ticks()
         self.regenerating = True
         damage = int(weapon_data[player.weapon]["damage"] * mult)
-        client_tcp.req(f"damage|{self.id}|{damage}")
+        if game.multiplayer:
+            client_tcp.req(f"damage|{self.id}|{damage}")
         if self.health <= 0:
             self.update()  # for dying
 
@@ -1486,14 +1504,21 @@ joystick_button_sprs = imgload(
 joystick_button_rect = joystick_button_sprs[0].get_rect()
 
 
-def check_new_players():
-    if client_udp.current_message:
-        message = json.loads(client_udp.current_message)
-        for addr in message:
-            if addr not in enemy_addresses:
-                enemy_addresses.append(addr)
-                enemies.append(EnemyPlayer(addr))
+def add_enemy(address: str, data: Any) -> None:
+    new_enemy = EnemyPlayer(address)
+    new_enemy.health = data["health"]
+    # TODO: Implement enemy color
+    # new_enemy.set_prim_skin(data["prim_color"], data["sec_color"])
+    new_enemy.name = data["name"]  # This isn't working yet
 
+    enemy_addresses.append(new_enemy.id)
+    enemies.append(new_enemy)
+    audio_channels.append(
+        [
+            pygame.mixer.Channel(len(audio_channels) + 1),
+            pygame.mixer.Channel(len(audio_channels) + 2),
+        ]
+    )
 
 def render_floor():
     fill_rect(
@@ -1524,31 +1549,35 @@ def main(multiplayer):
 
         # Global TCP events
         if game.multiplayer:
-            match client_tcp.current_message.split("|")[0]:
-                case "init_player":
-                    msg = client_tcp.current_message.split("|")
-                    for enemy in enemies:
-                        print(str(enemy.id), msg[1], type(enemy.id))
-                        if str(enemy.id) == msg[1]:
-                            data = json.loads(msg[2])
-                            print("Got new player:", data)
-                            enemy.health = data["health"]
-                            enemy.image.color = data["color"]
-                            enemy.name = data["name"] # This isn't working yet
+            for message in client_tcp.queue:
+                match message.split("|")[0]:
+                    case "init_player":
+                        msg = message.split("|")
 
-                    client_tcp.current_message = ""
+                        add_enemy(msg[1], json.loads(msg[2]))
 
-                case "feed":
-                    global feed
-                    message = Texture.from_surface(
-                        display.renderer,
-                        v_fonts[32].render(
-                            client_tcp.current_message.split("|")[1], True, Colors.WHITE
-                        ),
-                    )
-                    feed.append((message, ticks()))
+                        client_tcp.queue.remove(message)
 
-                    client_tcp.current_message = ""
+                    case "feed":
+                        global feed
+                        feed_tex = Texture.from_surface(
+                            display.renderer,
+                            v_fonts[32].render(
+                                message.split("|")[1], True, Colors.WHITE
+                            ),
+                        )
+                        feed.append((feed_tex, ticks()))
+
+                        client_tcp.queue.remove(message)
+
+                    case "init_res":
+                        print("init_res")
+                        print(message.split("|")[1])
+                        res = json.loads(message.split("|")[1])
+                        for id, data in res.items():
+                            add_enemy(id, data)
+
+                        client_tcp.queue.remove(message)
 
         for event in pygame.event.get():
             match event.type:
@@ -1669,7 +1698,6 @@ def main(multiplayer):
                 if game.should_render_map:
                     player.draw()
                     if game.multiplayer:
-                        check_new_players()
                         for enemy in enemies:
                             enemy.update()
 
