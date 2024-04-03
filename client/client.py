@@ -221,12 +221,11 @@ class GlobalTextures:
         self.object_textures = [
             (
                 imgload("client", "assets", "images", "objects", file_name + ".png")
-                if file_name is not None
+                if file_name is not None and file_name != "knife"
                 else None
             )
             for file_name in weapon_names
         ]
-
         self.highlighted_object_textures = [
             (
                 Texture.from_surface(
@@ -244,7 +243,7 @@ class GlobalTextures:
                         Colors.YELLOW,
                     ),
                 )
-                if file_name is not None
+                if file_name is not None and file_name != "knife"
                 else None
             )
             for file_name in weapon_names
@@ -252,7 +251,7 @@ class GlobalTextures:
 
         self.mask_object_textures = []
         for file_name_with_ext in weapon_names:
-            if file_name_with_ext is None:
+            if file_name_with_ext is None or file_name_with_ext == "knife":
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
@@ -392,14 +391,27 @@ class PlayerSelector:
         self.sec_colorkey = Colors.RED
         self.colors_equal = False
         self.set_skin()
-    
-    def update(self):
+        # surf
         o = 10
-        outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 5, self.rect.width + o * 2, self.rect.height + o * 7)
-        fill_rect(Colors.GRAY, outline)
-        draw_rect(Colors.WHITE, outline)
+        self.outline = pygame.Rect(self.rect.x - o, self.rect.y - o * 5, self.rect.width + o * 2, self.rect.height + o * 7)
+        #
+        self.black_surf = pygame.Surface(self.outline.size, pygame.SRCALPHA)
+        self.black_surf.fill((0, 0, 0, 120))
+        self.black_tex = Texture.from_surface(display.renderer, self.black_surf)
+   
+    def init(self):
+        self.menu_bg_surf = pygame.Surface((unleash_button.rect.width + 40, 180), pygame.SRCALPHA)
+        self.menu_bg_surf.fill((0, 0, 0, 120))
+        self.menu_bg_tex = Texture.from_surface(display.renderer, self.menu_bg_surf)
+        self.menu_bg_rect = self.menu_bg_surf.get_rect(topleft=(unleash_button.rect.x - 20, unleash_button.rect.y - 20))
+
+    def update(self):
+        # fill_rect((0, 0, 0, 120), outline)
+        display.renderer.blit(self.black_tex, self.outline)
+        display.renderer.blit(self.menu_bg_tex, self.menu_bg_rect)
+        # draw_rect(Colors.WHITE, self.outline)
         display.renderer.blit(self.tex, self.rect)
-        draw_rect(Colors.RED, self.rect)
+        # draw_rect(Colors.RED, self.rect)
         write("midleft", self.color_keys[self.prim_color].replace("_", " "), v_fonts[50], Colors.WHITE, prim_skin_button.rect.right + 100, prim_skin_button.rect.centery)
         write("midleft", self.color_keys[self.sec_color].replace("_", " "), v_fonts[50], Colors.WHITE, sec_skin_button.rect.right + 100, sec_skin_button.rect.centery)
     
@@ -514,6 +526,7 @@ class Player:
         self.reload_direc = 1
         self.weapon_yoffset = 0
         self.health = 100
+        self.meleing = False
         hud.update_health(self)
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
@@ -556,8 +569,8 @@ class Player:
         self.ammos[self.weapon_index] = value
 
     def display_weapon(self):
-        if self.weapon is not None:
-            weapon_data = gtex.weapon_textures[self.weapon]
+        if self.weapon is not None or self.meleing:
+            weapon_data = gtex.weapon_textures["2" if self.meleing else self.weapon]
             if self.shooting:
                 self.weapon_anim += 0.2
             try:
@@ -565,6 +578,8 @@ class Player:
             except IndexError:
                 self.shooting = False
                 self.weapon_anim = 1
+                if self.meleing:
+                    self.meleing = False
             weapon_tex = weapon_data[int(self.weapon_anim)][0]
             weapon_rect = weapon_data[int(self.weapon_anim)][1]
             weapon_rect.midbottom = (
@@ -816,7 +831,7 @@ class Player:
             m = 6
             self.weapon_yoffset += self.reload_direc * m
 
-    def shoot(self):
+    def shoot(self, melee=False):
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
@@ -845,6 +860,11 @@ class Player:
                 self.new_mag = weapon_data[self.weapon]["mag"]
                 self.mag_diff = self.new_mag - self.mag
                 self.new_ammo = self.ammo - self.mag_diff
+    
+    def melee(self):
+        self.meleing = True
+        self.shooting = True
+        self.weapon_anim = 0
 
     def cast_ray(
         self, deg_offset, index, start_x=None, start_y=None, abs_angle=False
@@ -1196,7 +1216,6 @@ class EnemyPlayer:
 cursor.enable()
 game = Game()
 hud = HUD()
-player_selector = PlayerSelector()
 # player_selector.set_all_skins()
 gtex = GlobalTextures()
 player: Player = None # initialization is in game.set_state
@@ -1217,13 +1236,7 @@ title = Button(
     anchor="center",
 )
 
-username_input = UserInput(
-    player_selector.rect.centerx,
-    player_selector.rect.y - 40,
-    40,
-    Colors.WHITE        
-)
-
+player_selector = PlayerSelector()
 main_settings_buttons = [
     title,
     Button(
@@ -1330,6 +1343,15 @@ all_buttons = {
 }
 prim_skin_button = all_buttons[States.MAIN_MENU][4]
 sec_skin_button = all_buttons[States.MAIN_MENU][5]
+unleash_button = all_buttons[States.MAIN_MENU][1]
+player_selector.init()
+
+username_input = UserInput(
+    player_selector.rect.centerx,
+    player_selector.rect.y - 30,
+    40,
+    Colors.WHITE        
+)
 
 
 class Hue:
