@@ -13,7 +13,7 @@
         "damage": 100,
         "cost": null,
         "ammo": null,
-        "fire_pause": null,
+        "fire_pause": 800,
         "auto": false
     }
 }

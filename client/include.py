@@ -8,6 +8,7 @@ import pygame
 import socket
 import sys
 import json
+import os
 
 
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
@@ -606,6 +607,12 @@ class Sounds:
         Path("client", "assets", "sounds", "music", "tristram.mp3")
     )
     PLAY = pygame.mixer.Sound(Path("client", "assets", "sounds", "music", "doom.mp3"))
+    FOOTSTEPS = {
+        os.path.splitext(file_with_ext)[0]: pygame.mixer.Sound(
+            Path("client", "assets", "sounds", "sfx", "footsteps", file_with_ext)
+        )
+        for file_with_ext in os.listdir(Path("client", "assets", "sounds", "sfx", "footsteps"))
+    }
 
 
 channel = pygame.mixer.Channel(0)
