@@ -799,6 +799,7 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
+
             if mod == 4097:
                 xvel /= 2
                 yvel /= 2
@@ -1657,11 +1658,13 @@ def main(multiplayer):
                         if event.button == 3:
                             game.target_zoom = 15
                             game.zoom = 0
+                            # game.set_fov(-40)
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
                         if event.button == 3:
                             game.target_zoom = 0
+                            # game.set_fov(40)
 
                 case pygame.KEYDOWN:
                     if game.state == States.MAIN_MENU:
