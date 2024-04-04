@@ -207,15 +207,11 @@ while True:
         client, client_addr = server_tcp.accept()
         clients.append(client)
         print(f"New connection from {client_addr}")
-<<<<<<< HEAD
         Thread(
             target=receive_tcp,
             args=(client, client_addr),
             daemon=True,
         ).start()
-=======
-        Thread(target=receive_tcp, args=(client, client_addr), daemon=True).start()
->>>>>>> 58be52e9b4fb9821b85b8012be110a6a2ca81e4b
 
     except ConnectionAbortedError:
         print(f"{Colors.RED}Connection aborted!{Colors.RESET}")
