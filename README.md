@@ -16,4 +16,6 @@
 * Fix fisheye bug
 * Fix shooting through walls
 * Sound of other players (including shots & footsteps)
-* Vertical FOV
+* Vertical FOV & vertical sens
+* Leaderboard
+* Enemy colors & name
