@@ -49,11 +49,51 @@ except BaseException as e:
 tcp_data: Dict[str, dict[str, Any]] = {}  # values are health, color and name
 udp_data: Dict[str, dict[str, Any]] = {}  # values are x, y, angle
 clients: list[socket.socket] = []
+inactive_clients: list[socket.socket] = []
 
 
 def feed(msg: str) -> None:
     for client in clients.copy():
         client.send(f"feed|{msg}\n".encode())
+
+
+def off(target: str, opt: str):
+    try:
+        name = tcp_data[target]["name"]
+        messages = {
+            "kill": [
+                f"imagine being {name} rn 💀",
+                f"{name} got PANDEMONIUMED",
+                f"{name} got shit on",
+                f"{name} was neutralized",
+                f"{name} was offed",
+                f"{name} 💀💀",
+            ],
+            "quit": [
+                f"{name} doesn't wanna play anymore",
+                f"{name} has better things to do",
+                f"{name} left",
+                f"{name} quit",
+                f"{name} rage quit",
+            ],
+        }
+        feed(messages[opt][randint(0, len(messages[opt]) - 1)])
+
+        del udp_data[target]
+        del tcp_data[target]
+
+        for client_ in clients.copy():
+            if client_ != client:
+                print(f"sending sig to {opt} {target}")
+                client_.send(f"{opt}|{target}\n".encode())
+
+            if str(client_.getpeername()) == target:
+                # if not F4ing, move client from clients to inactive_clients, otherwise, completely remove
+                clients.remove(client_)
+                if (opt == "quit" and not target) or (opt == "kill"):
+                    inactive_clients.append(client_)
+    except BaseException as e:
+        alert(f"Failed to {opt} player", e)
 
 
 def receive_udp():
@@ -94,11 +134,15 @@ def receive_tcp(client: socket.socket, client_addr):
                             )
                             tcp_data[str(client_addr)] = json.loads(args[0])
 
-                            # Introduce all enemies to player
                             # Introduce to all other players
                             for client_ in clients.copy():
                                 if client_ != client:
                                     client_.send(raw + b"\n")
+
+                            for client_ in inactive_clients.copy():
+                                if client.getpeername() == client_.getpeername():
+                                    inactive_clients.remove(client_)
+                                    clients.append(client_)
 
                             print("Initialized player:", tcp_data[str(client_addr)])
 
@@ -115,60 +159,9 @@ def receive_tcp(client: socket.socket, client_addr):
                             alert("Could not init_player", e)
 
                     case "quit":
-                        target = str(client_addr)
-                        try:
-                            name = tcp_data[target]["name"]
-                            messages = [
-                                f"{name} doesn't wanna play anymore",
-                                f"{name} has better things to do",
-                                f"{name} left",
-                                f"{name} quit",
-                                f"{name} rage quit",
-                            ]
-                            feed(messages[randint(0, len(messages) - 1)])
-
-                            del udp_data[target]
-                            del tcp_data[target]
-
-                            for client_ in clients.copy():
-                                if client_ != client:
-                                    print(f"sending sig to quit {target}")
-                                    client_.send(f"quit|{target}\n".encode())
-
-                                if client_.getpeername() == client_addr:
-                                    clients.remove(client_)
-
-                            feed(f"{target} quit")
-
-                        except BaseException as e:
-                            alert("Failed to quit player", e)
-
+                        off(target, "quit")
                     case "kill":
-                        try:
-                            name = tcp_data[target]["name"]
-                            messages = [
-                                f"imagine being {name} rn 💀",
-                                f"{name} got PANDEMONIUMED",
-                                f"{name} got shit on",
-                                f"{name} was neutralized",
-                                f"{name} was offed",
-                                f"{name} 💀💀",
-                            ]
-                            feed(messages[randint(0, len(messages) - 1)])
-
-                            del udp_data[target]
-                            del tcp_data[target]
-
-                            for client_ in clients.copy():
-                                if client_ != client:
-                                    print(f"sending sig to kill {target}")
-                                    client_.send(f"kill|{target}\n".encode())
-
-                                if client_.getpeername() == client_addr:
-                                    clients.remove(client_)
-
-                        except BaseException as e:
-                            alert("Failed to kill player", e)
+                        off(target, "kill")
 
                     case "damage":
                         try:
@@ -179,6 +172,7 @@ def receive_tcp(client: socket.socket, client_addr):
                             for client_ in clients.copy():
                                 if target == str(client_.getpeername()):
                                     client_.send(f"take_damage|{args[0]}\n".encode())
+
                         except BaseException as e:
                             alert("Failed to damage player", e)
 
@@ -220,3 +214,6 @@ while True:
 
     except ConnectionAbortedError:
         print(f"{Colors.RED}Connection aborted!{Colors.RESET}")
+
+    except KeyboardInterrupt:
+        break

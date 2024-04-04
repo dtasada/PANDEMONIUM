@@ -361,8 +361,9 @@ class Client(socket.socket):
                 SERVER_UDP_PORT,
             )
 
+        self.running = True
         self.queue: list[str] = []
-        self.current_message: str = ""
+        self.current_message = ""
         if self.conn_type == "tcp":
             try:
                 self.connect(self.target_server)
@@ -396,7 +397,7 @@ class Client(socket.socket):
 
             response = ""
             while not response:
-                data, addr = self.recvfrom(2**12)
+                data, _ = self.recvfrom(2**12)
                 if data:
                     response = data.decode()
 
@@ -405,15 +406,17 @@ class Client(socket.socket):
     def receive(self):
         if self.conn_type == "udp":
             while True:
-                data, addr = self.recvfrom(2**12)
-                self.current_message = data.decode()
+                while self.running:
+                    data, _ = self.recvfrom(2**12)
+                    self.current_message = data.decode()
 
         elif self.conn_type == "tcp":
             while True:
-                data = self.recv(2**12).decode()
-                messages = data.split("\n")
-                if messages:
-                    self.queue.extend(messages)
+                while self.running:
+                    data = self.recv(2**12).decode()
+                    messages = data.split("\n")
+
+                    [self.queue.append(message) for message in messages if message]
 
 
 def normalize_angle(angle: float) -> float:

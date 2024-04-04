@@ -25,7 +25,7 @@ def quit():
         json.dump(json_save, f)
 
     if game.multiplayer and client_tcp:
-        client_tcp.req("quit")
+        client_tcp.req("quit|f4")
 
     game.running = False
     pygame.quit()
@@ -150,7 +150,7 @@ class Game:
     def set_state(self, target_state):
         global player
 
-        if self.previous_state == States.LAUNCH or target_state == States.MAIN_MENU:
+        if target_state == States.MAIN_MENU:
             player = Player()
 
         if (
@@ -230,7 +230,7 @@ class Game:
     def set_max_fps(self, arg):
         self.max_fps_index += arg
         self.max_fps_index = max(0, min(self.max_fps_index, len(self.fps_list) - 1))
-    
+
     def get_max_fps(self):
         return self.fps_list[self.max_fps_index]
 
@@ -1161,11 +1161,11 @@ class Player:
     def update(self):
         if game.multiplayer:
             self.send_location()
-            for message in client_tcp.queue:
+            for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
-                    self.health = max(
-                        self.health - int(message.split("|")[1]), 0
-                    )
+                    print("taking damage")
+
+                    self.health = max(self.health - int(message.split("|")[1]), 0)
                     hud.update_health(self)
 
                     if self.health <= 0:
@@ -1176,7 +1176,6 @@ class Player:
 
                 if message == f"kill|{self.tcp_id}":
                     game.set_state(States.MAIN_MENU)
-
                     client_tcp.queue.remove(message)
                     return
 
@@ -1243,7 +1242,7 @@ class EnemyPlayer:
                 print(f"requesting to kill {self.id}")
                 client_tcp.req(f"kill|{self.id}")
 
-            for message in client_tcp.queue:
+            for message in client_tcp.queue.copy():
                 if message in (f"kill|{self.id}", f"quit|{self.id}"):
                     self.die()
 
@@ -1433,6 +1432,7 @@ main_settings_buttons = [
     ),
 ]
 
+
 def colors_equal():
     # print(player_selector.colors_equal, player_selector.prim, player_selector.sec, player_selector.prim == player_selector.sec)
     return player_selector.prim == player_selector.sec
@@ -1448,7 +1448,8 @@ all_buttons = {
             lambda: game.set_state(States.PLAY),
             font_size=48,
             color=Colors.RED,
-            grayed_out_when=lambda: player_selector.colors_equal or username_input.text == "",
+            grayed_out_when=lambda: player_selector.colors_equal
+            or username_input.text == "",
         ),
         Button(
             80,
@@ -1561,6 +1562,7 @@ def add_enemy(address: str, data: Any) -> None:
         ]
     )
 
+
 def render_floor():
     fill_rect(
         Colors.BROWN,
@@ -1584,13 +1586,14 @@ def main(multiplayer):
         Thread(target=client_tcp.receive, daemon=True).start()
 
     game.set_state(States.MAIN_MENU)
+
     while game.running:
         game.dt = clock.tick(game.get_max_fps()) / (1 / 60 * 1000)
         player.process_shot = False
 
         # Global TCP events
         if game.multiplayer:
-            for message in client_tcp.queue:
+            for message in client_tcp.queue.copy():
                 match message.split("|")[0]:
                     case "init_player":
                         msg = message.split("|")
