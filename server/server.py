@@ -187,7 +187,7 @@ def receive_tcp(client: socket.socket, client_addr):
 
 
 # UDP
-Thread(target=receive_udp).start()
+Thread(target=receive_udp, daemon=True).start()
 
 
 def quit():
@@ -207,10 +207,7 @@ while True:
         client, client_addr = server_tcp.accept()
         clients.append(client)
         print(f"New connection from {client_addr}")
-        Thread(
-            target=receive_tcp,
-            args=(client, client_addr),
-        ).start()
+        Thread(target=receive_tcp, args=(client, client_addr), daemon=True).start()
 
     except ConnectionAbortedError:
         print(f"{Colors.RED}Connection aborted!{Colors.RESET}")

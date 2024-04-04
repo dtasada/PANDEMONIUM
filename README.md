@@ -9,3 +9,10 @@
 * Run `./pandemonium.py`. By default it will search for a server, but you can disable online & multiplayer behavior with `--no-multiplayer`.
 * To run the server, run `./pandemonium.py --server`.
 * `--no-fullscreen` and `--no-vsync` are also available for testing purposes, but are not recommended for gameplay.
+
+## Todo
+* Fix respawn 😭
+* Fix ADS with single ray
+* Fix fisheye bug
+* Fix shooting through walls
+* Fix enemy height
