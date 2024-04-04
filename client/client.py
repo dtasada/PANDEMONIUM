@@ -49,8 +49,9 @@ class Game:
                     self.max_fps_index = json_load["max_fps_index"]
 
                     pygame.mixer.music.set_volume(json_load["volume"])
-                    for channel_pair in audio_channels:
-                        for channel in channel_pair:
+                    [channel.set_volume(json_load["volume"]) for channel in player.audio_channels]
+                    for enemy in enemies.copy():
+                        for channel in enemy.audio_channels:
                             channel.set_volume(json_load["volume"])
             else:
                 open(Path("client", "settings.json"), "w").close()
@@ -220,9 +221,11 @@ class Game:
 
     def set_volume(self, amount):
         target = 0.05 * round((pygame.mixer.music.get_volume() + amount / 100) / 0.05)
+
         pygame.mixer.music.set_volume(target)
-        for channel_pair in audio_channels:
-            for channel in channel_pair:
+        [channel.set_volume(target) for channel in player.audio_channels]
+        for enemy in enemies.copy():
+            for channel in enemy.audio_channels:
                 channel.set_volume(target)
 
     def get_volume(self):
@@ -376,7 +379,7 @@ class HUD:
             display.renderer.blit(self.weapon_tex, self.weapon_rect)
 
         display.renderer.blit(self.heart_tex, self.heart_rect)
-        for message in feed:
+        for i, message in enumerate(feed):
             if ticks() - 5000 > message[1]:
                 feed.remove(message)
             else:
@@ -384,7 +387,7 @@ class HUD:
                 display.renderer.blit(
                     tex,
                     tex.get_rect(
-                        topright=(display.width - 16, 16 + 32 * (len(feed) - 1))
+                        topright=(display.width - 16, 16 + 32 * i)
                     ),
                 )
 
@@ -618,6 +621,7 @@ class Player:
         )
         self.arrow_rect = pygame.Rect(0, 0, 16, 16)
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
+
         # weapon and shooting tech
         self.weapons = []
         self.ammos = []
@@ -645,6 +649,7 @@ class Player:
 
         self.bob = 0
         self.to_equip: tuple[tuple[int, int], int] | None = None
+        self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
 
         if game.multiplayer:
             self.tcp_id = client_tcp.getsockname()
@@ -966,7 +971,7 @@ class Player:
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
-            audio_channels[0][0].play(Sounds.GUN)
+            self.audio_channels[0].play(Sounds.GUN)
 
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
@@ -1200,8 +1205,6 @@ class Player:
             self.send_location()
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
-                    print("taking damage")
-
                     self.health = max(self.health - int(message.split("|")[1]), 0)
                     hud.update_health(self)
 
@@ -1257,6 +1260,7 @@ class EnemyPlayer:
         self.image.color = self.color
         self.health = 100  # currently not being updated
         self.name: str = None  # this doesn't work yet
+        self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
 
     def draw(self):
         if game.multiplayer:
@@ -1276,7 +1280,6 @@ class EnemyPlayer:
     def update(self):
         if game.multiplayer:
             if self.health <= 0:
-                print(f"requesting to kill {self.id}")
                 client_tcp.req(f"kill|{self.id}")
 
             for message in client_tcp.queue.copy():
@@ -1354,6 +1357,7 @@ class EnemyPlayer:
             self.arm2_rect.topleft = self.shoulder2_rect.topright
             # rest
             display.renderer.blit(self.image, self.rect)
+            """
             draw_rect(Colors.YELLOW, self.rect)
             draw_rect(Colors.ORANGE, self.head_rect)
             draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
@@ -1362,6 +1366,7 @@ class EnemyPlayer:
             draw_rect(Colors.BLUE, self.arm1_rect)
             draw_rect(Colors.BLUE, self.arm2_rect)
             draw_rect(Colors.PINK, self.legs_rect)
+            """
             self.rendering = True
 
     def regenerate(self):
@@ -1591,12 +1596,6 @@ def add_enemy(address: str, data: Any) -> None:
 
     enemy_addresses.append(new_enemy.id)
     enemies.append(new_enemy)
-    audio_channels.append(
-        [
-            pygame.mixer.Channel(len(audio_channels) + 1),
-            pygame.mixer.Channel(len(audio_channels) + 2),
-        ]
-    )
 
 
 def render_floor():
@@ -1652,8 +1651,6 @@ def main(multiplayer):
                         client_tcp.queue.remove(message)
 
                     case "init_res":
-                        print("init_res")
-                        print(message.split("|")[1])
                         res = json.loads(message.split("|")[1])
                         for id, data in res.items():
                             add_enemy(id, data)
