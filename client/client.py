@@ -74,6 +74,7 @@ class Game:
         self.state = States.MAIN_MENU
         self.previous_state = States.LAUNCH
         self.fps = 60
+        self.dt = 1
 
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
@@ -830,16 +831,16 @@ class Player:
             else:
                 self.last_step = ticks()
 
-            amult = 0.03 * game.dt
+            amult = 0.03
             if keys[pygame.K_LEFT]:
-                self.angle -= amult
+                self.angle -= amult * game.dt
             if keys[pygame.K_RIGHT]:
-                self.angle += amult
+                self.angle += amult * game.dt
             m = 12
             if keys[pygame.K_UP]:
-                self.bob += m
+                self.bob += m * game.dt
             if keys[pygame.K_DOWN]:
-                self.bob -= m
+                self.bob -= m * game.dt
 
             # joystick isn't actually a literal joystick, pygame input term for gamepad
             if joystick is not None:
@@ -1538,7 +1539,7 @@ all_buttons = {
         ),
         Button(
             80,
-            display.height / 2 + 48 * 6,
+            display.height / 2 + 48 * 5,
             "Back",
             lambda: game.set_state(game.previous_state),
             font_size=48,
@@ -1683,7 +1684,7 @@ def main(multiplayer):
                             elif ypos < 20:
                                 pygame.mouse.set_pos(xpos, display.height - 21)
                             else:
-                                player.bob -= event.rel[1] * game.sens / 100
+                                player.bob -= event.rel[1] * game.sens / 50
                                 player.bob = min(player.bob, display.height * 1.5)
                                 player.bob = max(player.bob, -display.height * 1.5)
 
