@@ -1353,6 +1353,7 @@ class EnemyPlayer:
             self.arm2_rect.topleft = self.shoulder2_rect.topright
             # rest
             display.renderer.blit(self.image, self.rect)
+            """
             draw_rect(Colors.YELLOW, self.rect)
             draw_rect(Colors.ORANGE, self.head_rect)
             draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
@@ -1361,6 +1362,7 @@ class EnemyPlayer:
             draw_rect(Colors.BLUE, self.arm1_rect)
             draw_rect(Colors.BLUE, self.arm2_rect)
             draw_rect(Colors.PINK, self.legs_rect)
+            """
             self.rendering = True
 
     def regenerate(self):
