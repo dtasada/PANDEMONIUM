@@ -625,13 +625,3 @@ class Sounds:
             Path("client", "assets", "sounds", "sfx", "footsteps")
         )
     }
-
-
-audio_channels = [[pygame.mixer.Channel(0), pygame.mixer.Channel(1)]]
-"""
-audio_channels = [
-    per player: [ gun_channel, footstep_channel ]
-]
-Channel x is for local player guns
-Channel x0 for local player footsteps
-"""

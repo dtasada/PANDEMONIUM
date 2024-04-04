@@ -62,12 +62,12 @@ def off(target: str, opt: str):
         name = tcp_data[target]["name"]
         messages = {
             "kill": [
-                f"imagine being {name} rn 💀",
+                f"imagine being {name} rn",
                 f"{name} got PANDEMONIUMED",
                 f"{name} got shit on",
                 f"{name} was neutralized",
                 f"{name} was offed",
-                f"{name} 💀💀",
+                f"{name} :skull:",
             ],
             "quit": [
                 f"{name} doesn't wanna play anymore",
