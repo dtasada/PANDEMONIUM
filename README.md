@@ -12,7 +12,8 @@
 
 ## Todo
 * Fix ADS with single ray
+* Fix enemy height
 * Fix fisheye bug
 * Fix shooting through walls
-* Fix enemy height
 * Sound of other players (including shots & footsteps)
+* Vertical FOV
