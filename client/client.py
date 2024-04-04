@@ -1008,23 +1008,27 @@ class Player:
         if not self.meleing:
             if ticks() - self.last_melee >= weapon_data["2"]["fire_pause"]:
                 self.weapon_anim = 1
-
                 for enemy in enemies:
-                    if enemy.rendering and not enemy.regenerating:
-                        if enemy.rect.collidepoint(display.center):
-                            # the body in general is hit
-                            mult = 1
-                            if (
-                                enemy.head_rect.collidepoint(display.center)
-                                or enemy.legs_rect.collidepoint(display.center)
-                                or enemy.shoulder1_rect.collidepoint(display.center)
-                                or enemy.shoulder2_rect.collidepoint(display.center)
-                                or enemy.arm1_rect.collidepoint(display.center)
-                                or enemy.arm2_rect.collidepoint(display.center)
-                            ):
+                    dist = hypot(
+                        enemy.indicator_rect.centerx - self.arrow_rect.centerx,
+                        enemy.indicator_rect.centery - self.arrow_rect.centery
+                    )
+                    if dist <= 20:
+                        if enemy.rendering and not enemy.regenerating:
+                            if enemy.rect.collidepoint(display.center):
+                                # the body in general is hit
                                 mult = 1
-                            if mult > 0:
-                                enemy.hit(mult, melee=True)
+                                if (
+                                    enemy.head_rect.collidepoint(display.center)
+                                    or enemy.legs_rect.collidepoint(display.center)
+                                    or enemy.shoulder1_rect.collidepoint(display.center)
+                                    or enemy.shoulder2_rect.collidepoint(display.center)
+                                    or enemy.arm1_rect.collidepoint(display.center)
+                                    or enemy.arm2_rect.collidepoint(display.center)
+                                ):
+                                    mult = 1
+                                if mult > 0:
+                                    enemy.hit(mult, melee=True)
 
                 self.meleing = True
                 self.shooting = True
