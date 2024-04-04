@@ -193,7 +193,7 @@ def receive_tcp(client: socket.socket, client_addr):
 
 
 # UDP
-Thread(target=receive_udp).start()
+Thread(target=receive_udp, daemon=True).start()
 
 
 def quit():
@@ -216,6 +216,7 @@ while True:
         Thread(
             target=receive_tcp,
             args=(client, client_addr),
+            daemon=True,
         ).start()
 
     except ConnectionAbortedError:

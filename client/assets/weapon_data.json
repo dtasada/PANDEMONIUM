@@ -1,7 +1,7 @@
 {
     "1": {
         "name": "revolver",
-		"damage": 50,
+		"damage": 45,
         "cost": 1000,
         "ammo": 60,
         "mag": 6,
@@ -10,7 +10,7 @@
     },
     "2": {
         "name": "knife",
-        "damage": 100,
+        "damage": 80,
         "cost": null,
         "ammo": null,
         "fire_pause": 800,
