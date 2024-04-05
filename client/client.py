@@ -25,7 +25,7 @@ def quit():
         json.dump(json_save, f)
 
     if game.multiplayer and client_tcp:
-        client_tcp.req("quit|f4")
+        client_tcp.req(f"quit|{player.tcp_id}|f4")
 
     game.running = False
     pygame.quit()
