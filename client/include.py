@@ -278,6 +278,16 @@ class Button:
                         if not self.grayed_out:
                             self.action()
 
+            if event.type == pygame.MOUSEWHEEL:
+                if self.is_slider:
+                    if pygame.Rect(
+                        self.rect.left,
+                        self.rect.top,
+                        self.right_slider_rect.right - self.rect.left,
+                        self.rect.height,
+                    ).collidepoint(pygame.mouse.get_pos()):
+                        self.action(event.y * self.action_arg)
+
     def update(self):
         if (
             self.rect.collidepoint(pygame.mouse.get_pos())
@@ -524,6 +534,12 @@ def load_map_from_csv(path_: str, int_: bool = True) -> list[list[int]]:
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
+def text2tex(content: str, font_size: int) -> Texture:
+    return Texture.from_surface(
+        display.renderer, v_fonts[font_size].render(content, True, Colors.WHITE)
+    )
+
+
 def write(
     anchor: str,
     content: str | int,
@@ -601,9 +617,8 @@ weapon_names = [None] + [v["name"] for k, v in weapon_data.items()]
 
 ticks = pygame.time.get_ticks
 
-
-class Sounds:
-    GUN = pygame.mixer.Sound(
+for name, data in {
+    "revolver": pygame.mixer.Sound(
         Path(
             "client",
             "assets",
@@ -615,6 +630,14 @@ class Sounds:
             "308 Single.mp3",
         )
     )
+}.items():
+    for i in weapon_data:
+        if name == weapon_data[i]["name"]:
+            weapon_data[i]["shot_sound"] = data
+            break
+
+
+class Sounds:
     MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
     PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
     FOOTSTEPS = {

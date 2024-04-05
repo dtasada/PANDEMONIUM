@@ -164,6 +164,11 @@ def receive_tcp(client: socket.socket, client_addr):
                     case "kill":
                         off("kill", target, args)
 
+                    case "shoot":
+                        for client_ in clients.copy():
+                            if client_ != client:
+                                client_.send(raw)
+
                     case "damage":
                         try:
                             tcp_data[target]["health"] = max(
