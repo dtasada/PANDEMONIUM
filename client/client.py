@@ -612,8 +612,9 @@ class Player:
         self.shooting = False
         self.reloading = False
         self.reload_direc = 1
-        self.weapon_yoffset = 0
-        self.weapon_ytarget = None
+        self.weapon_reload_offset = 0
+        self.weapon_ads_offset = 0
+        self.weapon_ads_offset_target = None
         self.health = 100
         self.meleing = False
         self.moving = False
@@ -682,19 +683,19 @@ class Player:
 
             weapon_tex = weapon_data[int(self.weapon_anim)][0]
             self.weapon_rect = weapon_data[int(self.weapon_anim)][1]
-            if self.weapon_ytarget is not None:
-                self.weapon_yoffset += (
-                    self.weapon_ytarget - self.weapon_yoffset
+            if self.weapon_ads_offset_target is not None:
+                self.weapon_ads_offset += (
+                    self.weapon_ads_offset_target - self.weapon_ads_offset
                 ) * game.zoom_speed
-                elapsed = ticks() - game.last_zoom
-                if self.weapon_ytarget == 0:
-                    if elapsed >= 500:
-                        self.weapon_ytarget = None
-                        self.weapon_yoffset = 0
+                # elapsed = ticks() - game.last_zoom
+                # if self.weapon_ads_offset_target == 0:
+                #     if elapsed >= 500:
+                #         self.weapon_ads_offset_target = None
+                #         self.weapon_ads_offset = 0
 
             self.weapon_rect.midbottom = (
                 display.width / 2,
-                display.height + self.weapon_yoffset,
+                display.height + self.weapon_reload_offset + self.weapon_ads_offset,
             )
 
             if self.reloading:
@@ -705,7 +706,7 @@ class Player:
                 ):
                     self.reload_direc = -self.reload_direc
                 # reload back up and get the ammo and magazine that was promised to you beforehand
-                if self.reload_direc == -1 and self.weapon_yoffset <= 0:
+                if self.reload_direc == -1 and self.weapon_reload_offset <= 0:
                     self.reloading = False
                     self.mag = self.new_mag
                     self.ammo = self.new_ammo
@@ -795,6 +796,20 @@ class Player:
         self.to_equip = None
         self.surround = []
         if game.state == States.PLAY:
+            # doing the ADS
+            mouses = pygame.mouse.get_pressed()
+            if mouses[2]:  # right mouse button
+                if not self.adsing and not self.reloading:
+                    if self.weapon is not None:
+                        game.target_zoom = 15
+                        game.zoom = 0
+                        self.weapon_ads_offset_target = 32 * 6
+                    self.adsing = True
+            else:
+                game.target_zoom = 0
+                game.last_zoom = ticks()
+                self.weapon_ads_offset_target = 0
+                self.adsing = False
             # keyboard
             self.moving = False
             vmult = 0.8
@@ -958,7 +973,7 @@ class Player:
         # check whether reloading
         if self.reloading:
             m = 6
-            self.weapon_yoffset += self.reload_direc * m * game.dt
+            self.weapon_reload_offset += self.reload_direc * m * game.dt
 
     def shoot(self, melee=False):
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
@@ -999,6 +1014,9 @@ class Player:
         if self.weapon is not None:
             if self.mag < weapon_data[self.weapon]["mag"]:
                 if not self.reloading:
+                    game.target_zoom = 0
+                    self.weapon_ads_offset_target = 0
+                    self.adsing = False
                     self.reloading = True
                     self.reload_direc = 1
                     self.new_mag = weapon_data[self.weapon]["mag"]
@@ -1759,17 +1777,12 @@ def main(multiplayer):
                         if event.button == 1:
                             player.process_shot = True
                         if event.button == 3:
-                            if player.weapon is not None:
-                                game.target_zoom = 15
-                                game.zoom = 0
-                                player.weapon_ytarget = 32 * 6
+                            pass
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
                         if event.button == 3:
-                            game.target_zoom = 0
-                            game.last_zoom = ticks()
-                            player.weapon_ytarget = 0
+                            pass
 
                 case pygame.KEYDOWN:
                     if game.state == States.MAIN_MENU:
