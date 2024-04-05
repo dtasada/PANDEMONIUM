@@ -151,11 +151,11 @@ class Game:
         self.running = False
 
     def set_state(self, target_state):
-        global player
-
+        global player, hud
         if target_state == States.MAIN_MENU:
             player = Player()
-
+            hud = HUD()
+            hud.update_health(player)
         if (
             target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
         ) or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU):
@@ -637,8 +637,6 @@ class Player:
         self.health = 100
         self.meleing = False
 
-        hud.update_health(self)
-
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
 
@@ -997,13 +995,14 @@ class Player:
             hud.update_weapon_general(self)
 
     def reload(self, amount=None):
-        if self.mag < weapon_data[self.weapon]["mag"]:
-            if not self.reloading:
-                self.reloading = True
-                self.reload_direc = 1
-                self.new_mag = weapon_data[self.weapon]["mag"]
-                self.mag_diff = self.new_mag - self.mag
-                self.new_ammo = self.ammo - self.mag_diff
+        if self.weapon is not None:
+            if self.mag < weapon_data[self.weapon]["mag"]:
+                if not self.reloading:
+                    self.reloading = True
+                    self.reload_direc = 1
+                    self.new_mag = weapon_data[self.weapon]["mag"]
+                    self.mag_diff = self.new_mag - self.mag
+                    self.new_ammo = self.ammo - self.mag_diff
 
     def melee(self):
         if not self.meleing:
@@ -1309,7 +1308,7 @@ class EnemyPlayer:
             height = game.projection_dist / self.dist_px * display.height / 2  # maths
             width = height / self.image.height * self.image.width
             # rects
-            og_width, og_height = 232, 400
+            og_width, og_height = 232 / 2, 400 / 2
             head_w_ratio = 84 / og_width
             head_h_ratio = 88 / og_height
             torso_w_ratio = 92 / og_width
@@ -1395,10 +1394,10 @@ class EnemyPlayer:
 
 cursor.enable()
 game = Game()
-hud = HUD()
 # player_selector.set_all_skins()
 gtex = GlobalTextures()
 player: Player = None  # initialization is in game.set_state
+hud: HUD = None  # same as above
 enemies: list[EnemyPlayer] = []
 enemy_addresses: list[str] = []
 feed: list[tuple[Texture, int]] = []
@@ -1701,6 +1700,7 @@ def main(multiplayer):
                     if game.state == States.PLAY:
                         if event.button == 3:
                             game.target_zoom = 0
+                            game.last_zoom = ticks()
                             player.weapon_ytarget = 0
 
                 case pygame.KEYDOWN:
