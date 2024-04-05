@@ -11,9 +11,14 @@
 * `--no-fullscreen` and `--no-vsync` are also available for testing purposes, but are not recommended for gameplay.
 
 ## Todo
+### Bugs
+* FLOOR AND CEILING TEXTURES
 * Fix ADS with single ray
 * Fix enemy height
 * Fix fisheye bug
+* Fix mouse flickering
 * Fix shooting through walls
-* Sound of other players (including shots & footsteps)
+
+### Features
 * Leaderboard & Point system
+* Enemy direction and sounds (including shots & footsteps)
