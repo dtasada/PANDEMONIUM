@@ -902,7 +902,7 @@ class Player:
                 self.surround.append((x, y))
 
         # cast the rays
-        if game.target_zoom > 0 and False:
+        if game.target_zoom > 0 and False:  # dit is voor debugging dus doet niks
             start_x, start_y = (
                 self.rect.centerx / game.tile_size,
                 self.rect.centery / game.tile_size,
@@ -915,9 +915,11 @@ class Player:
                 o += game.fov / game.ray_density
         _xvel, _yvel = angle_to_vel(self.angle)
 
+        self.start_x_px = self.start_x * game.tile_size
+        self.start_y_px = self.start_y * game.tile_size
         for enemy in enemies:
-            dy = enemy.indicator_rect.centery - self.rect.centery
-            dx = enemy.indicator_rect.centerx - self.rect.centerx
+            dy = enemy.indicator_rect.centery - self.start_x_px
+            dx = enemy.indicator_rect.centerx - self.start_y_px
             enemy.angle = degrees(atan2(dy, dx))
             enemy.dist_px = hypot(dy, dx)
         self.enemies_to_render = sorted(
