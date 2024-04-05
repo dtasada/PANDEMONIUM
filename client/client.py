@@ -918,8 +918,8 @@ class Player:
         self.start_x_px = self.start_x * game.tile_size
         self.start_y_px = self.start_y * game.tile_size
         for enemy in enemies:
-            dy = enemy.indicator_rect.centery - self.start_x_px
-            dx = enemy.indicator_rect.centerx - self.start_y_px
+            dy = enemy.indicator_rect.centery - self.start_y_px
+            dx = enemy.indicator_rect.centerx - self.start_x_px
             enemy.angle = degrees(atan2(dy, dx))
             enemy.dist_px = hypot(dy, dx)
         self.enemies_to_render = sorted(
