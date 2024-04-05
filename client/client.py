@@ -1243,9 +1243,9 @@ class EnemyPlayer:
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
-        self.angle = radians(-90)
+        self.angle = radians(-90) # TODO: Implement enemy direction
         self.indicator = imgload(
-            "client", "assets", "images", "minimap", "player_arrow.png"
+            "client", "assets", "images", "minimap", "enemy_indicator.png"
         )
         self.indicator.color = Colors.ORANGE
         self.indicator_rect = pygame.Rect((0, 0, 16, 16))
@@ -1281,7 +1281,7 @@ class EnemyPlayer:
                 self.angle = message[self.id]["angle"]
 
         self.rendering = False
-        draw_rect(Colors.RED, self.indicator_rect)
+        # draw_rect(Colors.RED, self.indicator_rect)
         display.renderer.blit(self.indicator, self.indicator_rect)
 
     def update(self):
