@@ -49,21 +49,11 @@ class Game:
                     self.resolution = json_load["resolution"]
                     self.max_fps_index = json_load["max_fps_index"]
                     self.volume = json_load["volume"]
-
-                    pygame.mixer.music.set_volume(json_load["volume"])
-                    [
-                        channel.set_volume(json_load["volume"])
-                        for channel in player.audio_channels
-                    ]
-                    for enemy in enemies.copy():
-                        [
-                            channel.set_volume(json_load["volume"])
-                            for channel in enemy.audio_channels
-                        ]
+                    pygame.mixer.music.set_volume(self.volume)
             else:
                 open(Path("client", "settings.json"), "w").close()
                 failed = True
-        except:
+        except Exception:
             failed = True
         if failed:
             self.sens = 50
@@ -626,6 +616,7 @@ class Player:
         self.weapon_ytarget = None
         self.health = 100
         self.meleing = False
+        self.moving = False
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
@@ -642,6 +633,10 @@ class Player:
 
         if game.multiplayer:
             self.tcp_id = client_tcp.getsockname()
+        
+        # sound
+        for channel in self.audio_channels:
+            channel.set_volume(game.volume)
 
     @property
     def weapon(self):
@@ -801,6 +796,7 @@ class Player:
         self.surround = []
         if game.state == States.PLAY:
             # keyboard
+            self.moving = False
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
@@ -818,6 +814,7 @@ class Player:
             xvel *= game.dt
             yvel *= game.dt
             if xvel or yvel:
+                self.moving = True
                 if ticks() - self.last_step >= 400:
                     # play sound perhaps?
                     self.last_step = ticks()
@@ -1401,13 +1398,45 @@ class EnemyPlayer:
             pass
 
 
+class Crosshair:
+    def __init__(self):
+        self.w = 4  # width
+        self.l = 20  # length
+        self.target_offset = self.o = 50  # self.o is offset
+       
+    def update(self):
+        if game.target_zoom > 0:
+            self.target_offset = 4
+            self.l = 10
+            self.zooming_mult = 0.15
+        else:
+            self.l = 20
+            if player.moving:
+                self.target_offset = 100
+            else:
+                self.target_offset = 50
+            self.zooming_mult = 0.05
+        self.o += (self.target_offset - self.o) * self.zooming_mult
+        self.center = (display.width / 2 - self.w / 2, display.height / 2 - self.w / 2, self.w, self.w)
+        self.right = (display.width / 2 + self.w / 2 + self.o, display.height / 2 - self.w / 2, self.l, self.w)
+        self.left = (display.width / 2 - self.w / 2 - self.o - self.l, display.height / 2 - self.w / 2, self.l, self.w)
+        self.bottom = (display.width / 2 - self.w / 2, display.height / 2 + self.w / 2 + self.o, self.w, self.l)
+        self.top = (display.width / 2 - self.w / 2, display.height / 2 - self.w / 2 - self.o - self.l, self.w, self.l)
+        fill_rect(Colors.WHITE, self.center)
+        fill_rect(Colors.WHITE, self.right)
+        fill_rect(Colors.WHITE, self.left)
+        fill_rect(Colors.WHITE, self.bottom)
+        fill_rect(Colors.WHITE, self.top)
+
+
+crosshair = Crosshair()
 cursor.enable()
-game = Game()
 # player_selector.set_all_skins()
-gtex = GlobalTextures()
 player_selector = PlayerSelector()
 player: Player = None  # initialization is in game.set_state
 hud: HUD = None  # same as above
+game = Game()
+gtex = GlobalTextures()
 leaderboard = Leaderboard()
 enemies: list[EnemyPlayer] = []
 feed: list[tuple[Texture, int]] = []
@@ -1813,12 +1842,12 @@ def main(multiplayer):
 
             hud.update()
 
-            display.renderer.blit(crosshair_tex, crosshair_rect)
             display.renderer.blit(redden_game.tex, redden_game.rect)
 
         if game.state == States.PLAY:
             game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
-            display.renderer.blit(crosshair_tex, crosshair_rect)
+            # display.renderer.blit(crosshair_tex, crosshair_rect)
+            crosshair.update()
 
             if pygame.key.get_pressed()[pygame.K_TAB]:
                 leaderboard.update()
