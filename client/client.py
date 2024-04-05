@@ -808,7 +808,7 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
-            if keys[pygame.K_LSHIFT]:
+            if keys[pygame.K_LSHIFT] or game.target_zoom > 0:
                 xvel /= 2
                 yvel /= 2
             xvel *= game.dt
@@ -1754,9 +1754,10 @@ def main(multiplayer):
                         if event.button == 1:
                             player.process_shot = True
                         if event.button == 3:
-                            game.target_zoom = 15
-                            game.zoom = 0
-                            player.weapon_ytarget = 32 * 6
+                            if player.weapon is not None:
+                                game.target_zoom = 15
+                                game.zoom = 0
+                                player.weapon_ytarget = 32 * 6
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
