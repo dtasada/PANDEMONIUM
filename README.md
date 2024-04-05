@@ -17,3 +17,5 @@
 * Fix shooting through walls
 * Sound of other players (including shots & footsteps)
 * Leaderboard & Point system
+* Fix mouse flickering
+* FLOOR AND CEILING TEXTURES
