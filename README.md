@@ -17,7 +17,7 @@
 * Fix enemy height
 * Fix fisheye bug
 * Fix mouse flickering
-* Fix shooting through walls
+* Fix shooting and ADSing through walls
 
 ### Features
 * Leaderboard & Point system
