@@ -1695,11 +1695,13 @@ def main(multiplayer):
                         if event.button == 3:
                             game.target_zoom = 15
                             game.zoom = 0
+                            player.weapon_ytarget = 32 * 6
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
                         if event.button == 3:
                             game.target_zoom = 0
+                            player.weapon_ytarget = 0
 
                 case pygame.KEYDOWN:
                     if game.state == States.MAIN_MENU:
