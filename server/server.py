@@ -57,7 +57,7 @@ def feed(msg: str) -> None:
         client.send(f"feed|{msg}\n".encode())
 
 
-def off(target: str, opt: str):
+def off(opt: str, target: str, args: list[str]):
     try:
         name = tcp_data[target]["name"]
         messages = {
@@ -90,7 +90,8 @@ def off(target: str, opt: str):
             if str(client_.getpeername()) == target:
                 # if not F4ing, move client from clients to inactive_clients, otherwise, completely remove
                 clients.remove(client_)
-                if (opt == "quit" and not target) or (opt == "kill"):
+
+                if (opt == "quit" and not args[0]) or (opt == "kill"):
                     inactive_clients.append(client_)
     except BaseException as e:
         alert(f"Failed to {opt} player", e)
@@ -159,9 +160,14 @@ def receive_tcp(client: socket.socket, client_addr):
                             alert("Could not init_player", e)
 
                     case "quit":
-                        off(target, "quit")
+                        off("quit", target, args)
                     case "kill":
-                        off(target, "kill")
+                        off("kill", target, args)
+
+                    case "shoot":
+                        for client_ in clients.copy():
+                            if client_ != client:
+                                client_.send(raw)
 
                     case "damage":
                         try:
