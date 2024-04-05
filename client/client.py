@@ -74,9 +74,11 @@ class Game:
         self.state = States.MAIN_MENU
         self.previous_state = States.LAUNCH
         self.fps = 60
+        self.dt = 1
 
         self.target_zoom = self.zoom = 0
         self.zoom_speed = 0.4
+        self.last_zoom = ticks()
         self.projection_dist = 32 / tan(radians(self.fov / 2))
         self.rendered_enemies = 0
         # map
@@ -268,7 +270,7 @@ class GlobalTextures:
                 if file_name is not None
                 else None
             )
-            for file_name in [None, "wall"]
+            for file_name in [None, "wall", "floor"]
         ]
         self.object_textures = [
             (
@@ -631,8 +633,10 @@ class Player:
         self.reloading = False
         self.reload_direc = 1
         self.weapon_yoffset = 0
+        self.weapon_ytarget = None
         self.health = 100
         self.meleing = False
+
         hud.update_health(self)
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
@@ -640,6 +644,7 @@ class Player:
 
         self.melee_anim = 1
         self.process_shot: bool | None = None
+        self.process_melee: bool | None = None
         self.last_melee = ticks()
         self.last_step = ticks()
 
@@ -691,23 +696,34 @@ class Player:
                 self.weapon_anim = 1
                 if self.meleing:
                     self.meleing = False
+
             weapon_tex = weapon_data[int(self.weapon_anim)][0]
-            weapon_rect = weapon_data[int(self.weapon_anim)][1]
-            weapon_rect.midbottom = (
+            self.weapon_rect = weapon_data[int(self.weapon_anim)][1]
+            if self.weapon_ytarget is not None:
+                self.weapon_yoffset += (self.weapon_ytarget - self.weapon_yoffset) * game.zoom_speed
+                elapsed = ticks() - game.last_zoom
+                if self.weapon_ytarget == 0:
+                    if elapsed >= 500:
+                        self.weapon_ytarget = None
+                        self.weapon_yoffset = 0
+
+            self.weapon_rect.midbottom = (
                 display.width / 2,
-                display.height + self.weapon_yoffset,
+                display.height + self.weapon_yoffset
             )
+
             if self.reloading:
                 # reload down
-                if weapon_rect.y >= display.height - 180:
+                if self.reload_direc == 1 and self.weapon_rect.y >= display.height - 180:
                     self.reload_direc = -self.reload_direc
                 # reload back up and get the ammo and magazine that was promised to you beforehand
-                if self.weapon_yoffset <= 0 and self.reload_direc == -1:
+                if self.reload_direc == -1 and self.weapon_yoffset <= 0:
                     self.reloading = False
                     self.mag = self.new_mag
                     self.ammo = self.new_ammo
                     hud.update_weapon_general(self)
-            display.renderer.blit(weapon_tex, weapon_rect)
+
+            display.renderer.blit(weapon_tex, self.weapon_rect)
 
     def draw(self):
         self.arrow_rect.center = self.rect.center
@@ -795,7 +811,6 @@ class Player:
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
-            mod = pygame.key.get_mods()
             if keys[pygame.K_w]:
                 xvel, yvel = angle_to_vel(self.angle, vmult)
             if keys[pygame.K_a]:
@@ -804,8 +819,7 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
-
-            if mod == 4097:
+            if keys[pygame.K_LSHIFT]:
                 xvel /= 2
                 yvel /= 2
             xvel *= game.dt
@@ -817,23 +831,16 @@ class Player:
             else:
                 self.last_step = ticks()
 
-            if keys[pygame.K_q]:
-                for enemy in enemies:
-                    enemy.indicator_rect.y -= 1
-
-            if keys[pygame.K_q]:
-                self.melee()
-
             amult = 0.03
             if keys[pygame.K_LEFT]:
-                self.angle -= amult
+                self.angle -= amult * game.dt
             if keys[pygame.K_RIGHT]:
-                self.angle += amult
+                self.angle += amult * game.dt
             m = 12
             if keys[pygame.K_UP]:
-                self.bob += m
+                self.bob += m * game.dt
             if keys[pygame.K_DOWN]:
-                self.bob -= m
+                self.bob -= m * game.dt
 
             # joystick isn't actually a literal joystick, pygame input term for gamepad
             if joystick is not None:
@@ -951,6 +958,10 @@ class Player:
                                 self.reload()
                             elif not self.reloading:
                                 self.shoot()
+        
+        # melee?
+        if self.process_melee:
+            self.melee()
 
         # check whether reloading
         if self.reloading:
@@ -968,14 +979,17 @@ class Player:
                     if enemy.rect.collidepoint(display.center):
                         # the body in general is hit
                         mult = 1
-                        if enemy.head_rect.collidepoint(display.center):
-                            mult = 1.4
-                        elif (
-                            enemy.legs_rect.collidepoint(display.center)
-                            or enemy.shoulder1_rect.collidepoint(display.center)
-                            or enemy.shoulder2_rect.collidepoint(display.center)
-                        ):
-                            mult = 0.5
+                        if not melee:
+                            if enemy.head_rect.collidepoint(display.center):
+                                mult = 1.4
+                            elif (
+                                enemy.legs_rect.collidepoint(display.center)
+                                or enemy.shoulder1_rect.collidepoint(display.center)
+                                or enemy.shoulder2_rect.collidepoint(display.center)
+                                or enemy.arm1_rect.collidepoint(display.center)
+                                or enemy.arm2_rect.collidepoint(display.center)
+                            ):
+                                mult = 0.5
                         enemy.hit(mult)
 
             self.last_shot = ticks()
@@ -994,6 +1008,29 @@ class Player:
     def melee(self):
         if not self.meleing:
             if ticks() - self.last_melee >= weapon_data["2"]["fire_pause"]:
+                self.weapon_anim = 1
+                for enemy in enemies:
+                    dist = hypot(
+                        enemy.indicator_rect.centerx - self.arrow_rect.centerx,
+                        enemy.indicator_rect.centery - self.arrow_rect.centery
+                    )
+                    if dist <= 20:
+                        if enemy.rendering and not enemy.regenerating:
+                            if enemy.rect.collidepoint(display.center):
+                                # the body in general is hit
+                                mult = 1
+                                if (
+                                    enemy.head_rect.collidepoint(display.center)
+                                    or enemy.legs_rect.collidepoint(display.center)
+                                    or enemy.shoulder1_rect.collidepoint(display.center)
+                                    or enemy.shoulder2_rect.collidepoint(display.center)
+                                    or enemy.arm1_rect.collidepoint(display.center)
+                                    or enemy.arm2_rect.collidepoint(display.center)
+                                ):
+                                    mult = 1
+                                if mult > 0:
+                                    enemy.hit(mult, melee=True)
+
                 self.meleing = True
                 self.shooting = True
                 self.weapon_anim = 0
@@ -1281,8 +1318,8 @@ class EnemyPlayer:
             legs_h_ratio = 168 / og_height
             shoulder_w_ratio = 28 / og_width
             shoulder_h_ratio = 84 / og_height
-            arm_w_ratio = 11 / og_width
-            arm_h_ratio = 50 / og_height
+            arm_w_ratio = 44 / og_width
+            arm_h_ratio = 200 / og_height
             # whole body
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
@@ -1318,7 +1355,7 @@ class EnemyPlayer:
             self.arm2_rect = pygame.Rect(
                 0, 0, arm_w_ratio * width, arm_h_ratio * height
             )
-            self.arm2_rect.topleft = self.shoulder2_rect.topleft
+            self.arm2_rect.topleft = self.shoulder2_rect.topright
             # rest
             display.renderer.blit(self.image, self.rect)
             """
@@ -1329,6 +1366,7 @@ class EnemyPlayer:
             draw_rect(Colors.GREEN, self.shoulder2_rect)
             draw_rect(Colors.BLUE, self.arm1_rect)
             draw_rect(Colors.BLUE, self.arm2_rect)
+            draw_rect(Colors.PINK, self.legs_rect)
             """
             self.rendering = True
 
@@ -1337,11 +1375,11 @@ class EnemyPlayer:
             self.regenerating = False
             self.image.color = self.color
 
-    def hit(self, mult):
+    def hit(self, mult, melee=False):
         self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
-        damage = int(weapon_data[player.weapon]["damage"] * mult)
+        damage = int(weapon_data[player.weapon if not melee else "2"]["damage"] * mult)
         if game.multiplayer:
             client_tcp.req(f"damage|{self.id}|{damage}")
         if self.health <= 0:
@@ -1501,7 +1539,7 @@ all_buttons = {
         ),
         Button(
             80,
-            display.height / 2 + 48 * 6,
+            display.height / 2 + 48 * 5,
             "Back",
             lambda: game.set_state(game.previous_state),
             font_size=48,
@@ -1588,6 +1626,7 @@ def main(multiplayer):
     while game.running:
         game.dt = clock.tick(game.get_max_fps()) / (1 / 60 * 1000)
         player.process_shot = False
+        player.process_melee = False
 
         # Global TCP events
         if game.multiplayer:
@@ -1645,7 +1684,7 @@ def main(multiplayer):
                             elif ypos < 20:
                                 pygame.mouse.set_pos(xpos, display.height - 21)
                             else:
-                                player.bob -= event.rel[1] * game.sens / 100
+                                player.bob -= event.rel[1] * game.sens / 50
                                 player.bob = min(player.bob, display.height * 1.5)
                                 player.bob = max(player.bob, -display.height * 1.5)
 
@@ -1656,13 +1695,13 @@ def main(multiplayer):
                         if event.button == 3:
                             game.target_zoom = 15
                             game.zoom = 0
-                            # game.set_fov(-40)
+                            player.weapon_ytarget = 32 * 6
 
                 case pygame.MOUSEBUTTONUP:
                     if game.state == States.PLAY:
                         if event.button == 3:
                             game.target_zoom = 0
-                            # game.set_fov(40)
+                            player.weapon_ytarget = 0
 
                 case pygame.KEYDOWN:
                     if game.state == States.MAIN_MENU:
@@ -1682,16 +1721,12 @@ def main(multiplayer):
                         case pygame.K_r:
                             if game.state == States.PLAY:
                                 player.reload()
+                        
+                        case pygame.K_q:
+                            player.process_melee = True
 
                         case pygame.K_SPACE:
                             enemies.append(EnemyPlayer())
-
-                        case pygame.K_q:
-                            for _ in range(3):
-                                try:
-                                    del enemies[rand(0, len(enemies) - 1)]
-                                except:
-                                    pass
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)

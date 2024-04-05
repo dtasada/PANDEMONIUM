@@ -334,8 +334,8 @@ display = Display(
     1280,
     720,
     "PANDEMONIUM",
-    fullscreen=False if "--no-fullscreen" else True,
-    vsync=False if "--no-vsync" else True,
+    fullscreen=False if "--no-fullscreen" in sys.argv else True,
+    vsync=False if "--no-vsync" in sys.argv else True,
 )
 
 
