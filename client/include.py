@@ -109,10 +109,14 @@ class UserInput:
     def process_event(self, event):
         if event.key == pygame.K_BACKSPACE:
             self.text = self.text[:-1]
-        elif event.key in (
-            pygame.K_RETURN,
-            pygame.K_ESCAPE,
-            pygame.K_TAB,
+        elif (
+            event.key
+            in (
+                pygame.K_RETURN,
+                pygame.K_ESCAPE,
+                pygame.K_TAB,
+            )
+            or pygame.key.get_pressed()[pygame.K_LCTRL]
         ):
             pass
         elif event.key != pygame.K_BACKSPACE:
@@ -204,7 +208,7 @@ class Button:
         should_background: bool = False,
         anchor: str = "topleft",
         is_slider: bool = False,
-        slider_display: Optional[str] = None,
+        slider_display: Optional[callable] = None,
         grayed_out_when: Optional[callable] = None,
     ):
         self.content = content

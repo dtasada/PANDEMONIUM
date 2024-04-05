@@ -1628,6 +1628,9 @@ joystick_button_rect = joystick_button_sprs[0].get_rect()
 def add_enemy(address: str, data: Dict[str, Any]) -> None:
     new_enemy = EnemyPlayer(address)
     new_enemy.health = data["health"]
+    new_enemy.name = data["name"]
+
+    [channel.set_volume(game.volume) for channel in new_enemy.audio_channels]
     prim = player_selector.color_keys[data["prim_color"]]
     sec = player_selector.color_keys[data["sec_color"]]
     surf = player_selector.database[f"{prim}_{sec}"]
@@ -1635,6 +1638,7 @@ def add_enemy(address: str, data: Dict[str, Any]) -> None:
         display.renderer,
         surf.subsurface(0, 0, surf.get_width() / 4, surf.get_height())
     )
+
     enemies.append(new_enemy)
     leaderboard.texs.append(text2tex(new_enemy.name, 32))
 
@@ -1706,7 +1710,6 @@ def main(multiplayer):
                                     volume = 1
 
                                 enemy.audio_channels[0].set_volume(volume)
-                                print("volume:", volume)
                                 enemy.audio_channels[0].play(
                                     weapon_data[split[2]]["shot_sound"]
                                 )

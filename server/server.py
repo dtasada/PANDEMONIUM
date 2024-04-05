@@ -59,6 +59,8 @@ def feed(msg: str) -> None:
 
 def off(opt: str, target: str, args: list[str]):
     try:
+        # Fix this: It raises an exception but has no perceivable bug or error,
+        # but that might be shitty in the future
         name = tcp_data[target]["name"]
         messages = {
             "kill": [
@@ -88,10 +90,9 @@ def off(opt: str, target: str, args: list[str]):
                 client_.send(f"{opt}|{target}\n".encode())
 
             if str(client_.getpeername()) == target:
-                # if not F4ing, move client from clients to inactive_clients, otherwise, completely remove
                 clients.remove(client_)
-
-                if (opt == "quit" and not args[0]) or (opt == "kill"):
+                # if not F4ing, move client from clients to inactive_clients, otherwise, completely remove
+                if (opt == "quit" and "f4" not in args) or (opt == "kill"):
                     inactive_clients.append(client_)
     except BaseException as e:
         alert(f"Failed to {opt} player", e)
