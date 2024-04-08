@@ -165,6 +165,11 @@ def receive_tcp(client: socket.socket, client_addr):
                     case "kill":
                         off("kill", target, args)
 
+                    case "inc_score":
+                        udp_data[target]["score"] += int(args[0])
+                        print("raw:", raw.decode())
+                        print("udp_data:", udp_data)
+
                     case "shoot":
                         for client_ in clients.copy():
                             if client_ != client:
@@ -178,7 +183,9 @@ def receive_tcp(client: socket.socket, client_addr):
 
                             for client_ in clients.copy():
                                 if target == str(client_.getpeername()):
-                                    client_.send(f"take_damage|{args[0]}\n".encode())
+                                    client_.send(
+                                        f"take_damage|{client_addr}|{args[0]}\n".encode()
+                                    )
 
                         except BaseException as e:
                             alert("Failed to damage player", e)
