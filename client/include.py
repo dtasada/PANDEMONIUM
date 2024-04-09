@@ -538,9 +538,9 @@ def load_map_from_csv(path_: str, int_: bool = True) -> list[list[int]]:
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
-def text2tex(content: str, font_size: int) -> Texture:
+def text2tex(content: str | int, font_size: int) -> Texture:
     return Texture.from_surface(
-        display.renderer, v_fonts[font_size].render(content, True, Colors.WHITE)
+        display.renderer, v_fonts[font_size].render(str(content), True, Colors.WHITE)
     )
 
 

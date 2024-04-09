@@ -140,7 +140,7 @@ class Game:
         self.map_tex = Texture.from_surface(display.renderer, self.map_surf)
         self.mo = self.tile_size * 0
         self.map_rect = self.map_tex.get_rect(topleft=(self.mo, self.mo))
-        self.fps_list = (30, 60, 120, 144, 240)
+        self.fps_list = (30, 60, 120, 144, 240, 1000)
 
     @property
     def rect_list(self):
@@ -150,10 +150,11 @@ class Game:
         self.running = False
 
     def set_state(self, target_state):
-        global player, hud
+        global player, hud, leaderboard
         if target_state == States.MAIN_MENU:
             player = Player()
             hud = HUD()
+            leaderboard = Leaderboard()
             hud.update_health(player)
         if (
             target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
@@ -172,7 +173,7 @@ class Game:
             and self.state == States.MAIN_MENU
         ):
             # All launch & init requirements
-            leaderboard.texs.append(text2tex(username_input.text, 32))
+            leaderboard.texs[player.tcp_id] = text2tex(username_input.text, 32)
             msg = json.dumps(
                 {
                     "health": player.health,
@@ -277,7 +278,7 @@ class GlobalTextures:
         self.object_textures = [
             (
                 imgload("client", "assets", "images", "objects", file_name + ".png")
-                if file_name is not None and file_name != "knife"
+                if file_name is not None and file_name != "Knife"
                 else None
             )
             for file_name in weapon_names
@@ -299,15 +300,15 @@ class GlobalTextures:
                         Colors.YELLOW,
                     ),
                 )
-                if file_name is not None and file_name != "knife"
+                if file_name is not None and file_name != "Knife"
                 else None
             )
             for file_name in weapon_names
         ]
 
         self.mask_object_textures = []
-        for file_name_without_ext in weapon_names:
-            if file_name_without_ext is None or file_name_without_ext == "knife":
+        for file_name in weapon_names:
+            if file_name is None or file_name == "Knife":
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
@@ -317,7 +318,7 @@ class GlobalTextures:
                             "assets",
                             "images",
                             "objects",
-                            file_name_without_ext + ".png",
+                            file_name + ".png",
                         )
                     )
                 ).to_surface(setcolor=Colors.WHITE)
@@ -332,12 +333,12 @@ class GlobalTextures:
                     "images",
                     "weapons",
                     data["name"],
-                    f"{data['name']}{i}.png",
+                    f"{data['name']}_{i}.png",
                     scale=6,
                     return_rect=True,
                     colorkey=Colors.PINK,
                 )
-                for i in range(1, 6)
+                for i in range(1, len(os.listdir(Path('client', 'assets', 'images', 'weapons', data['name']))) + 1)
             ]
             for weapon, data in weapon_data.items()
         }
@@ -414,7 +415,7 @@ class HUD:
         )
 
     def update_ammo(self, player):
-        mag_size = weapon_data[player.weapon]["mag"]
+        max_mag_size = weapon_data[player.weapon]["mag"]
         self.ammo_tex, self.ammo_rect = write(
             "bottomright",
             player.ammo,
@@ -423,11 +424,11 @@ class HUD:
             display.width - 150,
             display.height - 4,
         )
-        if mag_size > 16:
+        if max_mag_size > 16:
             self.mag_tex, self.mag_rect = write(
                 "midright",
-                mag_size,
-                v_fonts[46 if mag_size > 16 else 64],
+                player.mag,
+                v_fonts[46 if max_mag_size > 16 else 64],
                 Colors.WHITE,
                 self.ammo_rect.left,
                 self.ammo_rect.centery
@@ -455,15 +456,27 @@ class HUD:
 
 class Leaderboard:
     def __init__(self):
-        self.texs: list[Texture] = []
+        self.texs: Dict[str, Texture] = {}
 
     def update(self):
-        for i, tex in enumerate(self.texs):
+        for i, (id, tex) in enumerate(self.texs.items()):
+            # Name
             display.renderer.blit(
                 tex,
                 tex.get_rect(
                     topleft=(display.width / 4, (display.height / 8) + (32 * i))
                 ),
+            )
+
+            # Score
+            dict1 = {player.tcp_id: player.score} | {enemy.id: enemy.score for enemy in enemies.copy()}
+            array = [score for id_, score in dict1.items() if id_ == id]
+            score_tex = text2tex(array[0], 32)
+            display.renderer.blit(
+                score_tex,
+                score_tex.get_rect(
+                    topleft=(display.width / 2, (display.height / 8) + (32 * i))
+                )
             )
 
 
@@ -610,6 +623,7 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
+        self.score = 500
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -694,10 +708,10 @@ class Player:
                 weapon_data[int(self.weapon_anim)]
             except IndexError:
                 self.shooting = False
-                self.weapon_anim = 1
+                self.weapon_anim = 0
                 if self.meleing:
                     self.meleing = False
-
+            
             weapon_tex = weapon_data[int(self.weapon_anim)][0]
             self.weapon_rect = weapon_data[int(self.weapon_anim)][1]
             if self.weapon_ads_offset_target is not None:
@@ -710,10 +724,7 @@ class Player:
                 #         self.weapon_ads_offset_target = None
                 #         self.weapon_ads_offset = 0
 
-            self.weapon_rect.midbottom = (
-                display.width / 2,
-                display.height + self.weapon_reload_offset + self.weapon_ads_offset,
-            )
+        
 
             if self.reloading:
                 # reload down
@@ -727,7 +738,13 @@ class Player:
                     self.reloading = False
                     self.mag = self.new_mag
                     self.ammo = self.new_ammo
+                    self.weapon_reload_offset = 0
                     hud.update_weapon_general(self)
+            
+            self.weapon_rect.midbottom = (
+                display.width / 2,
+                display.height + self.weapon_reload_offset + self.weapon_ads_offset,
+            )
 
             display.renderer.blit(weapon_tex, self.weapon_rect)
 
@@ -746,7 +763,7 @@ class Player:
         if self.to_equip is not None:
             coord, obj = self.to_equip
             weapon_id, weapon_orien = obj
-            weapon_name = weapon_names[int(weapon_id)].title()
+            weapon_name = weapon_names[int(weapon_id)]
             # weapon_name =
             cost = weapon_data[weapon_id]["cost"]
             write(
@@ -804,7 +821,6 @@ class Player:
         if self.to_equip is not None:
             (x, y), obj = self.to_equip
             x, y = int(x), int(y)
-            game.current_object_map[y][x] = "0"
             weapon = obj[0]
             self.set_weapon(weapon)
 
@@ -946,7 +962,6 @@ class Player:
                 self.cast_ray(o, index)
                 o += game.fov / game.ray_density
         _xvel, _yvel = angle_to_vel(self.angle)
-
         self.start_x_px = self.start_x * game.tile_size
         self.start_y_px = self.start_y * game.tile_size
         for enemy in enemies:
@@ -975,13 +990,12 @@ class Player:
                 if weapon_data[self.weapon]["auto"]:
                     mouses = pygame.mouse.get_pressed()
                     shoot_auto = mouses[0]
-                else:
-                    if self.weapon is not None:
-                        if shoot_auto or self.process_shot:
-                            if self.mag == 0:
-                                self.reload()
-                            elif not self.reloading:
-                                self.shoot()
+                if self.weapon is not None:
+                    if shoot_auto or self.process_shot:
+                        if self.mag == 0:
+                            self.reload()
+                        elif not self.reloading:
+                            self.shoot()
 
         # melee?
         if self.process_melee:
@@ -999,7 +1013,7 @@ class Player:
             self.audio_channels[0].set_volume(
                 game.volume
             )  # Might not be necessary, just in case
-            self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
+            # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
 
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
@@ -1209,12 +1223,14 @@ class Player:
                         "x": self.arrow_rect.x + game.mo,
                         "y": self.arrow_rect.y + game.mo,
                         "angle": self.angle,
+                        "score": self.score,
                     },
                 }
             )
         )
 
     def set_weapon(self, weapon):
+        self.weapon_anim = 0
         weapon = int(weapon)
         self.weapon_hud_tex = gtex.mask_object_textures[weapon]
         self.weapon_hud_rect = self.weapon_hud_tex.get_rect(
@@ -1241,16 +1257,24 @@ class Player:
             self.send_location()
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
-                    self.health = max(self.health - int(message.split("|")[1]), 0)
+                    split = message.split("|")
+                    self.health = max(self.health - int(split[2]), 0)
                     hud.update_health(self)
 
                     if self.health <= 0:
                         client_tcp.req(f"kill|{self.tcp_id}")
+                        score_inc = 25
+                        self.score += score_inc
+                        client_tcp.req(f"inc_score|{split[1]}|{score_inc}")
                         game.set_state(States.MAIN_MENU)
 
                     client_tcp.queue.remove(message)
 
-                if message == f"kill|{self.tcp_id}":
+                elif message.startswith("inc_score|"):
+                    self.score += int(message.split("|")[1])
+                    client_tcp.queue.remove(message)
+
+                elif message == f"kill|{self.tcp_id}":
                     game.set_state(States.MAIN_MENU)
                     client_tcp.queue.remove(message)
                     return
@@ -1272,12 +1296,13 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, x=None, y=None, id_=None):
-        self.id: str = id_
-        self.x = int(game.tile_size * rand(0, game.map_width - 3)) if x is None else x
-        self.y = int(game.tile_size * rand(0, game.map_height - 3)) if y is None else y
+    def __init__(self, id=None):
+        self.id: str = id
+        self.x = int(game.tile_size * rand(0, game.map_width - 3))
+        self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
+        self.score = 500
         self.angle = radians(-90) # TODO: Implement enemy direction
         self.indicator = imgload(
             "client", "assets", "images", "minimap", "enemy_indicator.png"
@@ -1314,6 +1339,7 @@ class EnemyPlayer:
                 self.indicator_rect.x = message[self.id]["x"]
                 self.indicator_rect.y = message[self.id]["y"]
                 self.angle = message[self.id]["angle"]
+                self.score = message[self.id]["score"]
 
         self.rendering = False
         # draw_rect(Colors.RED, self.indicator_rect)
@@ -1430,6 +1456,7 @@ class EnemyPlayer:
 
     def die(self):
         try:
+            del leaderboard.texs[self.id]
             enemies.remove(self)
         except:
             pass
@@ -1677,7 +1704,7 @@ def add_enemy(address: str, data: Dict[str, Any]) -> None:
     )
 
     enemies.append(new_enemy)
-    leaderboard.texs.append(text2tex(new_enemy.name, 32))
+    leaderboard.texs[new_enemy.id] = text2tex(new_enemy.name, 32)
 
 
 def render_floor():
@@ -1727,8 +1754,8 @@ def main(multiplayer):
 
                     case "init_res":
                         res = json.loads(split[1])
-                        for id, data in res.items():
-                            add_enemy(id, data)
+                        for e_id, data in res.items():
+                            add_enemy(e_id, data)
 
                         client_tcp.queue.remove(message)
 
@@ -1824,7 +1851,10 @@ def main(multiplayer):
                             player.process_melee = True
 
                         case pygame.K_SPACE:
-                            enemies.append(EnemyPlayer())
+                            pass
+                            # enemies.append(EnemyPlayer())
+                            # client_tcp.req(f"inc_score|{player.tcp_id}|25")
+                            # player.score += 25
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)

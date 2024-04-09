@@ -1,6 +1,6 @@
 {
     "1": {
-        "name": "revolver",
+        "name": "Revolver",
 		"damage": 45,
         "cost": 1000,
         "ammo": 60,
@@ -9,7 +9,7 @@
         "auto": false
     },
     "2": {
-        "name": "knife",
+        "name": "Knife",
         "damage": 80,
         "cost": null,
         "ammo": null,
@@ -17,7 +17,7 @@
         "auto": false
     },
     "3": {
-        "name": "ak-47",
+        "name": "AK-47",
         "damage": 33,
         "cost": 1200,
         "ammo": 180,

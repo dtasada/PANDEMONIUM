@@ -20,3 +20,4 @@
 ### Features
 * Leaderboard & Point system
 * Enemy direction and sounds (including shots & footsteps)
+* Passive healing
