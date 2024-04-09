@@ -124,35 +124,38 @@ def receive_tcp(client: socket.socket, client_addr):
     try:
         while True:
             raw = client.recv(2**12)
-            request = raw.decode().split("|")
-            verb = request[0]  # verb like "kill"
-            target = request[1]  # target is a tcp id (`request[1]` is a string)
+            queue = raw.decode().split("\n")
+            for msg in queue:
+                request = msg.split("|")
+                verb = request[0]  # verb like "kill"
+                target = request[1]  # target is a tcp id (`request[1]` is a string)
 
-            args = []  # every item after the target is an arg, like a damage coef
-            if len(request) >= 3:
-                args = request[2:]
-            try:
-                match verb:
-                    case "init_player":
-                        try:
-                            client.send(
-                                ("init_res|" + json.dumps(tcp_data) + "\n").encode()
-                            )
-                            tcp_data[str(client_addr)] = json.loads(args[0])
+                args = []  # every item after the target is an arg, like a damage coef
+                if len(request) >= 3:
+                    args = request[2:]
+                try:
+                    match verb:
+                        case "init_player":
+                            try:
+                                print("msg:", msg)
+                                client.send(
+                                    ("init_res|" + json.dumps(tcp_data) + "\n").encode()
+                                )
+                                tcp_data[str(client_addr)] = json.loads(args[0])
 
-                            # Introduce to all other players
-                            for client_ in clients.copy():
-                                if client_ != client:
-                                    client_.send(raw + b"\n")
+                                # Introduce to all other players
+                                for client_ in clients.copy():
+                                    if client_ != client:
+                                        client_.send((msg + "\n").encode())
 
-                            for client_ in inactive_clients.copy():
-                                if client.getpeername() == client_.getpeername():
-                                    inactive_clients.remove(client_)
-                                    clients.append(client_)
-                                    id_ = str(client_.getpeername())
-                                    udp_data[id_] = inactive_data[id_]
+                                for client_ in inactive_clients.copy():
+                                    if client.getpeername() == client_.getpeername():
+                                        inactive_clients.remove(client_)
+                                        clients.append(client_)
+                                        id_ = str(client_.getpeername())
+                                        udp_data[id_] = inactive_data[id_]
 
-                            print("Initialized player:", tcp_data[str(client_addr)])
+                                print("Initialized player:", tcp_data[str(client_addr)])
 
                             name = tcp_data[str(client_addr)]["name"]
                             messages = [
@@ -164,42 +167,42 @@ def receive_tcp(client: socket.socket, client_addr):
                             ]
                             feed(choice(messages))
 
-                        except BaseException as e:
-                            alert("Could not init_player", e)
+                            except BaseException as e:
+                                alert("Could not init_player", e)
 
-                    case "quit":
-                        off("quit", target, args)
-                    case "kill":
-                        off("kill", target, args)
+                        case "quit":
+                            off("quit", target, args)
+                        case "kill":
+                            off("kill", target, args)
 
-                    case "inc_score":
-                        udp_data[target]["score"] += int(args[0])
-                        for client_ in clients:
-                            if str(client_.getpeername()) == target:
-                                client_.send(f"inc_score|{args[0]}".encode())
+                        case "inc_score":
+                            udp_data[target]["score"] += int(args[0])
+                            for client_ in clients:
+                                if str(client_.getpeername()) == target:
+                                    client_.send(f"inc_score|{args[0]}".encode())
 
-                    case "shoot":
-                        for client_ in clients.copy():
-                            if client_ != client:
-                                client_.send(raw)
-
-                    case "damage":
-                        try:
-                            tcp_data[target]["health"] = max(
-                                tcp_data[target]["health"] - int(args[0]), 0
-                            )
-
+                        case "shoot":
                             for client_ in clients.copy():
-                                if target == str(client_.getpeername()):
-                                    client_.send(
-                                        f"take_damage|{client_addr}|{args[0]}\n".encode()
-                                    )
+                                if client_ != client:
+                                    client_.send((msg + "\n").encode())
 
-                        except BaseException as e:
-                            alert("Failed to damage player", e)
+                        case "damage":
+                            try:
+                                tcp_data[target]["health"] = max(
+                                    tcp_data[target]["health"] - int(args[0]), 0
+                                )
 
-            except BaseException as e:
-                alert("Error sending TCP message", e)
+                                for client_ in clients.copy():
+                                    if target == str(client_.getpeername()):
+                                        client_.send(
+                                            f"take_damage|{client_addr}|{args[0]}\n".encode()
+                                        )
+
+                            except BaseException as e:
+                                alert("Failed to damage player", e)
+
+                except BaseException as e:
+                    alert("Error sending TCP message", e)
 
     except BaseException as e:
         print(f"Could not handle client {client_addr}", e)
