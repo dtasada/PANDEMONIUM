@@ -79,7 +79,6 @@ class Game:
         self.zoom_speed = 0.4
         self.last_zoom = ticks()
         self.projection_dist = 32 / tan(radians(self.fov / 2))
-        print(self.projection_dist)
         self.rendered_enemies = 0
         # map
         self.maps = {}
@@ -184,7 +183,6 @@ class Game:
                 }
             )
             client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
-            print(f"init_player|{player.tcp_id}|{msg}")
 
         self.previous_state = self.state
         self.state = target_state
@@ -616,7 +614,6 @@ class PlayerSelector:
                         ),
                     )
                     i += 1
-                    print(f"{i}/{imax}")
 
 
 class Player:
@@ -1364,7 +1361,6 @@ class EnemyPlayer:
                     client_tcp.queue.remove(message)
                     return
 
-        # print("enemy health:", self.health)
         self.draw()
         self.regenerate()
 
@@ -1600,12 +1596,6 @@ main_settings_buttons = [
         font_size=48,
     ),
 ]
-
-
-def colors_equal():
-    # print(player_selector.colors_equal, player_selector.prim, player_selector.sec, player_selector.prim == player_selector.sec)
-    return player_selector.prim == player_selector.sec
-
 
 all_buttons = {
     States.MAIN_MENU: [

@@ -157,15 +157,15 @@ def receive_tcp(client: socket.socket, client_addr):
 
                                 print("Initialized player:", tcp_data[str(client_addr)])
 
-                            name = tcp_data[str(client_addr)]["name"]
-                            messages = [
-                                f"say hi to {name}!",
-                                f"{name} also wants to play",
-                                f"{name} hails!",
-                                f"{name} joined",
-                                f"Have much fear, {name} is here!"
-                            ]
-                            feed(choice(messages))
+                                name = tcp_data[str(client_addr)]["name"]
+                                messages = [
+                                    f"say hi to {name}!",
+                                    f"{name} also wants to play",
+                                    f"{name} hails!",
+                                    f"{name} joined",
+                                    f"Have much fear, {name} is here!"
+                                ]
+                                feed(choice(messages))
 
                             except BaseException as e:
                                 alert("Could not init_player", e)
