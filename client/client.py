@@ -306,8 +306,8 @@ class GlobalTextures:
         ]
 
         self.mask_object_textures = []
-        for file_name_with_ext in weapon_names:
-            if file_name_with_ext is None or file_name_with_ext == "knife":
+        for file_name in weapon_names:
+            if file_name is None or file_name == "knife":
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
@@ -317,7 +317,7 @@ class GlobalTextures:
                             "assets",
                             "images",
                             "objects",
-                            file_name_with_ext + ".png",
+                            file_name + ".png",
                         )
                     )
                 ).to_surface(setcolor=Colors.WHITE)
@@ -744,7 +744,6 @@ class Player:
             coord, obj = self.to_equip
             weapon_id, weapon_orien = obj
             weapon_name = weapon_names[int(weapon_id)].title()
-            # weapon_name =
             cost = weapon_costs[weapon_id]
             write(
                 "midbottom",
@@ -801,7 +800,6 @@ class Player:
         if self.to_equip is not None:
             (x, y), obj = self.to_equip
             x, y = int(x), int(y)
-            game.current_object_map[y][x] = "0"
             weapon = obj[0]
             self.set_weapon(weapon)
 
@@ -1254,7 +1252,11 @@ class Player:
 
                     client_tcp.queue.remove(message)
 
-                if message == f"kill|{self.tcp_id}":
+                elif message.startswith("inc_score|"):
+                    self.score += int(message.split("|")[1])
+                    client_tcp.queue.remove(message)
+
+                elif message == f"kill|{self.tcp_id}":
                     game.set_state(States.MAIN_MENU)
                     client_tcp.queue.remove(message)
                     return
@@ -1829,7 +1831,10 @@ def main(multiplayer):
                             player.process_melee = True
 
                         case pygame.K_SPACE:
-                            enemies.append(EnemyPlayer())
+                            pass
+                            # enemies.append(EnemyPlayer())
+                            # client_tcp.req(f"inc_score|{player.tcp_id}|25")
+                            # player.score += 25
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)

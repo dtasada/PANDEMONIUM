@@ -50,6 +50,7 @@ tcp_data: Dict[str, dict[str, Any]] = {}  # values are health, color and name
 udp_data: Dict[str, dict[str, Any]] = {}  # values are x, y, angle
 clients: list[socket.socket] = []
 inactive_clients: list[socket.socket] = []
+inactive_data: Dict[str, dict[str, Any]] = {}
 
 
 def feed(msg: str) -> None:
@@ -81,6 +82,7 @@ def off(opt: str, target: str, args: list[str]):
         }
         feed(messages[opt][randint(0, len(messages[opt]) - 1)])
 
+        saved_score = udp_data[target]["score"]
         del udp_data[target]
         del tcp_data[target]
 
@@ -91,9 +93,10 @@ def off(opt: str, target: str, args: list[str]):
 
             if str(client_.getpeername()) == target:
                 clients.remove(client_)
-                # if not F4ing, move client from clients to inactive_clients, otherwise, completely remove
+                # if not F4ing, move client from clients to inactive, otherwise, completely remove
                 if (opt == "quit" and "f4" not in args) or (opt == "kill"):
                     inactive_clients.append(client_)
+                    inactive_data[target] = {"score": saved_score}
     except BaseException as e:
         alert(f"Failed to {opt} player", e)
 
@@ -145,6 +148,8 @@ def receive_tcp(client: socket.socket, client_addr):
                                 if client.getpeername() == client_.getpeername():
                                     inactive_clients.remove(client_)
                                     clients.append(client_)
+                                    id_ = str(client_.getpeername())
+                                    udp_data[id_] = inactive_data[id_]
 
                             print("Initialized player:", tcp_data[str(client_addr)])
 
@@ -167,8 +172,9 @@ def receive_tcp(client: socket.socket, client_addr):
 
                     case "inc_score":
                         udp_data[target]["score"] += int(args[0])
-                        print("raw:", raw.decode())
-                        print("udp_data:", udp_data)
+                        for client_ in clients:
+                            if str(client_.getpeername()) == target:
+                                client_.send(f"inc_score|{args[0]}".encode())
 
                     case "shoot":
                         for client_ in clients.copy():
