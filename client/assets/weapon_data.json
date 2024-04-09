@@ -15,5 +15,14 @@
         "ammo": null,
         "fire_pause": 800,
         "auto": false
+    },
+    "3": {
+        "name": "ak-47",
+        "damage": 33,
+        "cost": 1200,
+        "ammo": 180,
+        "mag": 30,
+        "fire_pause": 100,
+        "auto": true
     }
 }

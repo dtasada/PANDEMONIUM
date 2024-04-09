@@ -78,6 +78,7 @@ class Game:
         self.zoom_speed = 0.4
         self.last_zoom = ticks()
         self.projection_dist = 32 / tan(radians(self.fov / 2))
+        print(self.projection_dist)
         self.rendered_enemies = 0
         # map
         self.maps = {}
@@ -245,8 +246,8 @@ class GlobalTextures:
     def __init__(self):
         self.x = game.tile_size * 8
         self.y = game.tile_size * 8
-        self.w = 8
-        self.h = 8
+        self.w = 1
+        self.h = 1
         self.id = None
         self.color = Colors.WHITE
         self.angle = radians(-90)
@@ -305,8 +306,8 @@ class GlobalTextures:
         ]
 
         self.mask_object_textures = []
-        for file_name_with_ext in weapon_names:
-            if file_name_with_ext is None or file_name_with_ext == "knife":
+        for file_name_without_ext in weapon_names:
+            if file_name_without_ext is None or file_name_without_ext == "knife":
                 tex = None
             else:
                 surf = pygame.mask.from_surface(
@@ -316,7 +317,7 @@ class GlobalTextures:
                             "assets",
                             "images",
                             "objects",
-                            file_name_with_ext + ".png",
+                            file_name_without_ext + ".png",
                         )
                     )
                 ).to_surface(setcolor=Colors.WHITE)
@@ -362,18 +363,24 @@ class HUD:
         if self.ammo_tex is not None:
             display.renderer.blit(self.ammo_tex, self.ammo_rect)
             w, h = 3, 25
-            for yo in range(weapon_data[player.weapon]["mag"]):
-                color = Colors.WHITE if yo < player.mag else Colors.GRAY
-                yo = -yo * w * 4
-                fill_rect(
-                    color,
-                    (
-                        self.ammo_rect.x + yo - 15,
-                        self.ammo_rect.centery - h / 2 + 2,
-                        w,
-                        h,
-                    ),
-                )
+            mag_size = weapon_data[player.weapon]["mag"]
+            if mag_size <= 16:
+                max_width = 80
+                gap_width = (max_width - w * mag_size) / (mag_size - 1)
+                mult = (gap_width + w)
+                for xo in range(mag_size):
+                    color = Colors.WHITE if xo < player.mag else Colors.GRAY
+                    fill_rect(
+                        color,
+                        (
+                            self.ammo_rect.x - xo * mult - 15,
+                            self.ammo_rect.centery - h / 2 + 2,
+                            w,
+                            h,
+                        ),
+                    )
+            else:
+                display.renderer.blit(self.mag_tex, self.mag_rect)
 
         if self.weapon_name_tex is not None:
             display.renderer.blit(self.weapon_name_tex, self.weapon_name_rect)
@@ -407,14 +414,24 @@ class HUD:
         )
 
     def update_ammo(self, player):
+        mag_size = weapon_data[player.weapon]["mag"]
         self.ammo_tex, self.ammo_rect = write(
             "bottomright",
             player.ammo,
             v_fonts[64],
             Colors.WHITE,
-            display.width - 120,
+            display.width - 150,
             display.height - 4,
         )
+        if mag_size > 16:
+            self.mag_tex, self.mag_rect = write(
+                "midright",
+                mag_size,
+                v_fonts[46 if mag_size > 16 else 64],
+                Colors.WHITE,
+                self.ammo_rect.left,
+                self.ammo_rect.centery
+            )
 
     def update_weapon_name(self, player):
         self.weapon_name_tex, self.weapon_name_rect = write(
@@ -433,7 +450,7 @@ class HUD:
         self.weapon_rect.inflate_ip(
             self.weapon_rect.width * m, self.weapon_rect.height * m
         )
-        self.weapon_rect.center = (display.width - 60, display.height - 40)
+        self.weapon_rect.center = (display.width - 80, display.height - 40)
 
 
 class Leaderboard:
@@ -731,7 +748,7 @@ class Player:
             weapon_id, weapon_orien = obj
             weapon_name = weapon_names[int(weapon_id)].title()
             # weapon_name =
-            cost = weapon_costs[weapon_id]
+            cost = weapon_data[weapon_id]["cost"]
             write(
                 "midbottom",
                 f"Press <e> to buy {weapon_name} [${cost}]",
@@ -1112,14 +1129,12 @@ class Player:
             )
             ray_mult = 1
             dist *= ray_mult
-            dist_px = dist * game.tile_size
+            dist_px = dist * game.tile_size * cos(offset)
             self.rays.append(((p1, p2), dist_px))
             # init vars for walls
             ww = display.width / game.ray_density
             # wh = display.height * game.tile_size / dist_px * 1.7  # brute force
-            wh = (game.projection_dist / dist_px * display.height / 2) / (
-                game.fov / 60
-            )  # maths
+            wh = (game.projection_dist / dist_px * display.height / 2) * (60 / game.fov)  # maths
             wx = index * ww
             wy = display.height / 2 - wh / 2 + self.bob
             # texture calculations
@@ -1257,10 +1272,10 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, id=None):
-        self.id: str = id
-        self.x = int(game.tile_size * rand(0, game.map_width - 3))
-        self.y = int(game.tile_size * rand(0, game.map_height - 3))
+    def __init__(self, x=None, y=None, id_=None):
+        self.id: str = id_
+        self.x = int(game.tile_size * rand(0, game.map_width - 3)) if x is None else x
+        self.y = int(game.tile_size * rand(0, game.map_height - 3)) if y is None else y
         self.w = 8
         self.h = 8
         self.angle = radians(-90) # TODO: Implement enemy direction
@@ -1331,8 +1346,9 @@ class EnemyPlayer:
             diff2 = angle_diff(angle, end_angle)
             ratio = (diff1) / (diff1 + diff2)
             centerx = ratio * display.width
-            centery = display.height / 2 + player.bob
-            height = game.projection_dist / self.dist_px * display.height / 2  # maths
+            wall_height = (game.projection_dist / self.dist_px * display.height / 2) / (game.fov / 60)  # maths
+            centery = display.height / 2 + player.bob + wall_height * 0.2
+            height = wall_height * 0.8  # maths
             width = height / self.image.height * self.image.width
             # rects
             og_width, og_height = 232 / 2, 400 / 2
@@ -1384,6 +1400,7 @@ class EnemyPlayer:
             self.arm2_rect.topleft = self.shoulder2_rect.topright
             # rest
             display.renderer.blit(self.image, self.rect)
+            draw_rect(Colors.YELLOW, self.rect)
             """
             draw_rect(Colors.YELLOW, self.rect)
             draw_rect(Colors.ORANGE, self.head_rect)
@@ -1420,21 +1437,21 @@ class EnemyPlayer:
 
 class Crosshair:
     def __init__(self):
-        self.w = 4  # width
+        self.w = 3  # width
         self.l = 20  # length
         self.target_offset = self.o = 50  # self.o is offset
-       
+
     def update(self):
         if game.target_zoom > 0:
             self.target_offset = 4
             self.l = 10
             self.zooming_mult = 0.15
         else:
-            self.l = 20
+            self.l = 15
             if player.moving:
-                self.target_offset = 100
+                self.target_offset = 60
             else:
-                self.target_offset = 50
+                self.target_offset = 20
             self.zooming_mult = 0.05
         self.o += (self.target_offset - self.o) * self.zooming_mult
         self.center = (display.width / 2 - self.w / 2, display.height / 2 - self.w / 2, self.w, self.w)
@@ -1646,7 +1663,7 @@ joystick_button_rect = joystick_button_sprs[0].get_rect()
 
 
 def add_enemy(address: str, data: Dict[str, Any]) -> None:
-    new_enemy = EnemyPlayer(address)
+    new_enemy = EnemyPlayer(id_=address)
     new_enemy.health = data["health"]
     new_enemy.name = data["name"]
 
@@ -1842,6 +1859,7 @@ def main(multiplayer):
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.bob),
             )
+            # display.renderer.blit(sky_tex, sky_rect)
             fill_rect(
                 Colors.BROWN,
                 (

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from random import randint
+from random import randint, choice
 from threading import Thread
 from typing import Any, Dict
 import atexit
@@ -154,8 +154,9 @@ def receive_tcp(client: socket.socket, client_addr):
                                 f"{name} also wants to play",
                                 f"{name} hails!",
                                 f"{name} joined",
+                                f"Have much fear, {name} is here!"
                             ]
-                            feed(messages[randint(0, len(messages) - 1)])
+                            feed(choice(messages))
 
                         except BaseException as e:
                             alert("Could not init_player", e)

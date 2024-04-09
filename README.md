@@ -14,8 +14,6 @@
 ### Bugs
 * FLOOR AND CEILING TEXTURES
 * Fix ADS with single ray
-* Fix enemy height
-* Fix fisheye bug
 * Fix mouse flickering
 * Fix shooting and ADSing through walls
 

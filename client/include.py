@@ -611,10 +611,6 @@ cursor = Cursor()
 client_udp: Client = None
 client_tcp: Client = None
 
-
-weapon_costs = {
-    "1": 1200,
-}
 with open(Path("client", "assets", "weapon_data.json"), "r") as f:
     weapon_data = json.load(f)
 weapon_names = [None] + [v["name"] for k, v in weapon_data.items()]
@@ -652,3 +648,7 @@ class Sounds:
             Path("client", "assets", "sounds", "sfx", "footsteps")
         )
     }
+
+
+sky_tex = imgload("client", "assets", "images", "sky.jpeg")
+sky_rect = pygame.Rect(0, 0, display.width, display.height)
