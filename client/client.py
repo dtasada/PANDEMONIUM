@@ -139,7 +139,7 @@ class Game:
         self.map_tex = Texture.from_surface(display.renderer, self.map_surf)
         self.mo = self.tile_size * 0
         self.map_rect = self.map_tex.get_rect(topleft=(self.mo, self.mo))
-        self.fps_list = (30, 60, 120, 144, 240)
+        self.fps_list = (30, 60, 120, 144, 240, 1000)
 
     @property
     def rect_list(self):
@@ -149,10 +149,11 @@ class Game:
         self.running = False
 
     def set_state(self, target_state):
-        global player, hud
+        global player, hud, leaderboard
         if target_state == States.MAIN_MENU:
             player = Player()
             hud = HUD()
+            leaderboard = Leaderboard()
             hud.update_health(player)
         if (
             target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
@@ -171,7 +172,7 @@ class Game:
             and self.state == States.MAIN_MENU
         ):
             # All launch & init requirements
-            leaderboard.texs.append(text2tex(username_input.text, 32))
+            leaderboard.texs[player.tcp_id] = text2tex(username_input.text, 32)
             msg = json.dumps(
                 {
                     "health": player.health,
@@ -438,15 +439,27 @@ class HUD:
 
 class Leaderboard:
     def __init__(self):
-        self.texs: list[Texture] = []
+        self.texs: Dict[str, Texture] = {}
 
     def update(self):
-        for i, tex in enumerate(self.texs):
+        for i, (id, tex) in enumerate(self.texs.items()):
+            # Name
             display.renderer.blit(
                 tex,
                 tex.get_rect(
                     topleft=(display.width / 4, (display.height / 8) + (32 * i))
                 ),
+            )
+
+            # Score
+            dict1 = {player.tcp_id: player.score} | {enemy.id: enemy.score for enemy in enemies.copy()}
+            array = [score for id_, score in dict1.items() if id_ == id]
+            score_tex = text2tex(array[0], 32)
+            display.renderer.blit(
+                score_tex,
+                score_tex.get_rect(
+                    topleft=(display.width / 2, (display.height / 8) + (32 * i))
+                )
             )
 
 
@@ -593,6 +606,7 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
+        self.score = 500
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -1194,6 +1208,7 @@ class Player:
                         "x": self.arrow_rect.x + game.mo,
                         "y": self.arrow_rect.y + game.mo,
                         "angle": self.angle,
+                        "score": self.score,
                     },
                 }
             )
@@ -1226,11 +1241,15 @@ class Player:
             self.send_location()
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
-                    self.health = max(self.health - int(message.split("|")[1]), 0)
+                    split = message.split("|")
+                    self.health = max(self.health - int(split[2]), 0)
                     hud.update_health(self)
 
                     if self.health <= 0:
                         client_tcp.req(f"kill|{self.tcp_id}")
+                        score_inc = 25
+                        self.score += score_inc
+                        client_tcp.req(f"inc_score|{split[1]}|{score_inc}")
                         game.set_state(States.MAIN_MENU)
 
                     client_tcp.queue.remove(message)
@@ -1257,12 +1276,13 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, id=None):
-        self.id: str = id
+    def __init__(self, id_=None):
+        self.id: str = id_
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
         self.h = 8
+        self.score = 500
         self.angle = radians(-90) # TODO: Implement enemy direction
         self.indicator = imgload(
             "client", "assets", "images", "minimap", "enemy_indicator.png"
@@ -1299,6 +1319,7 @@ class EnemyPlayer:
                 self.indicator_rect.x = message[self.id]["x"]
                 self.indicator_rect.y = message[self.id]["y"]
                 self.angle = message[self.id]["angle"]
+                self.score = message[self.id]["score"]
 
         self.rendering = False
         # draw_rect(Colors.RED, self.indicator_rect)
@@ -1413,6 +1434,7 @@ class EnemyPlayer:
 
     def die(self):
         try:
+            del leaderboard.texs[self.id]
             enemies.remove(self)
         except:
             pass
@@ -1660,7 +1682,7 @@ def add_enemy(address: str, data: Dict[str, Any]) -> None:
     )
 
     enemies.append(new_enemy)
-    leaderboard.texs.append(text2tex(new_enemy.name, 32))
+    leaderboard.texs[new_enemy.id] = text2tex(new_enemy.name, 32)
 
 
 def render_floor():
@@ -1710,8 +1732,8 @@ def main(multiplayer):
 
                     case "init_res":
                         res = json.loads(split[1])
-                        for id, data in res.items():
-                            add_enemy(id, data)
+                        for e_id, data in res.items():
+                            add_enemy(e_id, data)
 
                         client_tcp.queue.remove(message)
 
