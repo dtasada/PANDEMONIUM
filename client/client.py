@@ -1297,8 +1297,8 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, id=None):
-        self.id: str = id
+    def __init__(self, id_=None):
+        self.id: str = id_
         self.x = int(game.tile_size * rand(0, game.map_width - 3))
         self.y = int(game.tile_size * rand(0, game.map_height - 3))
         self.w = 8
