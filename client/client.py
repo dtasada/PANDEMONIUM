@@ -8,6 +8,7 @@ from pathlib import Path
 from pygame._sdl2.video import Texture, Image
 from threading import Thread
 from random import randint as rand
+from random import uniform as randf
 from typing import Dict
 
 from .include import *
@@ -1015,7 +1016,12 @@ class Player:
                 game.volume
             )  # Might not be necessary, just in case
             # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
-            bullet_pos = display.center
+            bullet_pos = list(display.center)
+            radius = randf(0, crosshair.radius)
+            angle = randf(0, 2 * pi)
+            bullet_pos[0] += cos(angle) * radius
+            bullet_pos[1] += sin(angle) * radius
+            shots.append(Shot(bullet_pos))
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
                     if enemy.rect.collidepoint(bullet_pos):
@@ -1471,7 +1477,7 @@ class Crosshair:
     
     @property
     def radius(self):
-        return self.bottom.top - display.width / 2
+        return self.bottom[1] - display.height / 2
 
     def update(self):
         if game.target_zoom > 0:
@@ -1505,6 +1511,9 @@ class Shot:
         self.alpha = 255
     
     def update(self):
+        if self.alpha < 0:
+            shots.remove(self)
+            return
         fill_rect([0, 0, 0, self.alpha], (self.x - self.r, self.y - self.r, self.r * 2, self.r * 2))
         self.alpha -= 15 * game.dt
 
@@ -1520,6 +1529,7 @@ gtex = GlobalTextures()
 leaderboard = Leaderboard()
 enemies: list[EnemyPlayer] = []
 feed: list[tuple[Texture, int]] = []
+shots: list[Shot] = []
 clock = pygame.time.Clock()
 joystick: pygame.joystick.JoystickType = None
 
@@ -1926,6 +1936,8 @@ def main(multiplayer):
             hud.update()
 
             display.renderer.blit(redden_game.tex, redden_game.rect)
+            for shot in shots:
+                shot.update()
 
         if game.state == States.PLAY:
             game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
