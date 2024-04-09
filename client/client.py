@@ -182,6 +182,7 @@ class Game:
                 }
             )
             client_tcp.req(f"init_player|{player.tcp_id}|{msg}")
+            print(f"init_player|{player.tcp_id}|{msg}")
 
         self.previous_state = self.state
         self.state = target_state
@@ -1728,7 +1729,7 @@ def main(multiplayer):
 
                     case "feed":
                         global feed
-                        feed.append((text2tex(message.split("|")[1], 32), ticks()))
+                        feed.append((text2tex(split[1], 32), ticks()))
 
                         client_tcp.queue.remove(message)
 

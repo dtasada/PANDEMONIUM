@@ -388,15 +388,15 @@ class Client(socket.socket):
                     + f"{Colors.ANSI_BOLD}Use the {Colors.ANSI_ITALIC}--no-multiplayer{Colors.ANSI_RESET}{Colors.ANSI_BOLD} flag to run the game offline"
                 )
 
-    def req(self, message) -> None:
+    def req(self, message: str) -> None:
         """
         send message to server without waiting for response
         """
         if self.conn_type == "udp":
-            self.sendto(str(message).encode(), self.target_server)
+            self.sendto((message + "\n").encode(), self.target_server)
 
         if self.conn_type == "tcp":
-            self.send(str(message).encode())
+            self.send((message + "\n").encode())
 
     def req_res(self, *messages: str) -> str:
         """
@@ -404,10 +404,10 @@ class Client(socket.socket):
         """
         for message in messages:
             if self.conn_type == "udp":
-                self.sendto(str(message).encode(), self.target_server)
+                self.sendto((message + "\n").encode(), self.target_server)
 
             if self.conn_type == "tcp":
-                self.send(str(message).encode())
+                self.send((message + "\n").encode())
 
             response = ""
             while not response:
