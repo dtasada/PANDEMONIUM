@@ -22,7 +22,7 @@
         "cost": 1200,
         "ammo": 180,
         "mag": 30,
-        "fire_pause": 100,
+        "fire_pause": 150,
         "auto": true
     }
 }

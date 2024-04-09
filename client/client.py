@@ -427,12 +427,12 @@ class HUD:
         )
         if max_mag_size > 16:
             self.mag_tex, self.mag_rect = write(
-                "midright",
+                "bottomright",
                 player.mag,
-                v_fonts[46 if max_mag_size > 16 else 64],
+                v_fonts[46],
                 Colors.WHITE,
-                self.ammo_rect.left,
-                self.ammo_rect.centery
+                self.ammo_rect.left - 5,
+                self.ammo_rect.bottom
             )
 
     def update_weapon_name(self, player):
@@ -1015,21 +1015,21 @@ class Player:
                 game.volume
             )  # Might not be necessary, just in case
             # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
-
+            bullet_pos = display.center
             for enemy in enemies:
                 if enemy.rendering and not enemy.regenerating:
-                    if enemy.rect.collidepoint(display.center):
+                    if enemy.rect.collidepoint(bullet_pos):
                         # the body in general is hit
                         mult = 1
                         if not melee:
-                            if enemy.head_rect.collidepoint(display.center):
+                            if enemy.head_rect.collidepoint(bullet_pos):
                                 mult = 1.4
                             elif (
-                                enemy.legs_rect.collidepoint(display.center)
-                                or enemy.shoulder1_rect.collidepoint(display.center)
-                                or enemy.shoulder2_rect.collidepoint(display.center)
-                                or enemy.arm1_rect.collidepoint(display.center)
-                                or enemy.arm2_rect.collidepoint(display.center)
+                                enemy.legs_rect.collidepoint(bullet_pos)
+                                or enemy.shoulder1_rect.collidepoint(bullet_pos)
+                                or enemy.shoulder2_rect.collidepoint(bullet_pos)
+                                or enemy.arm1_rect.collidepoint(bullet_pos)
+                                or enemy.arm2_rect.collidepoint(bullet_pos)
                             ):
                                 mult = 0.5
                         enemy.hit(mult)
@@ -1468,6 +1468,10 @@ class Crosshair:
         self.w = 3  # width
         self.l = 20  # length
         self.target_offset = self.o = 50  # self.o is offset
+    
+    @property
+    def radius(self):
+        return self.bottom.top - display.width / 2
 
     def update(self):
         if game.target_zoom > 0:
@@ -1492,6 +1496,17 @@ class Crosshair:
         fill_rect(Colors.WHITE, self.left)
         fill_rect(Colors.WHITE, self.bottom)
         fill_rect(Colors.WHITE, self.top)
+
+
+class Shot:
+    def __init__(self, pos):
+        self.x, self.y = pos
+        self.r = 2
+        self.alpha = 255
+    
+    def update(self):
+        fill_rect([0, 0, 0, self.alpha], (self.x - self.r, self.y - self.r, self.r * 2, self.r * 2))
+        self.alpha -= 15 * game.dt
 
 
 crosshair = Crosshair()
@@ -1775,9 +1790,9 @@ def main(multiplayer):
                                     volume = 1
 
                                 enemy.audio_channels[0].set_volume(volume)
-                                enemy.audio_channels[0].play(
-                                    weapon_data[split[2]]["shot_sound"]
-                                )
+                                # enemy.audio_channels[0].play(
+                                #     weapon_data[split[2]]["shot_sound"]
+                                # )
 
                         client_tcp.queue.remove(message)
 
