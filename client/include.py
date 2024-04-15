@@ -1,5 +1,5 @@
 from enum import Enum
-from math import sin, cos, atan2
+from math import sin, cos, atan2, e, pi
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture
 from typing import Any, Optional, TypeAlias

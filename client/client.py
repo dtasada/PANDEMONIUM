@@ -642,9 +642,12 @@ class Player:
         self.shooting = False
         self.reloading = False
         self.reload_direc = 1
+        # offsets
         self.weapon_reload_offset = 0
         self.weapon_ads_offset = 0
         self.weapon_ads_offset_target = None
+        self.weapon_recoil_offset = 0
+        # rest
         self.health = 100
         self.meleing = False
         self.moving = False
@@ -960,7 +963,6 @@ class Player:
             for index in range(game.ray_density + 1):
                 self.cast_ray(o, index)
                 o += game.fov / game.ray_density
-        _xvel, _yvel = angle_to_vel(self.angle)
         self.start_x_px = self.start_x * game.tile_size
         self.start_y_px = self.start_y * game.tile_size
         for enemy in enemies:
@@ -999,6 +1001,10 @@ class Player:
         # melee?
         if self.process_melee:
             self.melee()
+        
+        # recoil
+        if self.shooting:
+            print("as", rand(0, 10))
 
         # check whether reloading
         if self.reloading:
@@ -1470,6 +1476,7 @@ class Crosshair:
         self.w = 3  # width
         self.l = 20  # length
         self.target_offset = self.o = 50  # self.o is offset
+        self.recoil_func = lambda x: -e ** (-x + pi) * sin(x + pi)
     
     @property
     def radius(self):
