@@ -393,41 +393,23 @@ class Client(socket.socket):
         send message to server without waiting for response
         """
         if self.conn_type == "udp":
-            self.sendto((message + "\n").encode(), self.target_server)
+            self.sendto(message.encode(), self.target_server)
 
         if self.conn_type == "tcp":
+            print("message:", message)
             self.send((message + "\n").encode())
-
-    def req_res(self, *messages: str) -> str:
-        """
-        send message to server and wait for response
-        """
-        for message in messages:
-            if self.conn_type == "udp":
-                self.sendto((message + "\n").encode(), self.target_server)
-
-            if self.conn_type == "tcp":
-                self.send((message + "\n").encode())
-
-            response = ""
-            while not response:
-                data, _ = self.recvfrom(2**12)
-                if data:
-                    response = data.decode()
-
-            return response
 
     def receive(self):
         if self.conn_type == "udp":
             while True:
                 while self.running:
-                    data, _ = self.recvfrom(2**12)
+                    data, _ = self.recvfrom(2**16)
                     self.current_message = data.decode()
 
         elif self.conn_type == "tcp":
             while True:
                 while self.running:
-                    data = self.recv(2**12).decode()
+                    data = self.recv(2**16).decode()
                     messages = data.split("\n")
 
                     [self.queue.append(message) for message in messages if message]

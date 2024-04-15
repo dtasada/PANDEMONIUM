@@ -38,7 +38,7 @@ except BaseException as e:
 try:
     server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_tcp.bind((SERVER_ADDRESS, SERVER_TCP_PORT))
-    server_tcp.listen(10)
+    server_tcp.listen()
     print(
         f"{Colors.GREEN}TCP server is listening at {SERVER_ADDRESS}:{SERVER_TCP_PORT}{Colors.RESET}"
     )
@@ -104,7 +104,7 @@ def off(opt: str, target: str, args: list[str]):
 
 def receive_udp():
     while True:
-        request, addr = server_udp.recvfrom(2**12)
+        request, addr = server_udp.recvfrom(2**16)
         request = json.loads(request)
         udp_data[request["tcp_id"]] = request["body"]
         udp_data[request["tcp_id"]][
@@ -123,7 +123,7 @@ def receive_udp():
 def receive_tcp(client: socket.socket, client_addr):
     try:
         while True:
-            raw = client.recv(2**12)
+            raw = client.recv(2**16)
             queue = raw.decode().split("\n")
             for msg in queue:
                 request = msg.split("|")
@@ -163,7 +163,7 @@ def receive_tcp(client: socket.socket, client_addr):
                                     f"{name} also wants to play",
                                     f"{name} hails!",
                                     f"{name} joined",
-                                    f"Have much fear, {name} is here!"
+                                    f"Have much fear, {name} is here!",
                                 ]
                                 feed(choice(messages))
 
@@ -179,7 +179,7 @@ def receive_tcp(client: socket.socket, client_addr):
                             udp_data[target]["score"] += int(args[0])
                             for client_ in clients:
                                 if str(client_.getpeername()) == target:
-                                    client_.send(f"inc_score|{args[0]}".encode())
+                                    client_.send(f"inc_score|{args[0]}\n".encode())
 
                         case "shoot":
                             for client_ in clients.copy():
