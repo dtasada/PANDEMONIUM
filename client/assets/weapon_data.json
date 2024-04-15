@@ -6,7 +6,9 @@
         "ammo": 60,
         "mag": 6,
         "fire_pause": 300,
-        "auto": false
+        "auto": false,
+        "recoil_mult": 20,
+        "recoil_time": 800
     },
     "2": {
         "name": "Knife",
@@ -23,6 +25,8 @@
         "ammo": 180,
         "mag": 30,
         "fire_pause": 150,
-        "auto": true
+        "auto": true,
+        "recoil_mult": 2.5,
+        "recoil_time": 300
     }
 }

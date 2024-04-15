@@ -437,7 +437,7 @@ class HUD:
     def update_weapon_name(self, player):
         self.weapon_name_tex, self.weapon_name_rect = write(
             "bottomright",
-            weapon_names[int(player.weapon)].title(),
+            weapon_names[int(player.weapon)],
             v_fonts[32],
             Colors.WHITE,
             display.width - 16,
@@ -634,19 +634,24 @@ class Player:
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
         # weapon and shooting tech
-        self.weapons = []
-        self.ammos = []
-        self.mags = []
+        self.weapons = [None, None]
+        self.ammos = [None, None]
+        self.mags = [None, None]
         self.weapon_index = 0
         self.weapon_anim = 1
+        # dynamic offsets and stuff
         self.shooting = False
         self.reloading = False
+        self.switching_weapons = False
         self.reload_direc = 1
-        # offsets
+        self.weapon_switch_direc = 1
         self.weapon_reload_offset = 0
+        self.weapon_switch_offset = 0
         self.weapon_ads_offset = 0
         self.weapon_ads_offset_target = None
         self.weapon_recoil_offset = 0
+        self.weapon_recoil_func = lambda x: -e ** (-x + pi) * sin(x + pi)
+        self.last_recoil = None
         # rest
         self.health = 100
         self.meleing = False
@@ -671,6 +676,14 @@ class Player:
         # sound
         for channel in self.audio_channels:
             channel.set_volume(game.volume)
+    
+    @property
+    def view_yoffset(self):
+        return self.bob + self.weapon_recoil_offset
+    
+    @property
+    def can_shoot(self):
+        return not self.reloading and not self.switching_weapons
 
     @property
     def weapon(self):
@@ -743,9 +756,23 @@ class Player:
                     self.weapon_reload_offset = 0
                     hud.update_weapon_general(self)
             
+            if self.switching_weapons:
+                # switch down
+                if (
+                    self.weapon_switch_direc == 1
+                    and self.weapon_rect.y >= display.height - 180
+                ):
+                    self.weapon_switch_direc = -self.weapon_switch_direc
+                    self.weapon_index = int(not self.weapon_index)  # 0 -> 1, 1 -> 0
+                    hud.update_weapon_general(self)
+                # reload back up and get the ammo and magazine that was promised to you beforehand
+                if self.weapon_switch_direc == -1 and self.weapon_switch_offset <= 0:
+                    self.switching_weapons = False
+                    self.weapon_switch_offset = 0
+            
             self.weapon_rect.midbottom = (
                 display.width / 2,
-                display.height + self.weapon_reload_offset + self.weapon_ads_offset,
+                display.height + self.weapon_reload_offset + self.weapon_switch_offset + self.weapon_ads_offset,
             )
 
             display.renderer.blit(weapon_tex, self.weapon_rect)
@@ -821,10 +848,15 @@ class Player:
 
     def try_to_buy_wall_weapon(self):
         if self.to_equip is not None:
+            # actually buy the wall weapon
             (x, y), obj = self.to_equip
             x, y = int(x), int(y)
             weapon = obj[0]
             self.set_weapon(weapon)
+        else:
+            # switch weapons
+            self.switching_weapons = True
+            self.weapon_switch_direc = 1
 
     def keys(self):
         # keyboard
@@ -834,7 +866,7 @@ class Player:
             # doing the ADS
             mouses = pygame.mouse.get_pressed()
             if mouses[2]:  # right mouse button
-                if not self.adsing and not self.reloading:
+                if not self.adsing and self.can_shoot:
                     if self.weapon is not None:
                         game.target_zoom = 15
                         game.zoom = 0
@@ -995,7 +1027,7 @@ class Player:
                     if shoot_auto or self.process_shot:
                         if self.mag == 0:
                             self.reload()
-                        elif not self.reloading:
+                        elif self.can_shoot:
                             self.shoot()
 
         # melee?
@@ -1003,18 +1035,28 @@ class Player:
             self.melee()
         
         # recoil
-        if self.shooting:
-            print("as", rand(0, 10))
+        if self.last_recoil is not None:
+            elapsed = ticks() - self.last_recoil
+            recoil_mult = weapon_data[self.weapon]["recoil_mult"]
+            recoil_time = weapon_data[self.weapon]["recoil_time"]
+            x = elapsed / recoil_time * 2 * pi
+            self.weapon_recoil_offset = self.weapon_recoil_func(x) * recoil_mult
+            if x >= 3 * pi:
+                self.last_recoil = None
 
-        # check whether reloading
+        # check whether reloading or switching weapons
         if self.reloading:
             m = 6
             self.weapon_reload_offset += self.reload_direc * m * game.dt
+        if self.switching_weapons:
+            m = 12
+            self.weapon_switch_offset += self.weapon_switch_direc * m * game.dt
 
     def shoot(self, melee=False):
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
+            self.last_recoil = ticks()
             self.audio_channels[0].set_volume(
                 game.volume
             )  # Might not be necessary, just in case
@@ -1160,7 +1202,7 @@ class Player:
             # wh = display.height * game.tile_size / dist_px * 1.7  # brute force
             wh = (game.projection_dist / dist_px * display.height / 2) * (60 / game.fov)  # maths
             wx = index * ww
-            wy = display.height / 2 - wh / 2 + self.bob
+            wy = display.height / 2 - wh / 2 + self.view_yoffset
             # texture calculations
             cur_pix_x = cur_x * game.tile_size
             cur_pix_y = cur_y * game.tile_size
@@ -1194,6 +1236,12 @@ class Player:
             tex = gtex.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
             tex.color = [int(min(wh * 2 / display.height * 255, 255))] * 3
+            # LSD SIMULATOR DONT DELETE
+            # tex.color = [
+            #     ((sin(ticks() * 0.01) + 1) / 2 * 255),
+            #     ((sin(ticks() * 0.01 + (1 / 3) * 2 * pi) + 1) / 2 * 255),
+            #     ((sin(ticks() * 0.01 + (2 / 3) * 2 * pi) + 1) / 2 * 255),
+            # ]
             self.walls_to_render.append(
                 (
                     dist_px,
@@ -1247,19 +1295,19 @@ class Player:
             bottomright=(display.width - 160, display.height - 10)
         ).scale_by(4)
         weapon = str(weapon)
-        if len(self.weapons) == 2:
+        if self.weapons.count(None) == 0:  # no empty weapon slots
             self.weapons[self.weapon_index] = weapon
             self.ammos[self.weapon_index] = weapon_data[weapon]["ammo"]
             self.mags[self.weapon_index] = weapon_data[weapon]["mag"]
-        elif len(self.weapons) == 1:
+        elif self.weapons.count(None) == 1:  # one empty weapon slots
             self.weapons[1] = weapon
             self.ammos[1] = weapon_data[weapon]["ammo"]
             self.mags[1] = weapon_data[weapon]["mag"]
             self.weapon_index = 1
-        else:
-            self.weapons.append(weapon)
-            self.ammos.append(weapon_data[weapon]["ammo"])
-            self.mags.append(weapon_data[weapon]["mag"])
+        else:  # two empty weapon slots
+            self.weapons[0] = weapon
+            self.ammos[0] = weapon_data[weapon]["ammo"]
+            self.mags[0] = weapon_data[weapon]["mag"]
         hud.update_weapon_general(self)
 
     def update(self):
@@ -1382,7 +1430,7 @@ class EnemyPlayer:
             ratio = (diff1) / (diff1 + diff2)
             centerx = ratio * display.width
             wall_height = (game.projection_dist / self.dist_px * display.height / 2) / (game.fov / 60)  # maths
-            centery = display.height / 2 + player.bob + wall_height * 0.2
+            centery = display.height / 2 + player.view_yoffset + wall_height * 0.2
             height = wall_height * 0.8  # maths
             width = height / self.image.height * self.image.width
             # rects
@@ -1476,7 +1524,6 @@ class Crosshair:
         self.w = 3  # width
         self.l = 20  # length
         self.target_offset = self.o = 50  # self.o is offset
-        self.recoil_func = lambda x: -e ** (-x + pi) * sin(x + pi)
     
     @property
     def radius(self):
@@ -1735,9 +1782,9 @@ def render_floor():
         Colors.BROWN,
         (
             0,
-            display.height / 2 + player.bob,
+            display.height / 2 + player.view_yoffset,
             display.width,
-            display.height / 2 - player.bob,
+            display.height / 2 - player.view_yoffset,
         ),
     )
 
@@ -1910,16 +1957,16 @@ def main(multiplayer):
         if game.state in (States.PLAY, States.PLAY_SETTINGS):
             fill_rect(
                 Colors.DARK_GRAY,
-                (0, 0, display.width, display.height / 2 + player.bob),
+                (0, 0, display.width, display.height / 2 + player.view_yoffset),
             )
             # display.renderer.blit(sky_tex, sky_rect)
             fill_rect(
                 Colors.BROWN,
                 (
                     0,
-                    display.height / 2 + player.bob,
+                    display.height / 2 + player.view_yoffset,
                     display.width,
-                    display.height / 2 - player.bob,
+                    display.height / 2 - player.view_yoffset,
                 ),
             )
 
