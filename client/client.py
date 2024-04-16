@@ -525,6 +525,7 @@ class PlayerSelector:
         self.black_tex = Texture.from_surface(display.renderer, self.black_surf)
 
     def init(self):
+        unleash_button = all_buttons[States.MAIN_MENU][1]
         self.menu_bg_surf = pygame.Surface(
             (unleash_button.rect.width + 40, 220), pygame.SRCALPHA
         )
@@ -535,12 +536,13 @@ class PlayerSelector:
         )
 
     def update(self):
-        # fill_rect((0, 0, 0, 120), outline)
         display.renderer.blit(self.black_tex, self.outline)
         display.renderer.blit(self.menu_bg_tex, self.menu_bg_rect)
-        # draw_rect(Colors.WHITE, self.outline)
         display.renderer.blit(self.tex, self.rect)
-        # draw_rect(Colors.RED, self.rect)
+
+        prim_skin_button = all_buttons[States.MAIN_MENU][5]
+        sec_skin_button = all_buttons[States.MAIN_MENU][6]
+
         write(
             "midleft",
             self.color_keys[self.prim_color].replace("_", " "),
@@ -1742,9 +1744,6 @@ all_buttons = {
         ),
     ], 
 }
-prim_skin_button = all_buttons[States.MAIN_MENU][4]
-sec_skin_button = all_buttons[States.MAIN_MENU][5]
-unleash_button = all_buttons[States.MAIN_MENU][1]
 player_selector.init()
 
 username_input = UserInput(
