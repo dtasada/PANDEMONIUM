@@ -83,16 +83,12 @@ def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
         }
         feed(messages[opt][randint(0, len(messages[opt]) - 1)])
 
-        if killer:
-            udp_data[killer]["kills"] += 1
-        udp_data[target]["deaths"] += 1
         saved_data = udp_data[target]
         del udp_data[target]
         del tcp_data[target]
 
         for client_ in clients.copy():
             if client_ != client:
-                print(f"sending sig to {opt} {target}")
                 client_.send(f"{opt}|{target}\n".encode())
 
             if str(client_.getpeername()) == target:
@@ -105,6 +101,7 @@ def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
                         "kills": saved_data["kills"],
                         "score": saved_data["score"],
                     }
+
     except BaseException as e:
         alert(f"Failed to {opt} player", e)
 
@@ -113,18 +110,13 @@ def receive_udp():
     while True:
         request, addr = server_udp.recvfrom(2**12)
         request = json.loads(request)
-        udp_data[request["tcp_id"]] = request["body"]
+        udp_data[request["tcp_id"]].update(request["body"])
         udp_data[request["tcp_id"]][
             "udp_id"
         ] = addr  # careful, this is a tuple, not a string
 
-        for tcp_id, content in udp_data.copy().items():
-            try:
-                response = {k: v for k, v in udp_data.copy().items() if k != tcp_id}
-                response = json.dumps(response)
-                server_udp.sendto(response.encode(), content["udp_id"])
-            except:
-                pass
+        for v in udp_data.values():
+            server_udp.sendto(json.dumps(udp_data).encode(), v["udp_id"])
 
 
 def receive_tcp(client: socket.socket, client_addr):
@@ -143,11 +135,15 @@ def receive_tcp(client: socket.socket, client_addr):
                 match verb:
                     case "init_player":
                         try:
-                            print("msg:", msg)
                             client.send(
                                 ("init_res|" + json.dumps(tcp_data) + "\n").encode()
                             )
                             tcp_data[str(client_addr)] = json.loads(args[0])
+                            udp_data[str(client_addr)] = {
+                                "kills": 0,
+                                "deaths": 0,
+                                "score": 500,
+                            }
 
                             # Introduce to all other players
                             for client_ in clients.copy():
@@ -156,12 +152,12 @@ def receive_tcp(client: socket.socket, client_addr):
 
                             for client_ in inactive_clients.copy():
                                 if client.getpeername() == client_.getpeername():
+                                    id_ = str(client_.getpeername())
+
                                     inactive_clients.remove(client_)
                                     clients.append(client_)
-                                    id_ = str(client_.getpeername())
                                     udp_data[id_] = inactive_data[id_]
-
-                            print("Initialized player:", tcp_data[str(client_addr)])
+                                    del inactive_data[id_]
 
                             name = tcp_data[str(client_addr)]["name"]
                             messages = [
@@ -197,6 +193,11 @@ def receive_tcp(client: socket.socket, client_addr):
                             tcp_data[target]["health"] = max(
                                 tcp_data[target]["health"] - int(args[0]), 0
                             )
+
+                            if tcp_data[target]["health"] <= 0:
+                                udp_data[target]["deaths"] += 1
+                                udp_data[str(client_addr)]["kills"] += 1
+                                # Rest of death handling is done elsewhere
 
                             for client_ in clients.copy():
                                 if target == str(client_.getpeername()):

@@ -37,7 +37,17 @@
         "fire_pause": 150,
         "auto": true,
         "recoil_mult": 2.5,
-        "recoil_time": 300
+        "recoil_time": 300,
+		"shot_sound": [
+			"client",
+            "assets",
+            "sounds",
+            "gun_sounds",
+            "Full Sound",
+            "7.62x39",
+            "MP3",
+            "762x39 Single MP3.mp3"
+		]
     },
     "4": {
         "name": "Pistol",
@@ -47,6 +57,16 @@
         "fire_pause": 150,
         "auto": false,
         "recoil_mult": 2,
-        "recoil_time": 300
+        "recoil_time": 300,
+		"shot_sound": [
+			"client",
+            "assets",
+            "sounds",
+            "gun_sounds",
+            "Full Sound",
+            "5.56",
+            "MP3",
+            "556 Single MP3.mp3"
+		]
     }
 }

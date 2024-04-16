@@ -470,6 +470,16 @@ class Leaderboard:
         self.texs: Dict[str, Texture] = {}
 
     def update(self):
+        # Sort by K/D
+        """
+        for id, tex in self.texs.items():
+            sort_kills = sorted(enemies, key=lambda enemy: (enemy.id, enemy.kills))
+            sort_deaths = sorted(enemies, key=lambda enemy: (enemy.id, enemy.deaths))
+            for i, _ in enumerate(sort_kills):
+                pass
+        """
+
+        # Render header
         for k, v in {
             1: "Name",
             2: "Score",
@@ -484,9 +494,8 @@ class Leaderboard:
                 )
             )
 
+        # Render data
         for i, (id, tex) in enumerate(self.texs.items()):
-
-
             # Name
             display.renderer.blit(
                 tex,
@@ -726,7 +735,7 @@ class Player:
         self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
 
         if game.multiplayer:
-            self.tcp_id = client_tcp.getsockname()
+            self.tcp_id = str(client_tcp.getsockname())
         
         # sound
         for channel in self.audio_channels:
@@ -1115,7 +1124,7 @@ class Player:
             self.audio_channels[0].set_volume(
                 game.volume
             )  # Might not be necessary, just in case
-            # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
+            self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
             bullet_pos = list(display.center)
             radius = randf(0, crosshair.radius)
             angle = randf(0, 2 * pi)
@@ -1331,14 +1340,11 @@ class Player:
         client_udp.req(
             json.dumps(
                 {
-                    "tcp_id": str(self.tcp_id),
+                    "tcp_id": self.tcp_id,
                     "body": {
                         "x": self.arrow_rect.x + game.mo,
                         "y": self.arrow_rect.y + game.mo,
                         "angle": self.angle,
-                        "deaths": self.deaths,
-                        "kills": self.kills,
-                        "score": self.score,
                     },
                 }
             )
@@ -1370,6 +1376,13 @@ class Player:
     def update(self):
         if game.multiplayer:
             self.send_location()
+
+            if client_udp.current_message:
+                msg = json.loads(client_udp.current_message)[self.tcp_id]
+                self.deaths = msg["deaths"]
+                self.kills = msg["kills"]
+                self.score = msg["score"]
+
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
                     split = message.split("|")
