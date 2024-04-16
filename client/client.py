@@ -416,6 +416,14 @@ class HUD:
             16,
             self.health_rect.top
         )
+        self.score_tex, self.score_rect = write(
+            "bottomleft",
+            f"${player.score}",
+            v_fonts[48],
+            Colors.WHITE,
+            16,
+            self.health_rect.top
+        )
 
     def update_ammo(self, player):
         max_mag_size = weapon_data[player.weapon]["mag"]
@@ -462,12 +470,28 @@ class Leaderboard:
         self.texs: Dict[str, Texture] = {}
 
     def update(self):
+        for k, v in {
+            1: "Name",
+            2: "Score",
+            3: "Kills",
+            4: "Deaths",
+        }.items():
+            tex = text2tex(v, 32)
+            display.renderer.blit(
+                tex,
+                tex.get_rect(
+                    topleft=(display.width * k / 5, display.height / 8 - 32)
+                )
+            )
+
         for i, (id, tex) in enumerate(self.texs.items()):
+
+
             # Name
             display.renderer.blit(
                 tex,
                 tex.get_rect(
-                    topleft=(display.width / 4, (display.height / 8) + (32 * i))
+                    topleft=(display.width * 1 / 5, (display.height / 8) + (32 * i))
                 ),
             )
 
@@ -478,9 +502,33 @@ class Leaderboard:
             display.renderer.blit(
                 score_tex,
                 score_tex.get_rect(
-                    topleft=(display.width / 2, (display.height / 8) + (32 * i))
+                    topleft=(display.width * 2 / 5, (display.height / 8) + (32 * i))
                 )
             )
+
+            # Kills
+            dict1 = {player.tcp_id: player.kills} | {enemy.id: enemy.kills for enemy in enemies.copy()}
+            array = [kills for id_, kills in dict1.items() if id_ == id]
+            kills_tex = text2tex(array[0], 32)
+            display.renderer.blit(
+                kills_tex,
+                kills_tex.get_rect(
+                    topleft=(display.width * 3 / 5, (display.height / 8) + (32 * i))
+                )
+            )
+
+            # Deaths
+            dict1 = {player.tcp_id: player.deaths} | {enemy.id: enemy.deaths for enemy in enemies.copy()}
+            array = [deaths for id_, deaths in dict1.items() if id_ == id]
+            deaths_tex = text2tex(array[0], 32)
+            display.renderer.blit(
+                deaths_tex,
+                deaths_tex.get_rect(
+                    topleft=(display.width * 4 / 5, (display.height / 8) + (32 * i))
+                )
+            )
+
+
 
 
 class PlayerSelector:
@@ -626,6 +674,8 @@ class Player:
         self.w = 8
         self.h = 8
         self.score = 500
+        self.kills = 0
+        self.deaths = 0
         self.color = Colors.WHITE
         self.angle = radians(-90)
         self.arrow_img = Image(
@@ -1063,7 +1113,7 @@ class Player:
             self.audio_channels[0].set_volume(
                 game.volume
             )  # Might not be necessary, just in case
-            self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
+            # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
             bullet_pos = list(display.center)
             radius = randf(0, crosshair.radius)
             angle = randf(0, 2 * pi)
@@ -1284,6 +1334,8 @@ class Player:
                         "x": self.arrow_rect.x + game.mo,
                         "y": self.arrow_rect.y + game.mo,
                         "angle": self.angle,
+                        "deaths": self.deaths,
+                        "kills": self.kills,
                         "score": self.score,
                     },
                 }
@@ -1324,9 +1376,11 @@ class Player:
 
                     if self.health <= 0:
                         client_tcp.req(f"kill|{self.tcp_id}")
+
                         score_inc = 25
                         self.score += score_inc
                         client_tcp.req(f"inc_score|{split[1]}|{score_inc}")
+
                         game.set_state(States.MAIN_MENU)
 
                     client_tcp.queue.remove(message)
@@ -1364,6 +1418,8 @@ class EnemyPlayer:
         self.w = 8
         self.h = 8
         self.score = 500
+        self.kills = 0
+        self.deaths = 0
         self.angle = radians(-90) # TODO: Implement enemy direction
         self.indicator = imgload(
             "client", "assets", "images", "minimap", "enemy_indicator.png"
@@ -1380,8 +1436,7 @@ class EnemyPlayer:
         self.image = self.images[0]
         self.color = [rand(0, 255) for _ in range(3)] + [255]
         self.image.color = self.color
-        self.health = 100  # currently not being updated
-        self.name: str = None  # this doesn't work yet
+        self.health = 100  # currently not being updated?
         self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
 
     def init_image(self, surf: pygame.Surface):
@@ -1400,6 +1455,8 @@ class EnemyPlayer:
                 self.indicator_rect.x = message[self.id]["x"]
                 self.indicator_rect.y = message[self.id]["y"]
                 self.angle = message[self.id]["angle"]
+                self.deaths = message[self.id]["deaths"]
+                self.kills = message[self.id]["kills"]
                 self.score = message[self.id]["score"]
 
         self.rendering = False
@@ -1847,9 +1904,9 @@ def main(multiplayer):
                                     volume = 1
 
                                 enemy.audio_channels[0].set_volume(volume)
-                                enemy.audio_channels[0].play(
-                                    weapon_data[split[2]]["shot_sound"]
-                                )
+                                # enemy.audio_channels[0].play(
+                                #     weapon_data[split[2]]["shot_sound"]
+                                # )
 
                         client_tcp.queue.remove(message)
 
@@ -1922,12 +1979,6 @@ def main(multiplayer):
 
                         case pygame.K_q:
                             player.process_melee = True
-
-                        case pygame.K_SPACE:
-                            pass
-                            # enemies.append(EnemyPlayer())
-                            # client_tcp.req(f"inc_score|{player.tcp_id}|25")
-                            # player.score += 25
 
                 case pygame.JOYDEVICEADDED:
                     joystick = pygame.joystick.Joystick(event.device_index)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from random import randint, choice
 from threading import Thread
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import atexit
 import json
 import socket
@@ -58,7 +58,7 @@ def feed(msg: str) -> None:
         client.send(f"feed|{msg}\n".encode())
 
 
-def off(opt: str, target: str, args: list[str]):
+def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
     try:
         # Fix this: It raises an exception but has no perceivable bug or error,
         # but that might be shitty in the future
@@ -83,7 +83,10 @@ def off(opt: str, target: str, args: list[str]):
         }
         feed(messages[opt][randint(0, len(messages[opt]) - 1)])
 
-        saved_score = udp_data[target]["score"]
+        if killer:
+            udp_data[killer]["kills"] += 1
+        udp_data[target]["deaths"] += 1
+        saved_data = udp_data[target]
         del udp_data[target]
         del tcp_data[target]
 
@@ -97,7 +100,11 @@ def off(opt: str, target: str, args: list[str]):
                 # if not F4ing, move client from clients to inactive, otherwise, completely remove
                 if (opt == "quit" and "f4" not in args) or (opt == "kill"):
                     inactive_clients.append(client_)
-                    inactive_data[target] = {"score": saved_score}
+                    inactive_data[target] = {
+                        "deaths": saved_data["deaths"],
+                        "kills": saved_data["kills"],
+                        "score": saved_data["score"],
+                    }
     except BaseException as e:
         alert(f"Failed to {opt} player", e)
 
@@ -172,7 +179,7 @@ def receive_tcp(client: socket.socket, client_addr):
                     case "quit":
                         off("quit", target, args)
                     case "kill":
-                        off("kill", target, args)
+                        off("kill", target, args, str(client.getpeername()))
 
                     case "inc_score":
                         udp_data[target]["score"] += int(args[0])
