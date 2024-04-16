@@ -8,7 +8,17 @@
         "fire_pause": 300,
         "auto": false,
         "recoil_mult": 20,
-        "recoil_time": 800
+        "recoil_time": 800,
+		"shot_sound": [
+			"client",
+            "assets",
+            "sounds",
+            "gun_sounds_2",
+            "Full Sounds",
+            ".308 (7.62x51)",
+            "MP3",
+            "308 Single.mp3"
+		]
     },
     "2": {
         "name": "Knife",

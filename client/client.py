@@ -573,8 +573,9 @@ class PlayerSelector:
         self.black_tex = Texture.from_surface(display.renderer, self.black_surf)
 
     def init(self):
+        unleash_button = all_buttons[States.MAIN_MENU][1]
         self.menu_bg_surf = pygame.Surface(
-            (unleash_button.rect.width + 40, 180), pygame.SRCALPHA
+            (unleash_button.rect.width + 40, 220), pygame.SRCALPHA
         )
         self.menu_bg_surf.fill((0, 0, 0, 120))
         self.menu_bg_tex = Texture.from_surface(display.renderer, self.menu_bg_surf)
@@ -583,12 +584,13 @@ class PlayerSelector:
         )
 
     def update(self):
-        # fill_rect((0, 0, 0, 120), outline)
         display.renderer.blit(self.black_tex, self.outline)
         display.renderer.blit(self.menu_bg_tex, self.menu_bg_rect)
-        # draw_rect(Colors.WHITE, self.outline)
         display.renderer.blit(self.tex, self.rect)
-        # draw_rect(Colors.RED, self.rect)
+
+        prim_skin_button = all_buttons[States.MAIN_MENU][5]
+        sec_skin_button = all_buttons[States.MAIN_MENU][6]
+
         write(
             "midleft",
             self.color_keys[self.prim_color].replace("_", " "),
@@ -1646,6 +1648,12 @@ joystick: pygame.joystick.JoystickType = None
 crosshair_tex = imgload("client", "assets", "images", "hud", "crosshair.png", scale=3)
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
+wasd_image = imgload("client", "assets", "images", "controls", "WASD.png", scale=0.5)
+e_image = imgload("client", "assets", "images", "controls", "E.png", scale=0.5)
+q_image = imgload("client", "assets", "images", "controls", "Q.png", scale=0.5)
+tab_image = imgload("client", "assets", "images", "controls", "TAB.png", scale=0.5)
+controls_images = [wasd_image, e_image, q_image, tab_image]
+
 title = Button(
     int(display.width / 2),
     150,
@@ -1733,6 +1741,12 @@ all_buttons = {
         Button(
             80,
             display.height / 2 + 48 * 2,
+            "Controls",
+            lambda: game.set_state(States.CONTROLS),
+        ),
+        Button(
+            80,
+            display.height / 2 + 48 * 3,
             "Exit",
             game.stop_running,
         ),
@@ -1777,10 +1791,16 @@ all_buttons = {
         ),
     ],
     States.PLAY: [],
+    States.CONTROLS: [
+        Button(
+        80,
+        display.height / 2 + 48 * 5,
+        "Back",
+        lambda: game.set_state(game.previous_state),
+        font_size=48,
+        ),
+    ], 
 }
-prim_skin_button = all_buttons[States.MAIN_MENU][4]
-sec_skin_button = all_buttons[States.MAIN_MENU][5]
-unleash_button = all_buttons[States.MAIN_MENU][1]
 player_selector.init()
 
 username_input = UserInput(
@@ -1993,7 +2013,7 @@ def main(multiplayer):
 
         display.renderer.clear()
 
-        if game.state in (States.MAIN_MENU, States.MAIN_SETTINGS):
+        if game.state in (States.MAIN_MENU, States.MAIN_SETTINGS, States.CONTROLS):
             # fill_rect(Colors.BLACK, (0, 0, display.width, display.height))
             global menu_wall_index
             display.renderer.blit(
@@ -2007,6 +2027,34 @@ def main(multiplayer):
         if game.state == States.MAIN_MENU:
             player_selector.update()
             username_input.update()
+        
+        if game.state == States.CONTROLS:
+            controls_outline = pygame.Rect(display.width/2 - 400, 100, 800, 750)
+            controls_black_surf = pygame.Surface(controls_outline.size, pygame.SRCALPHA)
+            controls_black_surf.fill((0, 0, 0, 120))
+            controls_black_tex = Texture.from_surface(display.renderer, controls_black_surf)
+            display.renderer.blit(controls_black_tex, controls_outline)
+            index = 1
+            for img in controls_images:
+                display.renderer.blit(img, img.get_rect(topleft= (display.width/2 - 350, 150 * index + 50)))
+                text = ""
+                match index:
+                    case 1:
+                        text = "to move"
+                    case 2:
+                        text = "to buy and switch weapons"
+                    case 3:
+                        text = "to use melee"
+                    case 4:
+                        text = "to show leaderboard"
+                write("center", 
+                text, 
+                v_fonts[40], 
+                Colors.WHITE, 
+                display.width/2 + 75, 
+                150 * index + 135,
+                )
+                index += 1
 
         if game.state in (States.PLAY, States.PLAY_SETTINGS):
             fill_rect(

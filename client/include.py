@@ -14,7 +14,7 @@ import sys
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
     socket.gethostbyname(
         socket.gethostname()
-    ),
+    ),  # Only when developing and playing on same machine
     6969,
     4200,
 )
@@ -72,6 +72,7 @@ class States(Enum):
     MAIN_SETTINGS = 2
     PLAY = 3
     PLAY_SETTINGS = 4
+    CONTROLS = 5
 
 
 class Directions(Enum):
@@ -137,17 +138,19 @@ class UserInput:
             self.x,
             self.y,
         )
-        # draw_rect(
-        #     Colors.RED,
-        #     write(
-        #         self.anchor,
-        #         text,
-        #         font,
-        #         self.color,
-        #         self.x,
-        #         self.y,
-        #     )[1],
-        # )
+        """
+        draw_rect(
+            Colors.RED,
+            write(
+                self.anchor,
+                text,
+                font,
+                self.color,
+                self.x,
+                self.y,
+            )[1],
+        )
+        """
 
 
 class Display:
@@ -597,29 +600,17 @@ client_tcp: Client = None
 
 with open(Path("client", "assets", "weapon_data.json"), "r") as f:
     weapon_data = json.load(f)
-weapon_names = [None] + [v["name"] for k, v in weapon_data.items()]
+weapon_names = [None] + [v["name"] for v in weapon_data.values()]
+
+for weapon, value in weapon_data.items():
+    if "shot_sound" in value:
+        weapon_data[weapon]["shot_sound"] = pygame.mixer.Sound(
+            Path(*value["shot_sound"])
+        )
 
 ticks = pygame.time.get_ticks
 
-for name, data in {
-    "revolver": pygame.mixer.Sound(
-        Path(
-            "client",
-            "assets",
-            "sounds",
-            "gun_sounds_2",
-            "Full Sounds",
-            ".308 (7.62x51)",
-            "MP3",
-            "308 Single.mp3",
-        )
-    )
-}.items():
-    for k in weapon_data:
-        if name == weapon_data[k]["name"]:
-            weapon_data[k]["shot_sound"] = data
-            print(weapon_data)
-            break
+
 class Sounds:
     MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
     PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
