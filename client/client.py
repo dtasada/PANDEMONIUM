@@ -1979,7 +1979,7 @@ def main(multiplayer):
             username_input.update()
         
         if game.state == States.CONTROLS:
-            controls_outline = pygame.Rect(450, 100, 800, 750)
+            controls_outline = pygame.Rect(display.width/2 - 400, 100, 800, 750)
             controls_black_surf = pygame.Surface(controls_outline.size, pygame.SRCALPHA)
             controls_black_surf.fill((0, 0, 0, 120))
             controls_black_tex = Texture.from_surface(display.renderer, controls_black_surf)
