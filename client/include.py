@@ -12,9 +12,9 @@ import sys
 
 
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
-    socket.gethostbyname(
+socket.gethostbyname(
         socket.gethostname()
-    ),  # Only when developing and playing on same machine
+    )    ,  # Only when developing and playing on same machine
     6969,
     4200,
 )
@@ -72,6 +72,7 @@ class States(Enum):
     MAIN_SETTINGS = 2
     PLAY = 3
     PLAY_SETTINGS = 4
+    CONTROLS = 5
 
 
 class Directions(Enum):
