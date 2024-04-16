@@ -156,6 +156,8 @@ class Game:
             hud = HUD()
             leaderboard = Leaderboard()
             hud.update_health(player)
+            hud.update_score(player)
+            hud.update_weapon_general(player)
         if (
             target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
         ) or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU):
@@ -278,7 +280,7 @@ class GlobalTextures:
         self.object_textures = [
             (
                 imgload("client", "assets", "images", "objects", file_name + ".png")
-                if file_name is not None and file_name != "Knife"
+                if file_name is not None and file_name not in ("Knife", "Pistol")
                 else None
             )
             for file_name in weapon_names
@@ -300,31 +302,20 @@ class GlobalTextures:
                         Colors.YELLOW,
                     ),
                 )
-                if file_name is not None and file_name != "Knife"
+                if file_name is not None and file_name not in ("Knife", "Pistol")
                 else None
             )
             for file_name in weapon_names
         ]
 
-        self.mask_object_textures = []
-        for file_name in weapon_names:
-            if file_name is None or file_name == "Knife":
-                tex = None
-            else:
-                surf = pygame.mask.from_surface(
-                    pygame.image.load(
-                        Path(
-                            "client",
-                            "assets",
-                            "images",
-                            "objects",
-                            file_name + ".png",
-                        )
-                    )
-                ).to_surface(setcolor=Colors.WHITE)
-                surf.set_colorkey(Colors.BLACK)
-                tex = Texture.from_surface(display.renderer, surf)
-            self.mask_object_textures.append(tex)
+        self.mask_object_textures = [
+            (
+                imgload("client", "assets", "images", "mask_objects", file_name + ".png")
+                if file_name is not None and file_name not in ("Knife",)
+                else None
+            )
+            for file_name in weapon_names
+        ]
         self.weapon_textures = {
             weapon: [
                 imgload(
@@ -361,6 +352,8 @@ class HUD:
     def update(self):
         if self.health_tex is not None:
             display.renderer.blit(self.health_tex, self.health_rect)
+        if self.score_tex is not None:
+            display.renderer.blit(self.score_tex, self.score_rect)
         if self.ammo_tex is not None:
             display.renderer.blit(self.ammo_tex, self.ammo_rect)
             w, h = 3, 25
@@ -413,6 +406,16 @@ class HUD:
             16,
             display.height - 4,
         )
+    
+    def update_score(self, player):
+        self.score_tex, self.score_rect = write(
+            "bottomleft",
+            f"${player.score}",
+            v_fonts[48],
+            Colors.WHITE,
+            16,
+            self.health_rect.top
+        )
 
     def update_ammo(self, player):
         max_mag_size = weapon_data[player.weapon]["mag"]
@@ -451,7 +454,7 @@ class HUD:
         self.weapon_rect.inflate_ip(
             self.weapon_rect.width * m, self.weapon_rect.height * m
         )
-        self.weapon_rect.center = (display.width - 80, display.height - 40)
+        self.weapon_rect.bottomright = (display.width - 10, display.height - 10)
 
 
 class Leaderboard:
@@ -634,11 +637,11 @@ class Player:
         self.rect = pygame.FRect((self.x, self.y, self.w, self.h))
 
         # weapon and shooting tech
-        self.weapons = [None, None]
-        self.ammos = [None, None]
-        self.mags = [None, None]
+        self.weapons = ["4", None]
         self.weapon_index = 0
-        self.weapon_anim = 1
+        self.ammos = [weapon_data["4"]["ammo"], None]
+        self.mags = [weapon_data["4"]["mag"], None]
+        self.weapon_anim = 0
         # dynamic offsets and stuff
         self.shooting = False
         self.reloading = False
@@ -1060,7 +1063,7 @@ class Player:
             self.audio_channels[0].set_volume(
                 game.volume
             )  # Might not be necessary, just in case
-            # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
+            self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
             bullet_pos = list(display.center)
             radius = randf(0, crosshair.radius)
             angle = randf(0, 2 * pi)
@@ -1865,9 +1868,9 @@ def main(multiplayer):
                                     volume = 1
 
                                 enemy.audio_channels[0].set_volume(volume)
-                                # enemy.audio_channels[0].play(
-                                #     weapon_data[split[2]]["shot_sound"]
-                                # )
+                                enemy.audio_channels[0].play(
+                                    weapon_data[split[2]]["shot_sound"]
+                                )
 
                         client_tcp.queue.remove(message)
 

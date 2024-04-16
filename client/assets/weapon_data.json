@@ -28,5 +28,15 @@
         "auto": true,
         "recoil_mult": 2.5,
         "recoil_time": 300
+    },
+    "4": {
+        "name": "Pistol",
+        "damage": 20,
+        "ammo": 60,
+        "mag": 8,
+        "fire_pause": 150,
+        "auto": false,
+        "recoil_mult": 2,
+        "recoil_time": 300
     }
 }

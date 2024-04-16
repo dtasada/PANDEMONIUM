@@ -397,20 +397,22 @@ class Client(socket.socket):
             self.sendto(message.encode(), self.target_server)
 
         if self.conn_type == "tcp":
-            print("message:", message)
-            self.send((message + "\n").encode())
+            # Padded messages to make sure every message is 2**12 B
+            padding = " " * (2**12 - len(message))
+            m = (message + padding).encode()
+            self.send(m)
 
     def receive(self):
         if self.conn_type == "udp":
             while True:
                 while self.running:
-                    data, _ = self.recvfrom(2**16)
+                    data, _ = self.recvfrom(2**12)
                     self.current_message = data.decode()
 
         elif self.conn_type == "tcp":
             while True:
                 while self.running:
-                    data = self.recv(2**16).decode()
+                    data = self.recv(2**12).decode()
                     messages = data.split("\n")
 
                     [self.queue.append(message) for message in messages if message]
@@ -614,12 +616,11 @@ for name, data in {
         )
     )
 }.items():
-    for i in weapon_data:
-        if name == weapon_data[i]["name"]:
-            weapon_data[i]["shot_sound"] = data
+    for k in weapon_data:
+        if name == weapon_data[k]["name"]:
+            weapon_data[k]["shot_sound"] = data
+            print(weapon_data)
             break
-
-
 class Sounds:
     MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
     PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
