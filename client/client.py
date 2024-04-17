@@ -420,12 +420,12 @@ class HUD:
     def update_ammo(self, player):
         max_mag_size = weapon_data[player.weapon]["mag"]
         self.ammo_tex, self.ammo_rect = write(
-            "bottomright",
+            "midright",
             player.ammo,
             v_fonts[64],
-            Colors.WHITE,
-            display.width - 150,
-            display.height - 4,
+            Colors.WHITE if player.ammo > 0 else Colors.RED,
+            self.weapon_rect.left - 16,
+            self.weapon_rect.centery,
         )
         if max_mag_size > 16:
             self.mag_tex, self.mag_rect = write(
@@ -1060,10 +1060,8 @@ class Player:
             self.shooting = True
             self.weapon_anim = 1
             self.last_recoil = ticks()
-            self.audio_channels[0].set_volume(
-                game.volume
-            )  # Might not be necessary, just in case
-            self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
+            self.audio_channels[0].set_volume(game.volume)  # Might not be necessary, just in case
+            # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
             bullet_pos = list(display.center)
             radius = randf(0, crosshair.radius)
             angle = randf(0, 2 * pi)
@@ -1074,7 +1072,7 @@ class Player:
                 if enemy.rendering and not enemy.regenerating:
                     if enemy.rect.collidepoint(bullet_pos):
                         # the body in general is hit
-                        mult = 1
+                        mult = 0
                         if not melee:
                             if enemy.head_rect.collidepoint(bullet_pos):
                                 mult = 1.4
@@ -1086,7 +1084,10 @@ class Player:
                                 or enemy.arm2_rect.collidepoint(bullet_pos)
                             ):
                                 mult = 0.5
-                        enemy.hit(mult)
+                            elif enemy.torso_rect.collidepoint(bullet_pos):
+                                mult = 1
+                        if mult > 0:
+                            enemy.hit(mult)
 
             self.last_shot = ticks()
             self.mag -= 1
@@ -1098,16 +1099,19 @@ class Player:
 
     def reload(self, amount=None):
         if self.weapon is not None:
-            if self.mag < weapon_data[self.weapon]["mag"]:
-                if not self.reloading:
-                    game.target_zoom = 0
-                    self.weapon_ads_offset_target = 0
-                    self.adsing = False
-                    self.reloading = True
-                    self.reload_direc = 1
-                    self.new_mag = weapon_data[self.weapon]["mag"]
-                    self.mag_diff = self.new_mag - self.mag
-                    self.new_ammo = self.ammo - self.mag_diff
+            if self.ammo > 0:
+                if self.mag < weapon_data[self.weapon]["mag"]:
+                    if not self.reloading:
+                        game.target_zoom = 0
+                        self.weapon_ads_offset_target = 0
+                        self.adsing = False
+                        self.reloading = True
+                        self.reload_direc = 1
+                        needed_mag = weapon_data[self.weapon]["mag"] - self.mag
+                        supplied_mag = min(self.ammo, weapon_data[self.weapon]["mag"])
+                        final_mag = min(needed_mag, supplied_mag)
+                        self.new_ammo = self.ammo - final_mag
+                        self.new_mag = self.mag + final_mag
 
     def melee(self):
         if not self.meleing:
@@ -1233,8 +1237,6 @@ class Player:
             # )
 
             # texture rendering
-            if tile_value == -1:
-                return
 
             tex = gtex.wall_textures[tile_value]
             axo = tex_d / game.tile_size * tex.width
@@ -1378,8 +1380,6 @@ class EnemyPlayer:
             "client", "assets", "images", "3d", "player.png", frames=4
         )
         self.image = self.images[0]
-        self.color = [rand(0, 255) for _ in range(3)] + [255]
-        self.image.color = self.color
         self.health = 100  # currently not being updated
         self.name: str = None  # this doesn't work yet
         self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
@@ -1487,6 +1487,12 @@ class EnemyPlayer:
             # rest
             display.renderer.blit(self.image, self.rect)
             draw_rect(Colors.YELLOW, self.rect)
+            fill_rect(Colors.ORANGE, self.head_rect)
+            fill_rect(Colors.RED, self.shoulder1_rect)
+            fill_rect(Colors.GREEN, self.legs_rect)
+            fill_rect(Colors.BLUE, self.torso_rect)
+            fill_rect(Colors.PINK, self.arm1_rect)
+
             """
             draw_rect(Colors.YELLOW, self.rect)
             draw_rect(Colors.ORANGE, self.head_rect)
@@ -1502,10 +1508,8 @@ class EnemyPlayer:
     def regenerate(self):
         if self.regenerating and ticks() - self.last_hit >= 70:
             self.regenerating = False
-            self.image.color = self.color
 
     def hit(self, mult, melee=False):
-        self.image.color = Colors.RED
         self.last_hit = ticks()
         self.regenerating = True
         damage = int(weapon_data[player.weapon if not melee else "2"]["damage"] * mult)
@@ -1742,8 +1746,8 @@ all_buttons = {
         ),
     ], 
 }
-prim_skin_button = all_buttons[States.MAIN_MENU][4]
-sec_skin_button = all_buttons[States.MAIN_MENU][5]
+prim_skin_button = all_buttons[States.MAIN_MENU][5]
+sec_skin_button = all_buttons[States.MAIN_MENU][6]
 unleash_button = all_buttons[States.MAIN_MENU][1]
 player_selector.init()
 
@@ -1867,10 +1871,10 @@ def main(multiplayer):
                                 else:
                                     volume = 1
 
-                                enemy.audio_channels[0].set_volume(volume)
-                                enemy.audio_channels[0].play(
-                                    weapon_data[split[2]]["shot_sound"]
-                                )
+                                # enemy.audio_channels[0].set_volume(volume)
+                                # enemy.audio_channels[0].play(
+                                #     weapon_data[split[2]]["shot_sound"]
+                                # )
 
                         client_tcp.queue.remove(message)
 
