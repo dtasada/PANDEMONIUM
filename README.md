@@ -13,9 +13,9 @@
 ## Todo
 ### Bugs
 * FLOOR AND CEILING TEXTURES
+* Fix shooting and ADSing through walls
 * Fix ADS with single ray
 * Fix mouse flickering
-* Fix shooting and ADSing through walls
 
 ### Features
 * Leaderboard & Point system
