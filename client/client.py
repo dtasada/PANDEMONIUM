@@ -490,8 +490,6 @@ class Leaderboard:
 
         self.texs = new_texs
 
-        print("self.texs", self.texs)
-
         # Render header
         for id, tex in {
             1: "Name",
@@ -562,7 +560,6 @@ class PlayerSelector:
             for file in os.listdir(Path("client", "assets", "images", "player_skins"))
         }
         self.image = self.database["WHITE_RED"]
-        # self.image = pygame.transform.scale_by(self.image, (4, 4))
         self.tex = Texture.from_surface(display.renderer, self.image)
         self.rect = self.image.get_rect(
             midright=(display.width - 120, display.height / 2)
@@ -733,6 +730,7 @@ class Player:
         self.health = 100
         self.meleing = False
         self.moving = False
+        self.wall_distance = None
 
         self.weapon_hud_tex = self.weapon_hud_rect = None
         self.last_shot = ticks()
@@ -930,7 +928,7 @@ class Player:
             x, y = int(x), int(y)
             weapon = obj[0]
             self.set_weapon(weapon)
-        else:
+        elif self.weapons.count(None) == 0:
             # switch weapons
             self.switching_weapons = True
             self.weapon_switch_direc = 1
@@ -945,7 +943,7 @@ class Player:
             if mouses[2]:  # right mouse button
                 if not self.adsing and self.can_shoot:
                     if self.weapon is not None:
-                        game.target_zoom = 15
+                        game.target_zoom = min(15, self.wall_distance)
                         game.zoom = 0
                         self.weapon_ads_offset_target = 32 * 6
                     self.adsing = True
@@ -1129,7 +1127,10 @@ class Player:
             m = 12
             self.weapon_switch_offset += self.weapon_switch_direc * m * game.dt
 
-    def shoot(self, melee=False):
+    def shoot(self, melee: bool = False):
+        """
+        Makes the player shoot a bullet and check whether it hits an enemy.
+        """
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
@@ -1146,22 +1147,24 @@ class Player:
                 if enemy.rendering and not enemy.regenerating:
                     if enemy.rect.collidepoint(bullet_pos):
                         # the body in general is hit
-                        mult = 0
-                        if not melee:
-                            if enemy.head_rect.collidepoint(bullet_pos):
-                                mult = 1.4
-                            elif (
-                                enemy.legs_rect.collidepoint(bullet_pos)
-                                or enemy.shoulder1_rect.collidepoint(bullet_pos)
-                                or enemy.shoulder2_rect.collidepoint(bullet_pos)
-                                or enemy.arm1_rect.collidepoint(bullet_pos)
-                                or enemy.arm2_rect.collidepoint(bullet_pos)
-                            ):
-                                mult = 0.5
-                            elif enemy.torso_rect.collidepoint(bullet_pos):
-                                mult = 1
-                        if mult > 0:
-                            enemy.hit(mult)
+                        if enemy.dist_px <= player.wall_distance:
+                            # the enemy is not obstructed by any walls
+                            mult = 0
+                            if not melee:
+                                if enemy.head_rect.collidepoint(bullet_pos):
+                                    mult = 1.4
+                                elif (
+                                    enemy.legs_rect.collidepoint(bullet_pos)
+                                    or enemy.shoulder1_rect.collidepoint(bullet_pos)
+                                    or enemy.shoulder2_rect.collidepoint(bullet_pos)
+                                    or enemy.arm1_rect.collidepoint(bullet_pos)
+                                    or enemy.arm2_rect.collidepoint(bullet_pos)
+                                ):
+                                    mult = 0.5
+                                elif enemy.torso_rect.collidepoint(bullet_pos):
+                                    mult = 1
+                            if mult > 0:
+                                enemy.hit(mult)
 
             self.last_shot = ticks()
             self.mag -= 1
@@ -1229,7 +1232,6 @@ class Player:
         dx = cos(angle)
         dy = sin(angle)
 
-        tot_length = 0
         y_length = x_length = 0
         start_x = start_x if start_x is not None else self.start_x
         start_y = start_y if start_y is not None else self.start_y
@@ -1277,6 +1279,8 @@ class Player:
             ray_mult = 1
             dist *= ray_mult
             dist_px = dist * game.tile_size * cos(offset)
+            if offset == 0:
+                player.wall_distance = dist_px
             self.rays.append(((p1, p2), dist_px))
             # init vars for walls
             ww = display.width / game.ray_density
@@ -1519,11 +1523,12 @@ class EnemyPlayer:
             ratio = (diff1) / (diff1 + diff2)
             centerx = ratio * display.width
             wall_height = (game.projection_dist / self.dist_px * display.height / 2) / (game.fov / 60)  # maths
-            centery = display.height / 2 + player.view_yoffset + wall_height * 0.2
-            height = wall_height * 0.8  # maths
+            size_mult = 0.8
+            centery = display.height / 2 + player.view_yoffset + wall_height * (1 - size_mult)
+            height = wall_height * size_mult  # maths
             width = height / self.image.height * self.image.width
             # rects
-            og_width, og_height = 232 / 2, 400 / 2
+            og_width, og_height = 232, 400
             head_w_ratio = 84 / og_width
             head_h_ratio = 88 / og_height
             torso_w_ratio = 92 / og_width
@@ -1573,22 +1578,11 @@ class EnemyPlayer:
             # rest
             display.renderer.blit(self.image, self.rect)
             draw_rect(Colors.YELLOW, self.rect)
-            fill_rect(Colors.ORANGE, self.head_rect)
-            fill_rect(Colors.RED, self.shoulder1_rect)
-            fill_rect(Colors.GREEN, self.legs_rect)
-            fill_rect(Colors.BLUE, self.torso_rect)
-            fill_rect(Colors.PINK, self.arm1_rect)
-
-            """
-            draw_rect(Colors.YELLOW, self.rect)
-            draw_rect(Colors.ORANGE, self.head_rect)
-            draw_rect(Colors.LIGHT_BLUE, self.torso_rect)
-            draw_rect(Colors.GREEN, self.shoulder1_rect)
-            draw_rect(Colors.GREEN, self.shoulder2_rect)
-            draw_rect(Colors.BLUE, self.arm1_rect)
-            draw_rect(Colors.BLUE, self.arm2_rect)
-            draw_rect(Colors.PINK, self.legs_rect)
-            """
+            # fill_rect(Colors.ORANGE, self.head_rect)
+            # fill_rect(Colors.GREEN, self.torso_rect)
+            # fill_rect(Colors.PINK, self.arm1_rect)
+            # fill_rect(Colors.PINK, self.shoulder1_rect)
+            # fill_rect(Colors.PINK, self.legs_rect)
             self.rendering = True
 
     def regenerate(self):
