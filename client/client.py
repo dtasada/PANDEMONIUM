@@ -175,7 +175,7 @@ class Game:
             and self.state == States.MAIN_MENU
         ):
             # All launch & init requirements
-            leaderboard.texs[player.tcp_id] = text2tex(username_input.text, 32)
+            leaderboard.texs[player.tcp_id] = (text2tex(username_input.text, 32), None)
             msg = json.dumps(
                 {
                     "health": player.health,
@@ -467,35 +467,48 @@ class HUD:
 
 class Leaderboard:
     def __init__(self):
-        self.texs: Dict[str, Texture] = {}
+        self.texs: Dict[str, tuple[Texture, Optional[int]]] = {}
 
     def update(self):
         # Sort by K/D
-        """
-        for id, tex in self.texs.items():
-            sort_kills = sorted(enemies, key=lambda enemy: (enemy.id, enemy.kills))
-            sort_deaths = sorted(enemies, key=lambda enemy: (enemy.id, enemy.deaths))
-            for i, _ in enumerate(sort_kills):
-                pass
-        """
+        scores: Dict[str, float] = {
+            player.tcp_id: player.kills / player.deaths
+            if player.deaths > 0 else player.kills
+        } | {
+                enemy.id: enemy.kills / enemy.deaths
+                if enemy.deaths > 0 else enemy.kills
+                for enemy in enemies
+            }
+        scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+        new_texs: Dict[str, tuple[Texture, int]] = {}
+        for (score_id, score) in scores:
+            for texs_id, (tex, _) in self.texs.items():
+                if texs_id == score_id:
+                    new_texs[texs_id] = (tex, score)
+                    break
+
+        self.texs = new_texs
+
+        print("self.texs", self.texs)
 
         # Render header
-        for k, v in {
+        for id, tex in {
             1: "Name",
             2: "Score",
             3: "Kills",
             4: "Deaths",
         }.items():
-            tex = text2tex(v, 32)
+            tex = text2tex(tex, 32)
             display.renderer.blit(
                 tex,
                 tex.get_rect(
-                    topleft=(display.width * k / 5, display.height / 8 - 32)
+                    topleft=(display.width * id / 5, display.height / 8 - 32)
                 )
             )
 
         # Render data
-        for i, (id, tex) in enumerate(self.texs.items()):
+        for i, (id, (tex, _)) in enumerate(self.texs.items()):
             # Name
             display.renderer.blit(
                 tex,
@@ -1867,7 +1880,7 @@ def add_enemy(address: str, data: Dict[str, Any]) -> None:
     )
 
     enemies.append(new_enemy)
-    leaderboard.texs[new_enemy.id] = text2tex(new_enemy.name, 32)
+    leaderboard.texs[new_enemy.id] = (text2tex(new_enemy.name, 32), None)
 
 
 def render_floor():
