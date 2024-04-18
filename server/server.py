@@ -114,7 +114,6 @@ def receive_udp():
         udp_data[request["tcp_id"]][
             "udp_id"
         ] = addr  # careful, this is a tuple, not a string
-
         for v in udp_data.values():
             server_udp.sendto(json.dumps(udp_data).encode(), v["udp_id"])
 

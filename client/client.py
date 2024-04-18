@@ -1075,7 +1075,7 @@ class Player:
         for enemy in enemies:
             dy = enemy.indicator_rect.centery - self.start_y_px
             dx = enemy.indicator_rect.centerx - self.start_x_px
-            enemy.angle = degrees(atan2(dy, dx))
+            enemy.player_pov_angle = degrees(atan2(dy, dx))
             enemy.dist_px = hypot(dy, dx)
         self.enemies_to_render = sorted(
             enemies, key=lambda te: te.dist_px, reverse=True
@@ -1455,10 +1455,10 @@ class EnemyPlayer:
         self.kills = 0
         self.deaths = 0
         self.angle = radians(-90) # TODO: Implement enemy direction
-        self.indicator = imgload(
-            "client", "assets", "images", "minimap", "enemy_indicator.png"
-        )
-        self.indicator.color = Colors.ORANGE
+        self.indicator_img = Image(imgload(
+            "client", "assets", "images", "minimap", "player_arrow.png"
+        ))
+        self.indicator_img.color = Colors.ORANGE
         self.indicator_rect = pygame.Rect((0, 0, 16, 16))
         self.indicator_rect.center = (self.x, self.y)
         self.last_hit = ticks()
@@ -1493,8 +1493,8 @@ class EnemyPlayer:
                 self.score = message[self.id]["score"]
 
         self.rendering = False
-        # draw_rect(Colors.RED, self.indicator_rect)
-        display.renderer.blit(self.indicator, self.indicator_rect)
+        self.indicator_img.angle = degrees(self.angle)
+        display.renderer.blit(self.indicator_img, self.indicator_rect)
 
     def update(self):
         if game.multiplayer:
@@ -1513,9 +1513,8 @@ class EnemyPlayer:
 
     def render(self):
         start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
-        angle = self.angle
+        angle = self.player_pov_angle
         end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
-
         if is_angle_between(start_angle, angle, end_angle):
             game.rendered_enemies += 1
             diff1 = angle_diff(start_angle, angle)
@@ -1575,7 +1574,23 @@ class EnemyPlayer:
                 0, 0, arm_w_ratio * width, arm_h_ratio * height
             )
             self.arm2_rect.topleft = self.shoulder2_rect.topright
-            # rest
+            # calculate 4-directional player image
+            dy = self.indicator_rect.centery - player.arrow_rect.centery
+            dx = self.indicator_rect.centerx - player.arrow_rect.centerx
+            angle = atan2(dy, dx) - (self.angle + 1 / 2 * pi)
+            angle = pi2pi(angle)
+            fourth = 1 / 4 * 2 * pi
+            eighth = 1 / 8 * 2 * pi
+            if 1 / 2 * pi - eighth <= angle < 1 / 2 * pi + eighth:
+                self.image = self.images[0]
+            elif -pi <= angle < -pi + eighth or \
+                        pi - eighth <= angle < pi:
+                self.image = self.images[1]
+            elif -1 / 2 * pi - eighth <= angle < -1 / 2 * pi + eighth:
+                self.image = self.images[2]
+            elif -eighth <= angle < eighth:
+                self.image = self.images[3]
+            # render
             display.renderer.blit(self.image, self.rect)
             draw_rect(Colors.YELLOW, self.rect)
             # fill_rect(Colors.ORANGE, self.head_rect)
