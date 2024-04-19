@@ -814,8 +814,6 @@ class Player:
                 #         self.weapon_ads_offset_target = None
                 #         self.weapon_ads_offset = 0
 
-        
-
             if self.reloading:
                 # reload down
                 if (
@@ -1136,7 +1134,7 @@ class Player:
             self.weapon_anim = 1
             self.last_recoil = ticks()
             self.audio_channels[0].set_volume(game.volume)  # Might not be necessary, just in case
-            # self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
+            self.audio_channels[0].play(weapon_data[self.weapon]["shot_sound"])
             bullet_pos = list(display.center)
             radius = randf(0, crosshair.radius)
             angle = randf(0, 2 * pi)
@@ -1920,6 +1918,7 @@ def main(multiplayer):
                 split = message.split("|")
                 match split[0]:
                     case "init_player":
+                        print("init_player!:", split)
                         add_enemy(split[1], json.loads(split[2]))
 
                         client_tcp.queue.remove(message)
@@ -1951,10 +1950,10 @@ def main(multiplayer):
                                 else:
                                     volume = 1
 
-                                # enemy.audio_channels[0].set_volume(volume)
-                                # # enemy.audio_channels[0].play(
-                                # #     weapon_data[split[2]]["shot_sound"]
-                                # # )
+                                enemy.audio_channels[0].set_volume(volume)
+                                enemy.audio_channels[0].play(
+                                    weapon_data[split[2]]["shot_sound"]
+                                )
 
                         client_tcp.queue.remove(message)
 

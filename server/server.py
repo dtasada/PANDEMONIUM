@@ -58,7 +58,7 @@ def feed(msg: str) -> None:
         client.send(f"feed|{msg}\n".encode())
 
 
-def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
+def off(opt: str, target: str, args: list[str]):
     try:
         # Fix this: It raises an exception but has no perceivable bug or error,
         # but that might be shitty in the future
@@ -115,8 +115,9 @@ def receive_udp():
             "udp_id"
         ] = addr  # careful, this is a tuple, not a string
 
-        for v in udp_data.values():
-            server_udp.sendto(json.dumps(udp_data).encode(), v["udp_id"])
+        for player in udp_data.values():
+            if "udp_id" in player:
+                server_udp.sendto(json.dumps(udp_data).encode(), player["udp_id"])
 
 
 def receive_tcp(client: socket.socket, client_addr):
@@ -137,7 +138,7 @@ def receive_tcp(client: socket.socket, client_addr):
                         try:
                             client.send(
                                 ("init_res|" + json.dumps(tcp_data) + "\n").encode()
-                            )
+                            )  # Send back all TCP data before adding new player
                             tcp_data[str(client_addr)] = json.loads(args[0])
                             udp_data[str(client_addr)] = {
                                 "kills": 0,
@@ -175,7 +176,7 @@ def receive_tcp(client: socket.socket, client_addr):
                     case "quit":
                         off("quit", target, args)
                     case "kill":
-                        off("kill", target, args, str(client.getpeername()))
+                        off("kill", target, args)
 
                     case "inc_score":
                         udp_data[target]["score"] += int(args[0])
