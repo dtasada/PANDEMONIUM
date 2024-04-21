@@ -67,7 +67,7 @@ class Joymap:
 
 
 class States(Enum):
-    LAUNCH = 0
+    LAUNCH = 0  # State when game is first launched
     MAIN_MENU = 1
     MAIN_SETTINGS = 2
     PLAY = 3
@@ -351,7 +351,7 @@ display = Display(
     1280,
     720,
     "PANDEMONIUM",
-    fullscreen=False if "--no-fullscreen" in sys.argv else True,
+    fullscreen=not any(x in sys.argv for x in ("--no-fullscreen", "-f", "-fm", "-mf")),
     vsync=False if "--no-vsync" in sys.argv else True,
 )
 
