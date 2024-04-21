@@ -58,7 +58,7 @@ def feed(msg: str) -> None:
         client.send(f"feed|{msg}\n".encode())
 
 
-def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
+def off(opt: str, target: str, args: list[str]):
     try:
         # Fix this: It raises an exception but has no perceivable bug or error,
         # but that might be shitty in the future
@@ -88,8 +88,7 @@ def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
         del tcp_data[target]
 
         for client_ in clients.copy():
-            if client_ != client:
-                client_.send(f"{opt}|{target}\n".encode())
+            client_.send(f"{opt}|{target}\n".encode())
 
             if str(client_.getpeername()) == target:
                 clients.remove(client_)
@@ -102,6 +101,8 @@ def off(opt: str, target: str, args: list[str], killer: Optional[str] = None):
                         "score": saved_data["score"],
                     }
 
+        print(f"{target} {opt if opt == 'quit' else 'was killed'}")
+
     except BaseException as e:
         alert(f"Failed to {opt} player", e)
 
@@ -110,12 +111,17 @@ def receive_udp():
     while True:
         request, addr = server_udp.recvfrom(2**12)
         request = json.loads(request)
-        udp_data[request["tcp_id"]].update(request["body"])
-        udp_data[request["tcp_id"]][
-            "udp_id"
-        ] = addr  # careful, this is a tuple, not a string
-        for v in udp_data.values():
-            server_udp.sendto(json.dumps(udp_data).encode(), v["udp_id"])
+
+        if request["tcp_id"] in udp_data:  # in case player died during a loop
+            udp_data[request["tcp_id"]].update(request["body"])
+
+            udp_data[request["tcp_id"]][
+                "udp_id"
+            ] = addr  # careful, this is a tuple, not a string
+
+            for player in udp_data.copy().values():
+                if "udp_id" in player:
+                    server_udp.sendto(json.dumps(udp_data).encode(), player["udp_id"])
 
 
 def receive_tcp(client: socket.socket, client_addr):
@@ -136,7 +142,7 @@ def receive_tcp(client: socket.socket, client_addr):
                         try:
                             client.send(
                                 ("init_res|" + json.dumps(tcp_data) + "\n").encode()
-                            )
+                            )  # Send back all TCP data before adding new player
                             tcp_data[str(client_addr)] = json.loads(args[0])
                             udp_data[str(client_addr)] = {
                                 "kills": 0,
@@ -149,6 +155,7 @@ def receive_tcp(client: socket.socket, client_addr):
                                 if client_ != client:
                                     client_.send((msg + "\n").encode())
 
+                            is_new = True
                             for client_ in inactive_clients.copy():
                                 if client.getpeername() == client_.getpeername():
                                     id_ = str(client_.getpeername())
@@ -157,6 +164,12 @@ def receive_tcp(client: socket.socket, client_addr):
                                     clients.append(client_)
                                     udp_data[id_] = inactive_data[id_]
                                     del inactive_data[id_]
+
+                                    is_new = False
+                                    print(f"{id_} returned:", tcp_data[id_])
+
+                            if is_new:
+                                print(f"{client_addr} joined")
 
                             name = tcp_data[str(client_addr)]["name"]
                             messages = [
@@ -174,7 +187,7 @@ def receive_tcp(client: socket.socket, client_addr):
                     case "quit":
                         off("quit", target, args)
                     case "kill":
-                        off("kill", target, args, str(client.getpeername()))
+                        off("kill", target, args)
 
                     case "inc_score":
                         udp_data[target]["score"] += int(args[0])

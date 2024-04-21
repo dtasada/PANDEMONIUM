@@ -67,7 +67,7 @@ class Joymap:
 
 
 class States(Enum):
-    LAUNCH = 0
+    LAUNCH = 0  # State when game is first launched
     MAIN_MENU = 1
     MAIN_SETTINGS = 2
     PLAY = 3
@@ -351,7 +351,7 @@ display = Display(
     1280,
     720,
     "PANDEMONIUM",
-    fullscreen=False if "--no-fullscreen" in sys.argv else True,
+    fullscreen=not any(x in sys.argv for x in ("--no-fullscreen", "-f", "-fm", "-mf")),
     vsync=False if "--no-vsync" in sys.argv else True,
 )
 
@@ -418,6 +418,28 @@ class Client(socket.socket):
                     messages = data.split("\n")
 
                     [self.queue.append(message) for message in messages if message]
+
+
+class Sounds:
+    MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
+    PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
+    FOOTSTEPS = {
+        os.path.splitext(file_with_ext)[0]: pygame.mixer.Sound(
+            Path("client", "assets", "sounds", "sfx", "footsteps", file_with_ext)
+        )
+        for file_with_ext in os.listdir(
+            Path("client", "assets", "sounds", "sfx", "footsteps")
+        )
+    }
+
+
+class Hue:
+    def __init__(self, color, alpha):
+        self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
+        self.surf.fill(color)
+        self.surf.set_alpha(alpha)
+        self.tex = Texture.from_surface(display.renderer, self.surf)
+        self.rect = self.surf.get_rect()
 
 
 def normalize_angle(angle: float) -> float:
@@ -609,19 +631,6 @@ for weapon, value in weapon_data.items():
         )
 
 ticks = pygame.time.get_ticks
-
-
-class Sounds:
-    MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
-    PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
-    FOOTSTEPS = {
-        os.path.splitext(file_with_ext)[0]: pygame.mixer.Sound(
-            Path("client", "assets", "sounds", "sfx", "footsteps", file_with_ext)
-        )
-        for file_with_ext in os.listdir(
-            Path("client", "assets", "sounds", "sfx", "footsteps")
-        )
-    }
 
 
 sky_tex = imgload("client", "assets", "images", "sky.jpeg")
