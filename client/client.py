@@ -1434,6 +1434,7 @@ class Player:
 
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
+                    print("take_damage:", message)
                     client_tcp.queue.remove(message)
 
                     split = message.split("|")
@@ -1446,8 +1447,6 @@ class Player:
                         score_inc = 25
                         self.score += score_inc
                         client_tcp.req(f"inc_score|{split[1]}|{score_inc}")
-
-                        # game.set_state(States.MAIN_MENU)
 
                 if message.startswith("inc_score|"):
                     client_tcp.queue.remove(message)
@@ -1621,7 +1620,7 @@ class EnemyPlayer:
                 self.image = self.images[3]
             # render
             display.renderer.blit(self.image, self.rect)
-            draw_rect(Colors.YELLOW, self.rect)
+            # draw_rect(Colors.YELLOW, self.rect)
             """
             fill_rect(Colors.ORANGE, self.head_rect)
             fill_rect(Colors.GREEN, self.torso_rect)
@@ -2189,16 +2188,8 @@ def main(multiplayer):
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.view_yoffset),
             )
+            render_floor()
             # display.renderer.blit(sky_tex, sky_rect)
-            fill_rect(
-                Colors.BROWN,
-                (
-                    0,
-                    display.height / 2 + player.view_yoffset,
-                    display.width,
-                    display.height / 2 - player.view_yoffset,
-                ),
-            )
 
             player.update()
             if game.should_render_map:
