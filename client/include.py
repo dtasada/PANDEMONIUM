@@ -420,6 +420,28 @@ class Client(socket.socket):
                     [self.queue.append(message) for message in messages if message]
 
 
+class Sounds:
+    MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
+    PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
+    FOOTSTEPS = {
+        os.path.splitext(file_with_ext)[0]: pygame.mixer.Sound(
+            Path("client", "assets", "sounds", "sfx", "footsteps", file_with_ext)
+        )
+        for file_with_ext in os.listdir(
+            Path("client", "assets", "sounds", "sfx", "footsteps")
+        )
+    }
+
+
+class Hue:
+    def __init__(self, color, alpha):
+        self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
+        self.surf.fill(color)
+        self.surf.set_alpha(alpha)
+        self.tex = Texture.from_surface(display.renderer, self.surf)
+        self.rect = self.surf.get_rect()
+
+
 def normalize_angle(angle: float) -> float:
     """
     Normalizes given angle to 0 - 360 degrees
@@ -609,19 +631,6 @@ for weapon, value in weapon_data.items():
         )
 
 ticks = pygame.time.get_ticks
-
-
-class Sounds:
-    MAIN_MENU = Path("client", "assets", "sounds", "music", "tristram.mp3")
-    PLAY = Path("client", "assets", "sounds", "music", "doom.mp3")
-    FOOTSTEPS = {
-        os.path.splitext(file_with_ext)[0]: pygame.mixer.Sound(
-            Path("client", "assets", "sounds", "sfx", "footsteps", file_with_ext)
-        )
-        for file_with_ext in os.listdir(
-            Path("client", "assets", "sounds", "sfx", "footsteps")
-        )
-    }
 
 
 sky_tex = imgload("client", "assets", "images", "sky.jpeg")

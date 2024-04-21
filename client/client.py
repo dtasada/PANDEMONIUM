@@ -152,10 +152,8 @@ class Game:
     def set_state(self, target_state):
         global player, hud, leaderboard
         if target_state == States.MAIN_MENU:
-            if self.previous_state != States.LAUNCH:
+            if self.previous_state != States.LAUNCH and client_tcp:
                 client_tcp.queue.clear()
-                # for entity in enemies.copy() + [player]:
-                #     entity.update()
 
             player = Player()
             hud = HUD()
@@ -581,7 +579,7 @@ class PlayerSelector:
         self.image = self.database["WHITE_RED"]
         self.tex = Texture.from_surface(display.renderer, self.image)
         self.rect = self.image.get_rect(
-            midright=(display.width - 120, display.height / 2)
+            midright=(display.width - 120, display.height / 2),
         )
         self.prim_color = 1
         self.sec_color = 0
@@ -597,18 +595,22 @@ class PlayerSelector:
         self.sec_colorkey = Colors.RED
         self.colors_equal = False
         self.set_skin()
-        # surf
+
+        self.hue = Hue(Colors.BLACK, 0.5)
+
         o = 10
-        self.outline = pygame.Rect(
+        self.portrait_rect = pygame.Rect(
             self.rect.x - o,
-            self.rect.y - o * 5,
+            self.rect.y - 10 - o * 5,
             self.rect.width + o * 2,
             self.rect.height + o * 7,
         )
-        #
-        self.black_surf = pygame.Surface(self.outline.size, pygame.SRCALPHA)
-        self.black_surf.fill((0, 0, 0, 120))
-        self.black_tex = Texture.from_surface(display.renderer, self.black_surf)
+        self.portrait_tex = Texture.from_surface(
+            display.renderer,
+            pygame.image.load(
+                Path("client", "assets", "images", "menu", "selector_backdrop.png")
+            ),
+        )
 
     def init(self):
         unleash_button = all_buttons[States.MAIN_MENU][1]
@@ -622,9 +624,12 @@ class PlayerSelector:
         )
 
     def update(self):
-        display.renderer.blit(self.black_tex, self.outline)
+        display.renderer.blit(self.hue.tex, self.portrait_rect)
+        display.renderer.blit(self.portrait_tex, self.portrait_rect)
         display.renderer.blit(self.menu_bg_tex, self.menu_bg_rect)
-        display.renderer.blit(self.tex, self.rect)
+        target = self.rect.scale_by(0.8)
+        target.y += 36
+        display.renderer.blit(self.tex, target)
 
         prim_skin_button = all_buttons[States.MAIN_MENU][5]
         sec_skin_button = all_buttons[States.MAIN_MENU][6]
@@ -1900,17 +1905,8 @@ unleash_button = all_buttons[States.MAIN_MENU][1]
 player_selector.init()
 
 username_input = UserInput(
-    player_selector.rect.centerx, player_selector.rect.y - 30, 40, Colors.WHITE
+    player_selector.rect.centerx, player_selector.rect.y + 48, 42, Colors.WHITE
 )
-
-
-class Hue:
-    def __init__(self, color, alpha):
-        self.surf = pygame.Surface((display.width, display.height), pygame.SRCALPHA)
-        self.surf.fill(color)
-        self.surf.set_alpha(alpha)
-        self.tex = Texture.from_surface(display.renderer, self.surf)
-        self.rect = self.surf.get_rect()
 
 
 darken_game = Hue(Colors.BLACK, 80)
