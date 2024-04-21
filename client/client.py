@@ -549,8 +549,6 @@ class Leaderboard:
             )
 
 
-
-
 class PlayerSelector:
     def __init__(self):
         self.database = {
@@ -793,7 +791,7 @@ class Player:
         if self.weapon is not None or self.meleing:
             weapon_data = gtex.weapon_textures["2" if self.meleing else self.weapon]
             if self.shooting:
-                self.weapon_anim += 0.2 * game.dt
+                self.weapon_anim += (0.2 if not self.meleing else 0.3) * game.dt
             try:
                 weapon_data[int(self.weapon_anim)]
             except IndexError:
@@ -1165,6 +1163,7 @@ class Player:
                                     mult = 1
                             if mult > 0:
                                 enemy.hit(mult)
+                                crosshair.set_damage_image_active()
 
             self.last_shot = ticks()
             self.mag -= 1
@@ -1626,10 +1625,31 @@ class Crosshair:
         self.w = 3  # width
         self.l = 20  # length
         self.target_offset = self.o = 50  # self.o is offset
-    
+        w, h = 50, 50
+        damage_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        br = 4
+        o = 0.35
+        color = Colors.ORANGE
+        pygame.draw.line(damage_surf, color, (0, 0), (w * o, h * o), br)
+        pygame.draw.line(damage_surf, color, (w, 0), (w * (1 - o), h * o), br)
+        pygame.draw.line(damage_surf, color, (w, h), (w * (1 - o), h * (1 - o)), br)
+        pygame.draw.line(damage_surf, color, (0, h), (w * o, h * (1 - o)), br)
+        self.damage_image = Texture.from_surface(display.renderer, damage_surf)
+        self.damage_rect = self.damage_image.get_rect(center=display.center)
+        self.damage_image_active = False
+        self.last_damage_image_active = 0
+        self.damage_image_diff = 0
+        self.m = 0.012
+        self.wavelength = 1 / self.m * pi
+
     @property
     def radius(self):
         return self.bottom[1] - display.height / 2
+
+    def set_damage_image_active(self):
+        if self.last_damage_image_active == 0:
+            self.last_damage_image_active = ticks()
+        self.damage_image_active = True
 
     def update(self):
         if game.target_zoom > 0:
@@ -1654,6 +1674,13 @@ class Crosshair:
         fill_rect(Colors.WHITE, self.left)
         fill_rect(Colors.WHITE, self.bottom)
         fill_rect(Colors.WHITE, self.top)
+        if self.damage_image_active:
+            self.damage_image_diff = ticks() - self.last_damage_image_active
+            self.damage_image.alpha = abs(sin(self.damage_image_diff * self.m) * 255)
+            display.renderer.blit(self.damage_image, self.damage_rect)
+            if self.damage_image_diff >= self.wavelength:
+                self.damage_image_active = False
+                self.last_damage_image_active = 0
 
 
 class Shot:
