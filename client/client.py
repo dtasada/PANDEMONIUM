@@ -1433,7 +1433,6 @@ class Player:
 
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
-                    print("take_damage:", message)
                     client_tcp.queue.remove(message)
 
                     split = message.split("|")
@@ -1636,9 +1635,11 @@ class EnemyPlayer:
     def hit(self, mult, melee=False):
         self.last_hit = ticks()
         self.regenerating = True
-        damage = int(weapon_data[player.weapon if not melee else "2"]["damage"] * mult)
+        damage = int(weapon_data["2" if melee else player.weapon]["damage"] * mult)
         if game.multiplayer:
+            # sometimes this gets triggered twice??
             client_tcp.req(f"damage|{self.id}|{damage}")
+
         if self.health <= 0:
             self.update()  # for dying
 
