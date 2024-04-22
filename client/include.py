@@ -151,11 +151,12 @@ class UserInput:
             )[1],
         )
         """
-
+        
 
 class Display:
     def __init__(self, width, height, title, fullscreen=False, vsync=False):
-        if fullscreen:
+        self.fullscreen = fullscreen
+        if self.fullscreen:
             self.width = pygame.display.Info().current_w
             self.height = pygame.display.Info().current_h
         else:
@@ -164,7 +165,7 @@ class Display:
         self.center = (self.width / 2, self.height / 2)
         self.window = Window(size=(self.width, self.height), title=title)
 
-        if fullscreen:
+        if self.fullscreen:
             self.window.set_fullscreen()
 
         self.renderer = Renderer(self.window, vsync=vsync)

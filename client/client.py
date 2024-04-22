@@ -164,7 +164,7 @@ class Game:
             hud.update_weapon_general(player)
 
         if (
-            target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
+            target_state == States.MAIN_MENU and self.state not in [States.MAIN_SETTINGS, States.CONTROLS] 
         ) or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU):
             pygame.mixer.music.load(Sounds.MAIN_MENU)
             pygame.mixer.music.play(-1)
@@ -1774,10 +1774,10 @@ joystick: pygame.joystick.JoystickType = None
 crosshair_tex = imgload("client", "assets", "images", "hud", "crosshair.png", scale=3)
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
-wasd_image = imgload("client", "assets", "images", "controls", "WASD.png", scale=0.5)
-e_image = imgload("client", "assets", "images", "controls", "E.png", scale=0.5)
-q_image = imgload("client", "assets", "images", "controls", "Q.png", scale=0.5)
-tab_image = imgload("client", "assets", "images", "controls", "TAB.png", scale=0.5)
+wasd_image = imgload("client", "assets", "images", "controls", "WASD.png", scale=0.5 if display.fullscreen else 0.3)
+e_image = imgload("client", "assets", "images", "controls", "E.png", scale=0.5 if display.fullscreen else 0.3)
+q_image = imgload("client", "assets", "images", "controls", "Q.png", scale=0.5 if display.fullscreen else 0.3)
+tab_image = imgload("client", "assets", "images", "controls", "TAB.png", scale=0.5 if display.fullscreen else 0.3)
 controls_images = [wasd_image, e_image, q_image, tab_image]
 
 title = Button(
@@ -2152,7 +2152,7 @@ def main(multiplayer):
             username_input.update()
 
         if game.state == States.CONTROLS:
-            controls_outline = pygame.Rect(display.width / 2 - 400, 100, 800, 750)
+            controls_outline = pygame.Rect(display.width / 2 - 400, display.height/7, 800, display.height * 5 / 7)
             controls_black_surf = pygame.Surface(controls_outline.size, pygame.SRCALPHA)
             controls_black_surf.fill((0, 0, 0, 120))
             controls_black_tex = Texture.from_surface(
@@ -2163,7 +2163,7 @@ def main(multiplayer):
             for img in controls_images:
                 display.renderer.blit(
                     img,
-                    img.get_rect(topleft=(display.width / 2 - 350, 150 * index + 50)),
+                    img.get_rect(topleft=(display.width / 2 - 350, img.height * index + display.height/7 - img.height/2)),
                 )
 
                 text = [
@@ -2179,7 +2179,7 @@ def main(multiplayer):
                     v_fonts[40],
                     Colors.WHITE,
                     display.width / 2 + 75,
-                    150 * index + 135,
+                    img.height * index + display.height/7,
                 )
                 index += 1
 
