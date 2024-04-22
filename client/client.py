@@ -1265,7 +1265,6 @@ class Player:
         start_y = start_y if start_y is not None else self.start_y
         cur_x, cur_y = [int(start_x), int(start_y)]
         hypot_x, hypot_y = sqrt(1 + (dy / dx) ** 2), sqrt(1 + (dx / dy) ** 2)
-        direc = (dx, dy)
 
         if dx < 0:
             step_x = -1
@@ -1620,8 +1619,8 @@ class EnemyPlayer:
                 self.image = self.images[3]
             # render
             display.renderer.blit(self.image, self.rect)
-            # draw_rect(Colors.YELLOW, self.rect)
             """
+            draw_rect(Colors.YELLOW, self.rect)
             fill_rect(Colors.ORANGE, self.head_rect)
             fill_rect(Colors.GREEN, self.torso_rect)
             fill_rect(Colors.PINK, self.arm1_rect)
