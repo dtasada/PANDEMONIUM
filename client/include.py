@@ -444,7 +444,9 @@ class Hue:
 
 def normalize_angle(angle: float) -> float:
     """
-    Normalizes given angle to 0 - 360 degrees
+    Normalizes given angle to 0 - 360 degrees (degrees this time)
+    :param angle: the angle to normalize
+    :return: the normalized angle
     """
     angle = positive_angle(angle)
     while angle > 180:
@@ -455,18 +457,23 @@ def normalize_angle(angle: float) -> float:
 def positive_angle(angle: float) -> float:
     """
     Makes angle positive
+    :param angle: the angle to be made positive
+    :return: the positive angle
     """
     while angle < 0:
         angle += 360
     return angle
 
 
-def is_angle_between(a: float, testAngle: float, b: float) -> bool:
+def is_angle_between(a: float, test_angle: float, b: float) -> bool:
     """
-    Checks if testAngle is between a and b
+    Checks if test_angle is between a and b
+    :param a: bound 1
+    :param b: bound 2
+    :return: whether test_angle is between bound 1 and bound 2
     """
-    a -= testAngle
-    b -= testAngle
+    a -= test_angle
+    b -= test_angle
     a = normalize_angle(a)
     b = normalize_angle(b)
     if a * b >= 0:
@@ -485,6 +492,19 @@ def imgload(
     to_tex: bool = True,
     return_rect: bool = False,
 ) -> tuple[Texture, pygame.Rect]:
+    """
+    Loads an image given the path and extra (keyword) arguments
+    :param path_: the path of the image (given as arbitrary amount of strings)
+    :param colorkey: the color to be made transparent in the final image(s)
+    :param frames: the amount of the frames that the spritesheet consist of (the default is None, so no spritesheet by default)
+    :param whitespace: the amount of whitespace in pixels for the given spritesheet
+    :param frame_pause: the specific frame to repeat more than the other frames, creating a pause-effect
+    :param end_frame: the specific frame to end on
+    :param scale: the scale factor for the image(s)
+    :param to_tex: whether to convert the Surface object to a Texture object (the default is True)
+    :param return_rect: whether to also return a rect together with the image(s)
+    :return: the loaded image, and optionally the rect
+    """
     # init
     ret = []
     img = pygame.image.load(Path(*path_))
@@ -521,33 +541,65 @@ def imgload(
 
 
 def fill_rect(color: Color, rect: pygame.Rect) -> None:
+    """
+    Draws and fills a rectangle at given 4 points.
+    :param color: the color
+    :param rect: the rectangle to use (must consist of a pygame.Rect object in the form x, y, width, height)
+    """
     display.renderer.draw_color = color
     display.renderer.fill_rect(rect)
 
 
 def draw_rect(color: Color, rect: pygame.Rect) -> None:
+    """
+    Draws a rectangle at given 4 points (only the 1 pixel outline).
+    :param color: the color
+    :param rect: the rectangle to use (must consist of a pygame.Rect object in the form x, y, width, height)
+    """
     display.renderer.draw_color = color
     display.renderer.draw_rect(rect)
 
 
 def draw_line(color: Color, p1: tuple[int, int], p2: tuple[int, int]) -> None:
+    """
+    Draws line at given coordinates
+    :param color: the color
+    :param p1: point 1
+    :param p2: point 2
+    """
     display.renderer.draw_color = color
     display.renderer.draw_line(p1, p2)
 
 
 def angle_to_vel(angle: float, speed: float = 1) -> tuple[float, float]:
-    """Convert een richting naar twee snelheidsvectoren"""
+    """
+    Convert a direction to a velocity vector
+    :param angle: the angle to convert
+    :param speed: the scalar multiplier for the final velocities
+    :return: returns the x and y velocities representing a vector
+    """
     return cos(angle) * speed, sin(angle) * speed
 
 
 def load_map_from_csv(path_: str, int_: bool = True) -> list[list[int]]:
-    """Load een 2D map van een csv bestand"""
+    """:
+    Load a 2D map from a csv file
+    :param path_: the path to load from
+    :param int_: whether to convert all string entries from the csv file to integers
+    :return: the map as a 2D list
+    """
     with open(path_, "r") as f:
         reader = csv.reader(f)
         return [[int(x) if int_ else x.lstrip() for x in line] for line in reader]
 
 
 def text2tex(content: str | int, font_size: int) -> Texture:
+    """
+    Convert text to a texture
+    :param content: the content as a string to convert to a texture
+    :param font_size: the font size
+    :return: the texture
+    """
     return Texture.from_surface(
         display.renderer, v_fonts[font_size].render(str(content), True, Colors.WHITE)
     )
@@ -566,6 +618,21 @@ def write(
     special_flags: int = 0,
     convert_to_tex: bool = True,
 ) -> tuple[Texture, pygame.Rect]:
+    """
+    Writes text on the screen.
+    :param anchor: the anchor of the text (topleft, midtop, topright, midright, bottomright, midbottom, bottomleft, midleft, center)
+    :param content: the text content as a string
+    :param font: the font
+    :param color: the body color
+    :param x: the x coordinate of the text
+    :param y: the y coordinate of the text
+    :param alpha: the alpha channel (transparency) of the text
+    :param blit: whether to blit the text (or just to blit it)
+    :param border: the optional border color
+    :param special_flags: special flags for pygame rendering
+    :convert_to_tex: whether to convert the Surface to a Texture
+    :return: the Texture and the Rect
+    """
     if border is not None:
         bc, bw = border, 1
         write(anchor, content, font, bc, x - bw, y - bw)
@@ -591,7 +658,13 @@ def write(
 def borderize(
     img: pygame.Surface, color: tuple[int, int, int], thickness: int = 1
 ) -> pygame.Surface:
-    """Returns a borderized version of a surface with the given color and thickness"""
+    """
+    Returns a borderized version of a surface with the given color and thickness
+    :param img: the image
+    :param color: the color
+    :param thickness: the thickness
+    :return: the borderized image
+    """
     mask = pygame.mask.from_surface(img)
     mask_surf = mask.to_surface(setcolor=color)
     mask_surf.set_colorkey(Colors.BLACK)
@@ -606,12 +679,21 @@ def borderize(
 
 
 def pi2pi(angle: float) -> float:
-    """Normalize the angle in radians to 2 * pi"""
+    """
+    Normalize the angle in radians to 2 * pi (in radialen)
+    :param angle: the angle
+    :return: the normalized angle
+    """
     return atan2(sin(angle), cos(angle))
 
 
 def angle_diff(angle1: float, angle2: float) -> float:
-    """Returns the smallest possible difference in given angles"""
+    """
+    Returns the smallest possible difference in given angles
+    :param angle1: angle 1
+    :param angle2: angle 2
+    :return: the difference between the two angles
+    """
     return min((angle1 - angle2 + 360) % 360, (angle2 - angle1 + 360) % 360)
 
 

@@ -16,6 +16,9 @@ import atexit
 
 
 def quit():
+    """
+    Quits the game and saves the user files for further launches.
+    """
     json_save = {
         "resolution": game.resolution,
         "fov": game.fov,
@@ -150,6 +153,10 @@ class Game:
         self.running = False
 
     def set_state(self, target_state):
+        """
+        The state of the game changes to the target state and the necessary variables get initialized.
+        :param target_state: the new game state
+        """
         global player, hud, leaderboard
         if target_state == States.MAIN_MENU:
             if self.previous_state != States.LAUNCH and client_tcp:
@@ -365,6 +372,9 @@ class HUD:
         )
 
     def update(self):
+        """
+        The update function of the HUD: it renders the score, ammo, health, etc..
+        """
         if self.health_tex is not None:
             display.renderer.blit(self.health_tex, self.health_rect)
         if self.score_tex is not None:
@@ -408,11 +418,19 @@ class HUD:
                 )
 
     def update_weapon_general(self, player):
+        """
+        The textures for general weapon stuff get updated (weapon image, ammo, name). Doing this each frame is expensive.
+        :param player: the player object which has all the weapon data that this function uses.
+        """
         self.update_weapon_tex(player)
         self.update_ammo(player)
         self.update_weapon_name(player)
 
     def update_health(self, player):
+        """
+        The health texture gets updated.
+        :param player: the player object which has all the weapon data that this function uses.
+        """
         self.health_tex, self.health_rect = write(
             "bottomleft",
             str(player.health),
@@ -423,6 +441,10 @@ class HUD:
         )
 
     def update_score(self, player):
+        """
+        The score texture gets updated.
+        :param player: the player object which has all the weapon data that this function uses.
+        """
         self.score_tex, self.score_rect = write(
             "bottomleft",
             f"${player.score}",
@@ -441,6 +463,10 @@ class HUD:
         )
 
     def update_ammo(self, player):
+        """
+        The ammo texture gets updated.
+        :param player: the player object which has all the weapon data that this function uses.
+        """
         max_mag_size = weapon_data[player.weapon]["mag"]
         self.ammo_tex, self.ammo_rect = write(
             "midright",
@@ -461,6 +487,10 @@ class HUD:
             )
 
     def update_weapon_name(self, player):
+        """
+        The weapon name texture gets updated.
+        :param player: the player object which has all the weapon data that this function uses.
+        """
         self.weapon_name_tex, self.weapon_name_rect = write(
             "bottomright",
             weapon_names[int(player.weapon)],
@@ -471,6 +501,10 @@ class HUD:
         )
 
     def update_weapon_tex(self, player):
+        """
+        The weapon texture gets updated.
+        :param player: the player object which has all the weapon data that this function uses.
+        """
         self.weapon_tex = gtex.mask_object_textures[int(player.weapon)]
         self.weapon_rect = self.weapon_tex.get_rect()
         m = 3
@@ -485,6 +519,9 @@ class Leaderboard:
         self.texs: Dict[str, tuple[Texture, Optional[int]]] = {}
 
     def update(self):
+        """
+        The leaderboard which shows the players and their scores.
+        """
         # Sort by K/D
         scores: Dict[str, float] = {
             player.id: (
@@ -624,6 +661,9 @@ class PlayerSelector:
         )
 
     def update(self):
+        """
+        De rendering van de skin selector.
+        """
         display.renderer.blit(self.hue.tex, self.portrait_rect)
         display.renderer.blit(self.portrait_tex, self.portrait_rect)
         display.renderer.blit(self.menu_bg_tex, self.menu_bg_rect)
@@ -814,6 +854,9 @@ class Player:
         self.ammos[self.weapon_index] = value
 
     def display_weapon(self):
+        """
+        The weapons of the player get displayed and updated.
+        """
         if self.weapon is not None or self.meleing:
             weapon_data = gtex.weapon_textures["2" if self.meleing else self.weapon]
             if self.shooting:
@@ -878,6 +921,9 @@ class Player:
             display.renderer.blit(weapon_tex, self.weapon_rect)
 
     def draw(self):
+        """
+        The player draw function that also renders the to-be-equipped weapon.
+        """
         self.arrow_rect.center = self.rect.center
         self.arrow_img.angle = degrees(self.angle)
         display.renderer.blit(
@@ -913,6 +959,9 @@ class Player:
                 )
 
     def render_map(self):
+        """
+        Renders the minimap.
+        """
         game.mo = game.tile_size * 0
         game.map_rect = game.map_tex.get_rect(topleft=(game.mo, game.mo))
         game.rendered_enemies = 0
@@ -947,6 +996,9 @@ class Player:
                 )
 
     def try_to_buy_wall_weapon(self):
+        """
+        Tries to buy the current wall weapon.
+        """
         if self.to_equip is not None:
             # actually buy the wall weapon
             (x, y), obj = self.to_equip
@@ -959,6 +1011,9 @@ class Player:
             self.weapon_switch_direc = 1
 
     def keys(self):
+        """
+        The movement mechanics of the players.
+        """
         # keyboard
         self.to_equip = None
         self.surround = []
@@ -1203,6 +1258,9 @@ class Player:
                 )
 
     def reload(self, amount=None):
+        """
+        Reloads the player weapon.
+        """
         if self.weapon is not None:
             if self.ammo > 0:
                 if self.mag < weapon_data[self.weapon]["mag"]:
@@ -1219,6 +1277,9 @@ class Player:
                         self.new_mag = self.mag + final_mag
 
     def melee(self):
+        """
+        The melee attack of the player.
+        """
         if not self.meleing:
             if ticks() - self.last_melee >= weapon_data["2"]["fire_pause"]:
                 self.weapon_anim = 1
@@ -1251,7 +1312,15 @@ class Player:
 
     def cast_ray(
         self, deg_offset, index, start_x=None, start_y=None, abs_angle=False
-    ):  # add comments here pls
+    ):
+        """
+        Casts a ray in given direction to render a wall.
+        :param deg_offset: the offset from the player direction
+        :param index: the index of the ray used for calculating the x position of the wall
+        :param start_x: the starting x position of the ray
+        :param start_y: the starting y position of the ray
+        :param abs_ange: whether to pass the ray angle in absolute fashion (instead of the deg_offset)
+        """
         offset = radians(deg_offset)
         if not abs_angle:
             angle = self.angle + offset
@@ -1386,6 +1455,9 @@ class Player:
                     )
 
     def send_location(self):
+        """
+        Sends the location of the player to the server
+        """
         client_udp.req(
             json.dumps(
                 {
@@ -1400,6 +1472,10 @@ class Player:
         )
 
     def set_weapon(self, weapon):
+        """
+        Sets the player weapon by checking which weapon slot it takes up
+        :param weapon: the weapon ID (you can check those in the weapon_data.json)
+        """
         self.weapon_anim = 0
         weapon = int(weapon)
         self.weapon_hud_tex = gtex.mask_object_textures[weapon]
@@ -1423,6 +1499,9 @@ class Player:
         hud.update_weapon_general(self)
 
     def update(self):
+        """
+        The update function of the player. It renders it and gets the messages from the server.
+        """
         if game.multiplayer:
             self.send_location()
 
@@ -1499,12 +1578,19 @@ class EnemyPlayer:
         self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
 
     def init_image(self, surf: pygame.Surface):
+        """
+        Initializes the enemy image.
+        :param surf: the surface to be used for initialization
+        """
         self.image = Texture.from_surface(
             display.renderer,
             surf.subsurface(0, 0, surf.get_width() / 4, surf.get_height()),
         )
 
     def draw(self):
+        """
+        Gets the enemy data from the server and renders it at given indicator position
+        """
         if game.multiplayer:
             if client_udp.current_message:
                 message = json.loads(client_udp.current_message)
@@ -1523,6 +1609,9 @@ class EnemyPlayer:
         display.renderer.blit(self.indicator_img, self.indicator_rect)
 
     def update(self):
+        """
+        Updates the enemy by drawing it, checking for deaths and regenerating it
+        """
         if game.multiplayer:
             if self.health <= 0:
                 client_tcp.req(f"kill|{self.id}")
@@ -1538,6 +1627,9 @@ class EnemyPlayer:
         self.regenerate()
 
     def render(self):
+        """
+        Renders the enemy at given position (this time 3D instead of the indicator)
+        """
         start_angle = degrees(pi2pi(player.angle)) - game.fov // 2
         angle = self.player_pov_angle
         end_angle = start_angle + (game.ray_density + 1) * game.fov / game.ray_density
@@ -1632,10 +1724,16 @@ class EnemyPlayer:
             self.rendering = True
 
     def regenerate(self):
+        """
+        Regenerates the enemy
+        """
         if self.regenerating and ticks() - self.last_hit >= 70:
             self.regenerating = False
 
     def hit(self, mult, melee=False):
+        """
+        Checks for hits
+        """
         self.last_hit = ticks()
         self.regenerating = True
         damage = int(weapon_data[player.weapon if not melee else "2"]["damage"] * mult)
@@ -1645,6 +1743,9 @@ class EnemyPlayer:
             self.update()  # for dying
 
     def die(self):
+        """
+        Attempts to kill the player
+        """
         try:
             del leaderboard.texs[self.id]
             enemies.remove(self)
@@ -1679,11 +1780,17 @@ class Crosshair:
         return self.bottom[1] - display.height / 2
 
     def set_damage_image_active(self):
+        """
+        Sets the damage indicator of the crosshair to True
+        """
         if self.last_damage_image_active == 0:
             self.last_damage_image_active = ticks()
         self.damage_image_active = True
 
     def update(self):
+        """
+        Updates the crosshair by rendering it and changing its position according to the player movement
+        """
         if game.target_zoom > 0:
             self.target_offset = 4
             self.l = 10
@@ -1747,6 +1854,9 @@ class Shot:
         self.alpha = 255
 
     def update(self):
+        """
+        Update the shot indicator
+        """
         if self.alpha < 0:
             shots.remove(self)
             return
@@ -1990,6 +2100,10 @@ def render_floor():
 
 
 def main(multiplayer):
+    """
+    The main loop of the game; it renders and updates everything and checks for events
+    :param multiplayer: whether the game is multiplayer (for singleplayer debugging purposes)
+    """
     global client_udp, client_tcp, joystick
 
     game.multiplayer = multiplayer
