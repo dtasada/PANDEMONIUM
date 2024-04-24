@@ -171,7 +171,7 @@ class Game:
             hud.update_weapon_general(player)
 
         if (
-            target_state == States.MAIN_MENU and self.state != States.MAIN_SETTINGS
+            target_state == States.MAIN_MENU and self.state not in [States.MAIN_SETTINGS, States.CONTROLS] 
         ) or (target_state == States.MAIN_SETTINGS and self.state != States.MAIN_MENU):
             pygame.mixer.music.load(Sounds.MAIN_MENU)
             pygame.mixer.music.play(-1)
@@ -1334,7 +1334,6 @@ class Player:
         start_y = start_y if start_y is not None else self.start_y
         cur_x, cur_y = [int(start_x), int(start_y)]
         hypot_x, hypot_y = sqrt(1 + (dy / dx) ** 2), sqrt(1 + (dx / dy) ** 2)
-        direc = (dx, dy)
 
         if dx < 0:
             step_x = -1
@@ -1526,8 +1525,6 @@ class Player:
                         self.score += score_inc
                         client_tcp.req(f"inc_score|{split[1]}|{score_inc}")
 
-                        # game.set_state(States.MAIN_MENU)
-
                 if message.startswith("inc_score|"):
                     client_tcp.queue.remove(message)
                     self.score += int(message.split("|")[1])
@@ -1713,8 +1710,8 @@ class EnemyPlayer:
                 self.image = self.images[3]
             # render
             display.renderer.blit(self.image, self.rect)
-            draw_rect(Colors.YELLOW, self.rect)
             """
+            draw_rect(Colors.YELLOW, self.rect)
             fill_rect(Colors.ORANGE, self.head_rect)
             fill_rect(Colors.GREEN, self.torso_rect)
             fill_rect(Colors.PINK, self.arm1_rect)
@@ -1736,9 +1733,11 @@ class EnemyPlayer:
         """
         self.last_hit = ticks()
         self.regenerating = True
-        damage = int(weapon_data[player.weapon if not melee else "2"]["damage"] * mult)
+        damage = int(weapon_data["2" if melee else player.weapon]["damage"] * mult)
         if game.multiplayer:
+            # sometimes this gets triggered twice??
             client_tcp.req(f"damage|{self.id}|{damage}")
+
         if self.health <= 0:
             self.update()  # for dying
 
@@ -1885,10 +1884,10 @@ joystick: pygame.joystick.JoystickType = None
 crosshair_tex = imgload("client", "assets", "images", "hud", "crosshair.png", scale=3)
 crosshair_rect = crosshair_tex.get_rect(center=(display.center))
 
-wasd_image = imgload("client", "assets", "images", "controls", "WASD.png", scale=0.5)
-e_image = imgload("client", "assets", "images", "controls", "E.png", scale=0.5)
-q_image = imgload("client", "assets", "images", "controls", "Q.png", scale=0.5)
-tab_image = imgload("client", "assets", "images", "controls", "TAB.png", scale=0.5)
+wasd_image = imgload("client", "assets", "images", "controls", "WASD.png", scale=0.5 if display.fullscreen else 0.3)
+e_image = imgload("client", "assets", "images", "controls", "E.png", scale=0.5 if display.fullscreen else 0.3)
+q_image = imgload("client", "assets", "images", "controls", "Q.png", scale=0.5 if display.fullscreen else 0.3)
+tab_image = imgload("client", "assets", "images", "controls", "TAB.png", scale=0.5 if display.fullscreen else 0.3)
 controls_images = [wasd_image, e_image, q_image, tab_image]
 
 title = Button(
@@ -2267,7 +2266,7 @@ def main(multiplayer):
             username_input.update()
 
         if game.state == States.CONTROLS:
-            controls_outline = pygame.Rect(display.width / 2 - 400, 100, 800, 750)
+            controls_outline = pygame.Rect(display.width / 2 - 400, display.height/7, 800, display.height * 5 / 7)
             controls_black_surf = pygame.Surface(controls_outline.size, pygame.SRCALPHA)
             controls_black_surf.fill((0, 0, 0, 120))
             controls_black_tex = Texture.from_surface(
@@ -2278,7 +2277,7 @@ def main(multiplayer):
             for img in controls_images:
                 display.renderer.blit(
                     img,
-                    img.get_rect(topleft=(display.width / 2 - 350, 150 * index + 50)),
+                    img.get_rect(topleft=(display.width / 2 - 350, img.height * index + display.height/7 - img.height/2)),
                 )
 
                 text = [
@@ -2294,7 +2293,7 @@ def main(multiplayer):
                     v_fonts[40],
                     Colors.WHITE,
                     display.width / 2 + 75,
-                    150 * index + 135,
+                    img.height * index + display.height/7,
                 )
                 index += 1
 
@@ -2303,16 +2302,8 @@ def main(multiplayer):
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.view_yoffset),
             )
+            render_floor()
             # display.renderer.blit(sky_tex, sky_rect)
-            fill_rect(
-                Colors.BROWN,
-                (
-                    0,
-                    display.height / 2 + player.view_yoffset,
-                    display.width,
-                    display.height / 2 - player.view_yoffset,
-                ),
-            )
 
             player.update()
             if game.should_render_map:
