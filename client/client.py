@@ -1216,7 +1216,8 @@ class Player:
             self.weapon_switch_offset += self.weapon_switch_direc * m * game.dt
 
     def shoot(self, melee: bool = False):
-        joystick.rumble(10, 10, 100)
+        if joystick is not None:
+            joystick.rumble(10, 10, 100)
         """
         Makes the player shoot a bullet and check whether it hits an enemy.
         """
@@ -1530,7 +1531,8 @@ class Player:
 
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
-                    joystick.rumble(1, 1, 300)
+                    if joystick is not None:
+                        joystick.rumble(1, 1, 300)
                     client_tcp.queue.remove(message)
 
                     split = message.split("|")
