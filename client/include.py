@@ -65,6 +65,10 @@ class Joymap:
     TRIANGLE = 3
     LEFT_JOYSTICK_CLICK = 7
 
+    # data
+    CACHE = dict.fromkeys(("LEFT_TRIGGER", "RIGHT_TRIGGER"), float("-inf"))
+    PRESSED = dict.fromkeys(("LEFT_TRIGGER", "RIGHT_TRIGGER"), False)
+
 
 class States(Enum):
     LAUNCH = 0  # State when game is first launched

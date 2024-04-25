@@ -778,6 +778,7 @@ class Player:
         self.mags = [weapon_data["4"]["mag"], None]
         self.weapon_anim = 0
         # dynamic offsets and stuff
+        self.adsing = False
         self.shooting = False
         self.reloading = False
         self.switching_weapons = False
@@ -1019,19 +1020,25 @@ class Player:
         self.surround = []
         if game.state == States.PLAY:
             # doing the ADS
+            ads = False
             mouses = pygame.mouse.get_pressed()
             if mouses[2]:  # right mouse button
-                if not self.adsing and self.can_shoot:
+                if self.can_shoot:
                     if self.weapon is not None:
-                        game.target_zoom = min(15, self.wall_distance)
-                        game.zoom = 0
-                        self.weapon_ads_offset_target = 32 * 6
-                    self.adsing = True
+                        ads = True
+            if self.process_ads:
+                ads = True
+            if ads:
+                game.target_zoom = min(15, self.wall_distance)
+                self.weapon_ads_offset_target = 32 * 6
+                self.adsing = True
+            # exit handler for adsing
+            if joystick is None:
+                exit_cond = not ads or not self.adsing
             else:
-                game.target_zoom = 0
-                game.last_zoom = ticks()
-                self.weapon_ads_offset_target = 0
-                self.adsing = False
+                exit_cond = False  # cannot exit right now with controller, event loop must do it
+            if exit_cond:
+                self.stop_adsing()
             # keyboard
             self.moving = False
             vmult = 0.8
@@ -1089,7 +1096,7 @@ class Player:
                     ax0p *= run_m
                     ax1p *= run_m
                 if ax0p != 0 or ax1p != 0:
-                    xvel, yvel = ax0p * vmult, ax1p * vmult
+                    xvel, yvel = ax0p * vmult * game.dt, ax1p * vmult * game.dt
                 # rotation
                 hor_m = 0.0005 * game.sens
                 ver_m = -0.4 * game.sens
@@ -1139,17 +1146,10 @@ class Player:
                 self.surround.append((x, y))
 
         # cast the rays
-        if game.target_zoom > 0 and False:  # dit is voor debugging dus doet niks
-            start_x, start_y = (
-                self.rect.centerx / game.tile_size,
-                self.rect.centery / game.tile_size,
-            )
-            self.cast_ray(0, 0, start_x, start_y)
-        else:
-            o = -game.fov // 2
-            for index in range(game.ray_density + 1):
-                self.cast_ray(o, index)
-                o += game.fov / game.ray_density
+        o = -game.fov // 2
+        for index in range(game.ray_density + 1):
+            self.cast_ray(o, index)
+            o += game.fov / game.ray_density
         self.start_x_px = self.start_x * game.tile_size
         self.start_y_px = self.start_y * game.tile_size
         for enemy in enemies:
@@ -1167,23 +1167,19 @@ class Player:
         # processing other important joystick input
         shoot_auto = False
         if joystick is not None:
-            # picking up wall items
-            if joystick.get_button(Joymap.SQUARE):
-                self.try_to_buy_wall_weapon()
             # shoot with joystick
             ax = joystick.get_axis(Joymap.RIGHT_TRIGGER)
-            shoot = ax > -1
-        else:
-            if self.weapon in weapon_data:
-                if weapon_data[self.weapon]["auto"]:
-                    mouses = pygame.mouse.get_pressed()
-                    shoot_auto = mouses[0]
-                if self.weapon is not None:
-                    if shoot_auto or self.process_shot:
-                        if self.mag == 0:
-                            self.reload()
-                        elif self.can_shoot:
-                            self.shoot()
+            shoot_auto_controller = ax > -1
+        if self.weapon in weapon_data:
+            if weapon_data[self.weapon]["auto"]:
+                mouses = pygame.mouse.get_pressed()
+                shoot_auto = mouses[0] or shoot_auto_controller
+            if self.weapon is not None:
+                if shoot_auto or self.process_shot:
+                    if self.mag == 0:
+                        self.reload()
+                    elif self.can_shoot:
+                        self.shoot()
 
         # melee?
         if self.process_melee:
@@ -1256,25 +1252,34 @@ class Player:
                 client_tcp.req(
                     f"shoot|{self.id}|{self.weapon}|{self.arrow_rect.x}|{self.arrow_rect.y}"
                 )
+    
+    def stop_adsing(self):
+        """
+        Stops the player from adsing.
+        """
+        game.target_zoom = 0
+        last_zoom = ticks()
+        self.weapon_ads_offset_target = 0
+        self.adsing = False
+    
+    def can_reload(self):
+        return self.weapon is not None and self.ammo > 0 and self.mag < weapon_data[self.weapon]["mag"]
 
     def reload(self, amount=None):
         """
         Reloads the player weapon.
         """
-        if self.weapon is not None:
-            if self.ammo > 0:
-                if self.mag < weapon_data[self.weapon]["mag"]:
-                    if not self.reloading:
-                        game.target_zoom = 0
-                        self.weapon_ads_offset_target = 0
-                        self.adsing = False
-                        self.reloading = True
-                        self.reload_direc = 1
-                        needed_mag = weapon_data[self.weapon]["mag"] - self.mag
-                        supplied_mag = min(self.ammo, weapon_data[self.weapon]["mag"])
-                        final_mag = min(needed_mag, supplied_mag)
-                        self.new_ammo = self.ammo - final_mag
-                        self.new_mag = self.mag + final_mag
+        if self.can_reload():
+            game.target_zoom = 0
+            self.weapon_ads_offset_target = 0
+            self.adsing = False
+            self.reloading = True
+            self.reload_direc = 1
+            needed_mag = weapon_data[self.weapon]["mag"] - self.mag
+            supplied_mag = min(self.ammo, weapon_data[self.weapon]["mag"])
+            final_mag = min(needed_mag, supplied_mag)
+            self.new_ammo = self.ammo - final_mag
+            self.new_mag = self.mag + final_mag
 
     def melee(self):
         """
@@ -1790,6 +1795,7 @@ class Crosshair:
         """
         Updates the crosshair by rendering it and changing its position according to the player movement
         """
+        # the cross symbol
         if game.target_zoom > 0:
             self.target_offset = 4
             self.l = 10
@@ -1837,6 +1843,7 @@ class Crosshair:
         fill_rect(Colors.WHITE, self.left)
         fill_rect(Colors.WHITE, self.bottom)
         fill_rect(Colors.WHITE, self.top)
+        # damage indicator
         if self.damage_image_active:
             self.damage_image_diff = ticks() - self.last_damage_image_active
             self.damage_image.alpha = abs(sin(self.damage_image_diff * self.m) * 255)
@@ -2118,6 +2125,7 @@ def main(multiplayer):
         game.dt = clock.tick(game.get_max_fps()) / (1 / 60 * 1000)
         player.process_shot = False
         player.process_melee = False
+        player.process_ads = False
 
         # Global TCP events
         if game.multiplayer:
@@ -2244,6 +2252,31 @@ def main(multiplayer):
                     if event.button == Joymap.CROSS:
                         # player.jump() implement
                         ...
+                    
+                    elif event.button == Joymap.SQUARE:
+                        if player.can_reload():
+                            player.reload()
+                        else:
+                            player.try_to_buy_wall_weapon()
+                
+                case pygame.JOYAXISMOTION:
+                    # ADS
+                    if event.axis == Joymap.LEFT_TRIGGER:
+                        if event.value - Joymap.CACHE["LEFT_TRIGGER"] > 0 and not Joymap.PRESSED["LEFT_TRIGGER"]:
+                            player.process_ads = True
+                        else:
+                            Joymap.PRESSED["LEFT_TRIGGER"] = False
+                            player.stop_adsing()
+                        Joymap.CACHE["LEFT_TRIGGER"] = event.value
+                
+                    # shoot
+                    elif event.axis == Joymap.RIGHT_TRIGGER:
+                        if event.value - Joymap.CACHE["RIGHT_TRIGGER"] > 0 and not Joymap.PRESSED["RIGHT_TRIGGER"]:
+                            if not weapon_data[player.weapon]["auto"]:
+                                player.process_shot = True
+                        else:
+                            Joymap.PRESSED["RIGHT_TRIGGER"] = False
+                        Joymap.CACHE["RIGHT_TRIGGER"] = event.value
 
             for button in current_buttons:
                 button.process_event(event)
