@@ -37,6 +37,14 @@ def quit():
     print("Exited successfully")
 
 
+def escape_key():
+    match game.state:
+        case States.PLAY_SETTINGS:
+            game.set_state(States.PLAY)
+        case States.PLAY:
+            game.set_state(States.PLAY_SETTINGS)
+
+
 atexit.register(quit)
 
 
@@ -942,7 +950,7 @@ class Player:
             weapon_name = weapon_names[int(weapon_id)]
             # weapon_name =
             cost = weapon_data[weapon_id]["cost"]
-            write(
+            _, rect = write(
                 "midbottom",
                 f"Press <e> to buy {weapon_name} [${cost}]",
                 v_fonts[52],
@@ -951,9 +959,8 @@ class Player:
                 display.height - 50,
             )
             if joystick is not None:
-                joystick_button_rect.midbottom = (
-                    display.width / 2 - 115,
-                    display.height - 42,
+                joystick_button_rect.midleft = (
+                    rect.left + 130, rect.centery
                 )
                 display.renderer.blit(
                     joystick_button_sprs[Joymap.SQUARE], joystick_button_rect
@@ -1039,8 +1046,11 @@ class Player:
                 exit_cond = False  # cannot exit right now with controller, event loop must do it
             if exit_cond:
                 self.stop_adsing()
-            # keyboard
+            # vars
+            run_m = 1.5
+            self.running = False
             self.moving = False
+            # keyboard
             vmult = 0.8
             keys = pygame.key.get_pressed()
             xvel = yvel = 0
@@ -1053,17 +1063,11 @@ class Player:
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
             if keys[pygame.K_LSHIFT] or game.target_zoom > 0:
-                xvel /= 2
-                yvel /= 2
+                xvel *= run_m
+                yvel *= run_m
+                self.running = True
             xvel *= game.dt
             yvel *= game.dt
-            if xvel or yvel:
-                self.moving = True
-                if ticks() - self.last_step >= 400:
-                    # play sound perhaps?
-                    self.last_step = ticks()
-            else:
-                self.last_step = ticks()
 
             amult = 0.03
             if keys[pygame.K_LEFT]:
@@ -1092,9 +1096,9 @@ class Player:
                 thr = 0.06
                 # run mechanics
                 if joystick.get_button(Joymap.LEFT_JOYSTICK_CLICK):
-                    run_m = 2
                     ax0p *= run_m
                     ax1p *= run_m
+                    self.running = True
                 if ax0p != 0 or ax1p != 0:
                     xvel, yvel = ax0p * vmult * game.dt, ax1p * vmult * game.dt
                 # rotation
@@ -1111,6 +1115,14 @@ class Player:
                 # rot_yvel = ax3 * m
                 self.angle += rot_xvel
 
+            # move
+            if xvel or yvel:
+                self.moving = True
+                if ticks() - self.last_step >= 400:
+                    # play sound perhaps?
+                    self.last_step = ticks()
+            else:
+                self.last_step = ticks()
             # x-col
             self.rect.x += xvel
             for rect in game.rect_list:
@@ -1204,6 +1216,7 @@ class Player:
             self.weapon_switch_offset += self.weapon_switch_direc * m * game.dt
 
     def shoot(self, melee: bool = False):
+        joystick.rumble(10, 10, 100)
         """
         Makes the player shoot a bullet and check whether it hits an enemy.
         """
@@ -1517,6 +1530,7 @@ class Player:
 
             for message in client_tcp.queue.copy():
                 if message.startswith("take_damage|"):
+                    joystick.rumble(1, 1, 300)
                     client_tcp.queue.remove(message)
 
                     split = message.split("|")
@@ -1802,7 +1816,9 @@ class Crosshair:
             self.zooming_mult = 0.15
         else:
             self.l = 15
-            if player.moving:
+            if player.running:
+                self.target_offset = 100
+            elif player.moving:
                 self.target_offset = 60
             else:
                 self.target_offset = 20
@@ -2229,11 +2245,7 @@ def main(multiplayer):
 
                     match event.key:
                         case pygame.K_ESCAPE:
-                            match game.state:
-                                case States.PLAY_SETTINGS:
-                                    game.set_state(States.PLAY)
-                                case States.PLAY:
-                                    game.set_state(States.PLAY_SETTINGS)
+                            escape_key()
 
                         case pygame.K_e:
                             player.try_to_buy_wall_weapon()
@@ -2258,12 +2270,20 @@ def main(multiplayer):
                             player.reload()
                         else:
                             player.try_to_buy_wall_weapon()
+                    
+                    elif event.button == Joymap.RIGHT_JOYSTICK_CLICK:
+                        player.melee()
+                    
+                    elif event.button == Joymap.OPTION:
+                        escape_key()
                 
                 case pygame.JOYAXISMOTION:
                     # ADS
                     if event.axis == Joymap.LEFT_TRIGGER:
-                        if event.value - Joymap.CACHE["LEFT_TRIGGER"] > 0 and not Joymap.PRESSED["LEFT_TRIGGER"]:
-                            player.process_ads = True
+                        if event.value - Joymap.CACHE["LEFT_TRIGGER"] > 0:
+                            if not Joymap.PRESSED["LEFT_TRIGGER"]:
+                                player.process_ads = True
+                                Joymap.PRESSED["LEFT_TRIGGER"] = True
                         else:
                             Joymap.PRESSED["LEFT_TRIGGER"] = False
                             player.stop_adsing()
@@ -2271,9 +2291,11 @@ def main(multiplayer):
                 
                     # shoot
                     elif event.axis == Joymap.RIGHT_TRIGGER:
-                        if event.value - Joymap.CACHE["RIGHT_TRIGGER"] > 0 and not Joymap.PRESSED["RIGHT_TRIGGER"]:
-                            if not weapon_data[player.weapon]["auto"]:
-                                player.process_shot = True
+                        if event.value - Joymap.CACHE["RIGHT_TRIGGER"] > 0:
+                            if not Joymap.PRESSED["RIGHT_TRIGGER"]:
+                                if not weapon_data[player.weapon]["auto"]:
+                                    player.process_shot = True
+                                    Joymap.PRESSED["RIGHT_TRIGGER"] = True
                         else:
                             Joymap.PRESSED["RIGHT_TRIGGER"] = False
                         Joymap.CACHE["RIGHT_TRIGGER"] = event.value

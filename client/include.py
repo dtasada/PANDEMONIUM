@@ -64,6 +64,8 @@ class Joymap:
     SQUARE = 2
     TRIANGLE = 3
     LEFT_JOYSTICK_CLICK = 7
+    RIGHT_JOYSTICK_CLICK = 8
+    OPTION = 6
 
     # data
     CACHE = dict.fromkeys(("LEFT_TRIGGER", "RIGHT_TRIGGER"), float("-inf"))
