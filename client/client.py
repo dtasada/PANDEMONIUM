@@ -1062,7 +1062,7 @@ class Player:
                 xvel, yvel = angle_to_vel(self.angle + pi, vmult)
             if keys[pygame.K_d]:
                 xvel, yvel = angle_to_vel(self.angle + pi / 2, vmult)
-            if keys[pygame.K_LSHIFT] or game.target_zoom > 0:
+            if keys[pygame.K_LSHIFT]:
                 xvel *= run_m
                 yvel *= run_m
                 self.running = True
