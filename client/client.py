@@ -15,6 +15,17 @@ from .include import *
 import atexit
 
 
+def new_enemy():
+    x = rand(0, game.map_width - 1)
+    y = rand(0, game.map_height - 1)
+    while game.current_map[y][x] != 0:
+        x = rand(0, game.map_width - 1)
+        y = rand(0, game.map_height - 1)
+    enemies.append(
+        EnemyPlayer(None, x, y)
+    )
+
+
 def quit():
     """
     Quits the game and saves the user files for further launches.
@@ -52,6 +63,7 @@ class Game:
     def __init__(self):
         # settings values
         failed = False
+        self.last_timer = None
         try:
             if os.path.isfile(Path("client", "settings.json")):
                 with open(Path("client", "settings.json"), "r") as f:
@@ -186,6 +198,7 @@ class Game:
         elif (target_state == States.PLAY and self.state != States.PLAY_SETTINGS) or (
             target_state == States.PLAY_SETTINGS and self.state != States.PLAY
         ):
+            game.last_timer = time.time()
             pygame.mixer.music.load(Sounds.PLAY)
             pygame.mixer.music.play(-1)
 
@@ -378,6 +391,8 @@ class HUD:
         self.heart_rect = self.heart_tex.get_rect(
             bottomright=(150, display.height - 12)
         )
+        self.timer_tex = None
+        self.timer_rect = None
 
     def update(self):
         """
@@ -424,6 +439,12 @@ class HUD:
                     tex,
                     tex.get_rect(topright=(display.width - 16, 16 + 32 * i)),
                 )
+        timer = round(120 - (time.time() - game.last_timer), 2)
+        if timer <= 0:
+            print(f"YOU HAVE ACQUIRED {player.kills} kills")
+            sys.exit()
+        timer_tex, timer_rect = write("midleft", timer, v_fonts[70], Colors.WHITE, display.width / 2 - 60, 40)
+        display.renderer.blit(timer_tex, timer_rect)
 
     def update_weapon_general(self, player):
         """
@@ -766,7 +787,7 @@ class Player:
         self.y = game.tile_size * 8
         self.w = 8
         self.h = 8
-        self.score = 500
+        self.score = 0
         self.kills = 0
         self.deaths = 0
         self.color = Colors.WHITE
@@ -1003,7 +1024,7 @@ class Player:
                     ((x + 1) * game.tile_size, (game.map_height + 1) * game.tile_size),
                 )
 
-    def try_to_buy_wall_weapon(self):
+    def try_to_buy_wall_weapon(self) -> None:
         """
         Tries to buy the current wall weapon.
         """
@@ -1012,7 +1033,9 @@ class Player:
             (x, y), obj = self.to_equip
             x, y = int(x), int(y)
             weapon = obj[0]
-            self.set_weapon(weapon)
+            cost = weapon_data[weapon]["cost"]
+            if self.score >= cost:
+                self.set_weapon(weapon)
         elif self.weapons.count(None) == 0:
             # switch weapons
             self.switching_weapons = True
@@ -1104,6 +1127,10 @@ class Player:
                 # rotation
                 hor_m = 0.0005 * game.sens
                 ver_m = -0.4 * game.sens
+                if self.adsing:
+                    hor_m *= 0.4
+                if self.adsing:
+                    ver_m *= 0.4
                 ax2 = joystick.get_axis(Joymap.RIGHT_JOYSTICK_HOR)
                 ax3 = joystick.get_axis(Joymap.RIGHT_JOYSTICK_VER)
                 if abs(ax2) <= thr:
@@ -1178,6 +1205,7 @@ class Player:
 
         # processing other important joystick input
         shoot_auto = False
+        shoot_auto_controller = False
         if joystick is not None:
             # shoot with joystick
             ax = joystick.get_axis(Joymap.RIGHT_TRIGGER)
@@ -1189,7 +1217,8 @@ class Player:
             if self.weapon is not None:
                 if shoot_auto or self.process_shot:
                     if self.mag == 0:
-                        self.reload()
+                        if not self.reloading:
+                            self.reload()
                     elif self.can_shoot:
                         self.shoot()
 
@@ -1568,10 +1597,12 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, id_: str = None):
+    def __init__(self, id_: str = None, x: int = None, y: int = None):
         self.id: str = id_
-        self.x = int(game.tile_size * rand(0, game.map_width - 3))
-        self.y = int(game.tile_size * rand(0, game.map_height - 3))
+        #
+        self.x = x * game.tile_size + game.tile_size / 2
+        self.y = y * game.tile_size + game.tile_size / 2
+        #
         self.w = 8
         self.h = 8
         self.score = 500
@@ -1582,7 +1613,6 @@ class EnemyPlayer:
             imgload("client", "assets", "images", "minimap", "player_arrow.png")
         )
         self.indicator_img.color = Colors.ORANGE
-        self.indicator_rect = pygame.Rect((0, 0, 16, 16))
         self.indicator_rect.center = (self.x, self.y)
         self.last_hit = ticks()
         self.regenerating = False
@@ -1594,6 +1624,8 @@ class EnemyPlayer:
         self.health = 100  # currently not being updated
         self.name: str = None  # this doesn't work yet
         self.audio_channels = [pygame.mixer.find_channel() for _ in range(2)]
+        self.xvel = randf(-0.2, 0.2)
+        self.yvel = randf(-0.2, 0.2)
 
     def init_image(self, surf: pygame.Surface):
         """
@@ -1604,6 +1636,12 @@ class EnemyPlayer:
             display.renderer,
             surf.subsurface(0, 0, surf.get_width() / 4, surf.get_height()),
         )
+    
+    @property
+    def indicator_rect(self):
+        rect = pygame.Rect(0, 0, 16, 16)
+        rect.center = (self.x, self.y)
+        return rect
 
     def draw(self):
         """
@@ -1630,6 +1668,23 @@ class EnemyPlayer:
         """
         Updates the enemy by drawing it, checking for deaths and regenerating it
         """
+        self.x += self.xvel
+        for rect in game.rect_list:
+            if rect is not None and self.indicator_rect.colliderect(rect):
+                if self.xvel >= 0:
+                    self.x = rect.left - self.indicator_rect.width / 2
+                else:
+                    self.x = rect.right + self.indicator_rect.width / 2
+                self.xvel *= -1
+        self.y += self.yvel
+        for rect in game.rect_list:
+            if rect is not None and self.indicator_rect.colliderect(rect):
+                if self.yvel >= 0:
+                    self.y = rect.top - self.indicator_rect.height / 2
+                else:
+                    self.y = rect.bottom + self.indicator_rect.width / 2
+                self.yvel *= -1
+        #
         if game.multiplayer:
             if self.health <= 0:
                 client_tcp.req(f"kill|{self.id}")
@@ -1756,11 +1811,18 @@ class EnemyPlayer:
         self.regenerating = True
         damage = int(weapon_data["2" if melee else player.weapon]["damage"] * mult)
         if game.multiplayer:
-            # sometimes this gets triggered twice??
             client_tcp.req(f"damage|{self.id}|{damage}")
-
+        else:
+            self.health -= damage
         if self.health <= 0:
-            self.update()  # for dying
+            if game.multiplayer:
+                self.update()  # for dying
+            else:
+                enemies.remove(self)
+                player.score += 200
+                player.kills += 1
+                hud.update_score(player)
+                new_enemy()
 
     def die(self):
         """
@@ -1900,7 +1962,10 @@ hud: HUD = None  # same as above
 game = Game()
 gtex = GlobalTextures()
 leaderboard = Leaderboard()
+# -------
 enemies: list[EnemyPlayer] = []
+new_enemy()
+# -------
 feed: list[tuple[Texture, int]] = []
 shots: list[Shot] = []
 clock = pygame.time.Clock()
@@ -2365,9 +2430,8 @@ def main(multiplayer):
             player.update()
             if game.should_render_map:
                 player.draw()
-                if game.multiplayer:
-                    for thing in enemies:
-                        thing.update()
+                for thing in enemies:
+                    thing.update()
 
             hud.update()
 

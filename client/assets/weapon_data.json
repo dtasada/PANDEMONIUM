@@ -52,7 +52,7 @@
     "4": {
         "name": "Pistol",
         "damage": 20,
-        "ammo": 32,
+        "ammo": 64,
         "mag": 8,
         "fire_pause": 150,
         "auto": false,

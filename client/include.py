@@ -3,6 +3,7 @@ from math import sin, cos, atan2, e, pi
 from pathlib import Path
 from pygame._sdl2.video import Window, Renderer, Texture
 from typing import Any, Optional, TypeAlias
+import time
 import csv
 import json
 import os
@@ -12,7 +13,9 @@ import sys
 
 
 SERVER_ADDRESS, SERVER_TCP_PORT, SERVER_UDP_PORT = (
-    "10.1.73.64",
+    socket.gethostbyname(
+        socket.gethostname()
+    ),  # Only when developing and playing on same machine
     6969,
     4200,
 )
