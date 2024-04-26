@@ -445,12 +445,12 @@ class HUD:
                     tex,
                     tex.get_rect(topright=(display.width - 16, 16 + 32 * i)),
                 )
-        timer = round(120 - (time.time() - game.last_timer), 2)
-        if timer <= 0:
-            print(f"YOU HAVE ACQUIRED {player.kills} kills")
-            sys.exit()
-        timer_tex, timer_rect = write("midleft", timer, v_fonts[70], Colors.WHITE, display.width / 2 - 60, 40)
-        display.renderer.blit(timer_tex, timer_rect)
+        if not game.multiplayer:
+            timer = round(120 - (time.time() - game.last_timer), 2) if game.state != States.GAME_OVER else "0.00"
+            if float(timer) <= 0:
+                game.set_state(States.GAME_OVER)
+            timer_tex, timer_rect = write("midleft", timer, v_fonts[70], Colors.WHITE, display.width / 2 - 60, 40)
+            display.renderer.blit(timer_tex, timer_rect)
 
     def update_weapon_general(self) -> None:
         """
@@ -1986,8 +1986,6 @@ gtex = GlobalTextures()
 leaderboard = Leaderboard()
 
 enemies: list[EnemyPlayer] = []
-new_enemy()
-
 feed: list[tuple[Texture, int]] = []
 shots: list[Shot] = []
 clock = pygame.time.Clock()
@@ -2148,10 +2146,21 @@ all_buttons = {
             font_size=48,
         ),
     ],
+    States.GAME_OVER: [
+        Button(
+            display.width / 2,
+            display.height / 2 + 50,
+            "Return to main menu",
+            lambda: game.set_state(States.MAIN_MENU),
+            font_size=60,
+            anchor="center"
+        )
+    ]
 }
 prim_skin_button = all_buttons[States.MAIN_MENU][5]
 sec_skin_button = all_buttons[States.MAIN_MENU][6]
 unleash_button = all_buttons[States.MAIN_MENU][1]
+game_over_button = all_buttons[States.GAME_OVER][0]
 player_selector.init()
 
 username_input = UserInput(
@@ -2231,6 +2240,8 @@ def main(multiplayer) -> None:
         client_tcp = Client("tcp")
         Thread(target=client_udp.receive, daemon=True).start()
         Thread(target=client_tcp.receive, daemon=True).start()
+    else:
+        new_enemy()
 
     game.set_state(States.MAIN_MENU)
 
@@ -2449,7 +2460,7 @@ def main(multiplayer) -> None:
                 )
                 index += 1
 
-        if game.state in (States.PLAY, States.PLAY_SETTINGS):
+        if game.state in (States.PLAY, States.PLAY_SETTINGS, States.GAME_OVER):
             fill_rect(
                 Colors.DARK_GRAY,
                 (0, 0, display.width, display.height / 2 + player.view_yoffset),
@@ -2468,7 +2479,7 @@ def main(multiplayer) -> None:
             display.renderer.blit(redden_game.tex, redden_game.rect)
             for shot in shots:
                 shot.update()
-
+        
         if game.state == States.PLAY:
             game.zoom += (game.target_zoom - game.zoom) * game.zoom_speed
             # display.renderer.blit(crosshair_tex, crosshair_rect)
@@ -2477,8 +2488,11 @@ def main(multiplayer) -> None:
             if pygame.key.get_pressed()[pygame.K_TAB]:
                 leaderboard.update()
 
-        if game.state == States.PLAY_SETTINGS:
+        if game.state in (States.PLAY_SETTINGS, States.GAME_OVER):
             display.renderer.blit(darken_game.tex, darken_game.rect)
+        
+        if game.state == States.GAME_OVER:
+            write("center", f"You acquired {player.kills} kills", v_fonts[70], Colors.WHITE, display.width / 2, display.height / 2 - 40)
 
         for button in current_buttons:
             button.update()
