@@ -24,6 +24,8 @@ pygame.init()
 
 
 Color: TypeAlias = tuple[int, int, int, int] | tuple[int, int, int]
+Number: TypeAlias = int | float
+Rect: TypeAlias = pygame.Rect | tuple[Number, Number, Number, Number]
 
 
 class Colors:
@@ -158,7 +160,7 @@ class UserInput:
             )[1],
         )
         """
-        
+
 
 class Display:
     def __init__(self, width, height, title, fullscreen=False, vsync=False):
@@ -548,7 +550,7 @@ def imgload(
     return ret
 
 
-def fill_rect(color: Color, rect: pygame.Rect) -> None:
+def fill_rect(color: Color, rect: Rect) -> None:
     """
     Draws and fills a rectangle at given 4 points.
     :param color: the color
@@ -558,7 +560,7 @@ def fill_rect(color: Color, rect: pygame.Rect) -> None:
     display.renderer.fill_rect(rect)
 
 
-def draw_rect(color: Color, rect: pygame.Rect) -> None:
+def draw_rect(color: Color, rect: Rect) -> None:
     """
     Draws a rectangle at given 4 points (only the 1 pixel outline).
     :param color: the color

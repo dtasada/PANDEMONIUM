@@ -15,7 +15,10 @@ from .include import *
 import atexit
 
 
-def new_enemy():
+def new_enemy() -> None:
+    """
+    Create new enemy in blitz mode
+    """
     x = rand(0, game.map_width - 1)
     y = rand(0, game.map_height - 1)
     while game.current_map[y][x] != 0:
@@ -26,7 +29,7 @@ def new_enemy():
     )
 
 
-def quit():
+def quit() -> None:
     """
     Quits the game and saves the user files for further launches.
     """
@@ -48,7 +51,10 @@ def quit():
     print("Exited successfully")
 
 
-def escape_key():
+def escape_key() -> None:
+    """
+    Handle escape key
+    """
     match game.state:
         case States.PLAY_SETTINGS:
             game.set_state(States.PLAY)
@@ -60,7 +66,7 @@ atexit.register(quit)
 
 
 class Game:
-    def __init__(self):
+    def __init__(self) -> None:
         # settings values
         failed = False
         self.last_timer = None
@@ -166,10 +172,10 @@ class Game:
         self.fps_list = (30, 60, 120, 144, 240, 1000)
 
     @property
-    def rect_list(self):
+    def rect_list(self) -> None:
         return sum(self.rects, [])
 
-    def stop_running(self):
+    def stop_running(self) -> None:
         self.running = False
 
     def set_state(self, target_state):
@@ -186,9 +192,9 @@ class Game:
             hud = HUD()
             leaderboard = Leaderboard()
 
-            hud.update_health(player)
-            hud.update_score(player)
-            hud.update_weapon_general(player)
+            hud.update_health()
+            hud.update_score()
+            hud.update_weapon_general()
 
         if (
             target_state == States.MAIN_MENU and self.state not in [States.MAIN_SETTINGS, States.CONTROLS] 
@@ -230,32 +236,32 @@ class Game:
         global current_buttons
         current_buttons = all_buttons[self.state]
 
-    def get_fov(self):
+    def get_fov(self) -> int:
         return self.fov
 
-    def set_fov(self, amount):
+    def set_fov(self, amount: int) -> None:
         self.fov += amount
         self.fov = min(self.fov, 120)
         self.fov = max(self.fov, 30)
 
-    def get_sens(self):
+    def get_sens(self) -> int:
         return self.sens
 
-    def set_sens(self, amount):
+    def set_sens(self, amount: int) -> None:
         self.sens += amount
         self.sens = max(self.sens, 10)
 
-    def get_res(self):
+    def get_res(self) -> int:
         return self.resolution
 
-    def set_res(self, amount):
+    def set_res(self, amount: int) -> None:
         self.resolution += amount
         self.resolution = min(self.resolution, 4)
         self.resolution = max(self.resolution, 1)
 
         self.ray_density = self.resolutions_list[self.resolution - 1]
 
-    def set_volume(self, amount):
+    def set_volume(self, amount: int) -> None:
         # 0.05 is for rounding to steps of 5
         self.volume = 0.05 * round(
             (pygame.mixer.music.get_volume() + amount / 100) / 0.05
@@ -266,20 +272,20 @@ class Game:
         for enemy in enemies.copy():
             [channel.set_volume(self.volume) for channel in enemy.audio_channels]
 
-    def get_volume(self):
+    def get_volume(self) -> int:
         # 0.05 is for floating point inaccuracy
         return int(5 * round(pygame.mixer.music.get_volume() / 0.05))
 
-    def set_max_fps(self, arg):
-        self.max_fps_index += arg
+    def set_max_fps(self, amount: int) -> None:
+        self.max_fps_index += amount
         self.max_fps_index = max(0, min(self.max_fps_index, len(self.fps_list) - 1))
 
-    def get_max_fps(self):
+    def get_max_fps(self) -> int:
         return self.fps_list[self.max_fps_index]
 
 
 class GlobalTextures:
-    def __init__(self):
+    def __init__(self) -> None:
         self.x = game.tile_size * 8
         self.y = game.tile_size * 8
         self.w = 1
@@ -379,7 +385,7 @@ class GlobalTextures:
 
 
 class HUD:
-    def __init__(self):
+    def __init__(self) -> None:
         self.health_tex = None
         self.ammo_tex = None
         self.weapon_name_tex = None
@@ -394,7 +400,7 @@ class HUD:
         self.timer_tex = None
         self.timer_rect = None
 
-    def update(self):
+    def update(self) -> None:
         """
         The update function of the HUD: it renders the score, ammo, health, etc..
         """
@@ -446,19 +452,17 @@ class HUD:
         timer_tex, timer_rect = write("midleft", timer, v_fonts[70], Colors.WHITE, display.width / 2 - 60, 40)
         display.renderer.blit(timer_tex, timer_rect)
 
-    def update_weapon_general(self, player):
+    def update_weapon_general(self) -> None:
         """
         The textures for general weapon stuff get updated (weapon image, ammo, name). Doing this each frame is expensive.
-        :param player: the player object which has all the weapon data that this function uses.
         """
-        self.update_weapon_tex(player)
-        self.update_ammo(player)
-        self.update_weapon_name(player)
+        self.update_weapon_tex()
+        self.update_ammo()
+        self.update_weapon_name()
 
-    def update_health(self, player):
+    def update_health(self) -> None:
         """
         The health texture gets updated.
-        :param player: the player object which has all the weapon data that this function uses.
         """
         self.health_tex, self.health_rect = write(
             "bottomleft",
@@ -469,10 +473,9 @@ class HUD:
             display.height - 4,
         )
 
-    def update_score(self, player):
+    def update_score(self) -> None:
         """
         The score texture gets updated.
-        :param player: the player object which has all the weapon data that this function uses.
         """
         self.score_tex, self.score_rect = write(
             "bottomleft",
@@ -491,10 +494,9 @@ class HUD:
             self.health_rect.top,
         )
 
-    def update_ammo(self, player):
+    def update_ammo(self) -> None:
         """
         The ammo texture gets updated.
-        :param player: the player object which has all the weapon data that this function uses.
         """
         max_mag_size = weapon_data[player.weapon]["mag"]
         self.ammo_tex, self.ammo_rect = write(
@@ -515,10 +517,9 @@ class HUD:
                 self.ammo_rect.bottom,
             )
 
-    def update_weapon_name(self, player):
+    def update_weapon_name(self) -> None:
         """
         The weapon name texture gets updated.
-        :param player: the player object which has all the weapon data that this function uses.
         """
         self.weapon_name_tex, self.weapon_name_rect = write(
             "bottomright",
@@ -529,10 +530,9 @@ class HUD:
             self.ammo_rect.y,
         )
 
-    def update_weapon_tex(self, player):
+    def update_weapon_tex(self) -> None:
         """
         The weapon texture gets updated.
-        :param player: the player object which has all the weapon data that this function uses.
         """
         self.weapon_tex = gtex.mask_object_textures[int(player.weapon)]
         self.weapon_rect = self.weapon_tex.get_rect()
@@ -544,10 +544,10 @@ class HUD:
 
 
 class Leaderboard:
-    def __init__(self):
+    def __init__(self) -> None:
         self.texs: Dict[str, tuple[Texture, Optional[int]]] = {}
 
-    def update(self):
+    def update(self) -> None:
         """
         The leaderboard which shows the players and their scores.
         """
@@ -635,7 +635,7 @@ class Leaderboard:
 
 
 class PlayerSelector:
-    def __init__(self):
+    def __init__(self) -> None:
         self.database = {
             os.path.splitext(file)[0]: pygame.image.load(
                 Path("client", "assets", "images", "player_skins", file)
@@ -678,7 +678,7 @@ class PlayerSelector:
             ),
         )
 
-    def init(self):
+    def init(self) -> None:
         unleash_button = all_buttons[States.MAIN_MENU][1]
         self.menu_bg_surf = pygame.Surface(
             (unleash_button.rect.width + 40, 220), pygame.SRCALPHA
@@ -720,13 +720,17 @@ class PlayerSelector:
             sec_skin_button.rect.centery,
         )
 
-    def get_prim_skin(self):
+    def get_prim_skin(self) -> int:
         return self.prim_color
 
-    def get_sec_skin(self):
+    def get_sec_skin(self) -> int:
         return self.sec_color
 
-    def set_prim_skin(self, amount):
+    def set_prim_skin(self, amount: int) -> None:
+        """
+        set primary skin
+        :param amount: how much the function should increment the skin by
+        """
         self.prim_color += amount
         if self.prim_color == len(self.color_keys):
             self.prim_color = 0
@@ -734,7 +738,11 @@ class PlayerSelector:
             self.prim_color = len(self.color_keys) - 1
         self.set_skin()
 
-    def set_sec_skin(self, amount):
+    def set_sec_skin(self, amount: int) -> None:
+        """
+        set secondary skin
+        :param amount: im not explaining this again
+        """
         self.sec_color += amount
         if self.sec_color == len(self.color_keys):
             self.sec_color = 0
@@ -742,7 +750,10 @@ class PlayerSelector:
             self.sec_color = len(self.color_keys) - 1
         self.set_skin()
 
-    def set_skin(self):
+    def set_skin(self) -> None:
+        """
+        sets the skin
+        """
         self.prim = prim = self.color_keys[self.prim_color]
         self.sec = sec = self.color_keys[self.sec_color]
         name = f"{prim}_{sec}"
@@ -755,10 +766,12 @@ class PlayerSelector:
         self.rect.topright = (display.width - 135, 200)
         self.tex = Texture.from_surface(display.renderer, self.image)
 
-    def set_all_skins(self):
+    def generate_skins(self) -> None:
+        """
+        generate all skin pngs (not used in game)
+        """
         self.image_copy = self.image.copy()
         i = 0
-        imax = len(self.color_keys) ** 2
         for name, rgba in self.colors.items():
             for iname, irgba in self.colors.items():
                 if name != iname or True:
@@ -782,7 +795,7 @@ class PlayerSelector:
 
 
 class Player:
-    def __init__(self):
+    def __init__(self) -> None:
         self.x = game.tile_size * 8
         self.y = game.tile_size * 8
         self.w = 8
@@ -847,43 +860,43 @@ class Player:
             channel.set_volume(game.volume)
 
     @property
-    def view_yoffset(self):
+    def view_yoffset(self) -> int:
         return self.bob + self.weapon_recoil_offset
 
     @property
-    def can_shoot(self):
+    def can_shoot(self) -> bool:
         return not self.reloading and not self.switching_weapons
 
     @property
-    def weapon(self):
+    def weapon(self) -> list | None:
         try:
             return self.weapons[self.weapon_index]
         except IndexError:
             return None
 
     @property
-    def mag(self):
+    def mag(self) -> list | None:
         try:
             return self.mags[self.weapon_index]
         except IndexError:
             return None
 
     @mag.setter
-    def mag(self, value):
+    def mag(self, value: int) -> None:
         self.mags[self.weapon_index] = value
 
     @property
-    def ammo(self):
+    def ammo(self) -> list | None:
         try:
             return self.ammos[self.weapon_index]
         except IndexError:
             return None
 
     @ammo.setter
-    def ammo(self, value):
+    def ammo(self, value: int) -> None:
         self.ammos[self.weapon_index] = value
 
-    def display_weapon(self):
+    def display_weapon(self) -> None:
         """
         The weapons of the player get displayed and updated.
         """
@@ -950,7 +963,7 @@ class Player:
 
             display.renderer.blit(weapon_tex, self.weapon_rect)
 
-    def draw(self):
+    def draw(self) -> None:
         """
         The player draw function that also renders the to-be-equipped weapon.
         """
@@ -987,7 +1000,7 @@ class Player:
                     joystick_button_sprs[Joymap.SQUARE], joystick_button_rect
                 )
 
-    def render_map(self):
+    def render_map(self) -> None:
         """
         Renders the minimap.
         """
@@ -1041,7 +1054,7 @@ class Player:
             self.switching_weapons = True
             self.weapon_switch_direc = 1
 
-    def keys(self):
+    def keys(self) -> None:
         """
         The movement mechanics of the players.
         """
@@ -1244,12 +1257,12 @@ class Player:
             m = 12
             self.weapon_switch_offset += self.weapon_switch_direc * m * game.dt
 
-    def shoot(self, melee: bool = False):
-        if joystick is not None:
-            joystick.rumble(10, 10, 100)
+    def shoot(self, melee: bool = False) -> None:
         """
         Makes the player shoot a bullet and check whether it hits an enemy.
         """
+        if joystick is not None:
+            joystick.rumble(10, 10, 100)
         if ticks() - self.last_shot >= weapon_data[self.weapon]["fire_pause"]:
             self.shooting = True
             self.weapon_anim = 1
@@ -1290,13 +1303,13 @@ class Player:
 
             self.last_shot = ticks()
             self.mag -= 1
-            hud.update_weapon_general(self)
+            hud.update_weapon_general()
             if game.multiplayer:
                 client_tcp.req(
                     f"shoot|{self.id}|{self.weapon}|{self.arrow_rect.x}|{self.arrow_rect.y}"
                 )
     
-    def stop_adsing(self):
+    def stop_adsing(self) -> None:
         """
         Stops the player from adsing.
         """
@@ -1305,10 +1318,10 @@ class Player:
         self.weapon_ads_offset_target = 0
         self.adsing = False
     
-    def can_reload(self):
+    def can_reload(self) -> bool:
         return self.weapon is not None and self.ammo > 0 and self.mag < weapon_data[self.weapon]["mag"]
 
-    def reload(self, amount=None):
+    def reload(self) -> None:
         """
         Reloads the player weapon.
         """
@@ -1324,7 +1337,7 @@ class Player:
             self.new_ammo = self.ammo - final_mag
             self.new_mag = self.mag + final_mag
 
-    def melee(self):
+    def melee(self) -> None:
         """
         The melee attack of the player.
         """
@@ -1359,7 +1372,12 @@ class Player:
                 self.last_melee = ticks()
 
     def cast_ray(
-        self, deg_offset, index, start_x=None, start_y=None, abs_angle=False
+        self,
+        deg_offset: float,
+        index: int,
+        start_x: Optional[int | float] = None,
+        start_y: Optional[int | float] = None,
+        abs_angle: bool = False,
     ):
         """
         Casts a ray in given direction to render a wall.
@@ -1501,7 +1519,7 @@ class Player:
                         )
                     )
 
-    def send_location(self):
+    def send_location(self) -> None:
         """
         Sends the location of the player to the server
         """
@@ -1518,18 +1536,16 @@ class Player:
             )
         )
 
-    def set_weapon(self, weapon):
+    def set_weapon(self, weapon: str) -> None:
         """
         Sets the player weapon by checking which weapon slot it takes up
         :param weapon: the weapon ID (you can check those in the weapon_data.json)
         """
         self.weapon_anim = 0
-        weapon = int(weapon)
-        self.weapon_hud_tex = gtex.mask_object_textures[weapon]
+        self.weapon_hud_tex = gtex.mask_object_textures[int(weapon)]
         self.weapon_hud_rect = self.weapon_hud_tex.get_rect(
             bottomright=(display.width - 160, display.height - 10)
         ).scale_by(4)
-        weapon = str(weapon)
         if self.weapons.count(None) == 0:  # no empty weapon slots
             self.weapons[self.weapon_index] = weapon
             self.ammos[self.weapon_index] = weapon_data[weapon]["ammo"]
@@ -1545,7 +1561,7 @@ class Player:
             self.mags[0] = weapon_data[weapon]["mag"]
         hud.update_weapon_general(self)
 
-    def update(self):
+    def update(self) -> None:
         """
         The update function of the player. It renders it and gets the messages from the server.
         """
@@ -1597,12 +1613,12 @@ class Player:
 
 
 class EnemyPlayer:
-    def __init__(self, id_: str = None, x: int = None, y: int = None):
+    def __init__(self, id_: str = None, x: int = None, y: int = None) -> None:
         self.id: str = id_
-        #
+
         self.x = x * game.tile_size + game.tile_size / 2
         self.y = y * game.tile_size + game.tile_size / 2
-        #
+
         self.w = 8
         self.h = 8
         self.score = 500
@@ -1627,7 +1643,7 @@ class EnemyPlayer:
         self.xvel = randf(-0.2, 0.2)
         self.yvel = randf(-0.2, 0.2)
 
-    def init_image(self, surf: pygame.Surface):
+    def init_image(self, surf: pygame.Surface) -> None:
         """
         Initializes the enemy image.
         :param surf: the surface to be used for initialization
@@ -1638,12 +1654,12 @@ class EnemyPlayer:
         )
     
     @property
-    def indicator_rect(self):
+    def indicator_rect(self) -> pygame.Rect:
         rect = pygame.Rect(0, 0, 16, 16)
         rect.center = (self.x, self.y)
         return rect
 
-    def draw(self):
+    def draw(self) -> None:
         """
         Gets the enemy data from the server and renders it at given indicator position
         """
@@ -1664,7 +1680,7 @@ class EnemyPlayer:
         self.indicator_img.angle = degrees(self.angle)
         display.renderer.blit(self.indicator_img, self.indicator_rect)
 
-    def update(self):
+    def update(self) -> None:
         """
         Updates the enemy by drawing it, checking for deaths and regenerating it
         """
@@ -1684,7 +1700,7 @@ class EnemyPlayer:
                 else:
                     self.y = rect.bottom + self.indicator_rect.width / 2
                 self.yvel *= -1
-        #
+
         if game.multiplayer:
             if self.health <= 0:
                 client_tcp.req(f"kill|{self.id}")
@@ -1699,7 +1715,7 @@ class EnemyPlayer:
         self.draw()
         self.regenerate()
 
-    def render(self):
+    def render(self) -> None:
         """
         Renders the enemy at given position (this time 3D instead of the indicator)
         """
@@ -1736,21 +1752,25 @@ class EnemyPlayer:
             # whole body
             self.rect = pygame.Rect(0, 0, width, height)
             self.rect.center = (centerx, centery)
+
             # head
             self.head_rect = pygame.Rect(
                 0, 0, head_w_ratio * width, head_h_ratio * height
             )
             self.head_rect.midtop = (self.rect.centerx, self.rect.top)
+
             # torso
             self.torso_rect = pygame.Rect(
                 0, 0, torso_w_ratio * width, torso_h_ratio * height
             )
             self.torso_rect.midtop = (self.rect.centerx, self.head_rect.bottom)
+
             # legs
             self.legs_rect = pygame.Rect(
                 0, 0, legs_w_ratio * width, legs_h_ratio * height
             )
             self.legs_rect.midtop = (self.rect.centerx, self.torso_rect.bottom)
+
             # shoulders
             self.shoulder1_rect = pygame.Rect(
                 0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height
@@ -1760,6 +1780,7 @@ class EnemyPlayer:
                 0, 0, shoulder_w_ratio * width, shoulder_h_ratio * height
             )
             self.shoulder2_rect.topleft = self.torso_rect.topright
+
             # arms
             self.arm1_rect = pygame.Rect(
                 0, 0, arm_w_ratio * width, arm_h_ratio * height
@@ -1769,6 +1790,7 @@ class EnemyPlayer:
                 0, 0, arm_w_ratio * width, arm_h_ratio * height
             )
             self.arm2_rect.topleft = self.shoulder2_rect.topright
+
             # calculate 4-directional player image
             dy = self.indicator_rect.centery - player.arrow_rect.centery
             dx = self.indicator_rect.centerx - player.arrow_rect.centerx
@@ -1786,7 +1808,7 @@ class EnemyPlayer:
                 self.image = self.images[3]
             # render
             display.renderer.blit(self.image, self.rect)
-            """
+            """ show hitboxes
             draw_rect(Colors.YELLOW, self.rect)
             fill_rect(Colors.ORANGE, self.head_rect)
             fill_rect(Colors.GREEN, self.torso_rect)
@@ -1796,14 +1818,14 @@ class EnemyPlayer:
             """
             self.rendering = True
 
-    def regenerate(self):
+    def regenerate(self) -> None:
         """
         Regenerates the enemy
         """
         if self.regenerating and ticks() - self.last_hit >= 70:
             self.regenerating = False
 
-    def hit(self, mult, melee=False):
+    def hit(self, mult: float, melee: bool = False) -> None:
         """
         Checks for hits
         """
@@ -1821,10 +1843,10 @@ class EnemyPlayer:
                 enemies.remove(self)
                 player.score += 200
                 player.kills += 1
-                hud.update_score(player)
+                hud.update_score()
                 new_enemy()
 
-    def die(self):
+    def die(self) -> None:
         """
         Attempts to kill the player
         """
@@ -1836,7 +1858,7 @@ class EnemyPlayer:
 
 
 class Crosshair:
-    def __init__(self):
+    def __init__(self) -> None:
         self.w = 3  # width
         self.l = 20  # length
         self.target_offset = self.o = 50  # self.o is offset
@@ -1858,10 +1880,10 @@ class Crosshair:
         self.wavelength = 1 / self.m * pi
 
     @property
-    def radius(self):
+    def radius(self) -> float:
         return self.bottom[1] - display.height / 2
 
-    def set_damage_image_active(self):
+    def set_damage_image_active(self) -> None:
         """
         Sets the damage indicator of the crosshair to True
         """
@@ -1869,7 +1891,7 @@ class Crosshair:
             self.last_damage_image_active = ticks()
         self.damage_image_active = True
 
-    def update(self):
+    def update(self) -> None:
         """
         Updates the crosshair by rendering it and changing its position according to the player movement
         """
@@ -1934,12 +1956,12 @@ class Crosshair:
 
 
 class Shot:
-    def __init__(self, pos):
+    def __init__(self, pos) -> None:
         self.x, self.y = pos
         self.r = 2
         self.alpha = 255
 
-    def update(self):
+    def update(self) -> None:
         """
         Update the shot indicator
         """
@@ -1962,10 +1984,10 @@ hud: HUD = None  # same as above
 game = Game()
 gtex = GlobalTextures()
 leaderboard = Leaderboard()
-# -------
+
 enemies: list[EnemyPlayer] = []
 new_enemy()
-# -------
+
 feed: list[tuple[Texture, int]] = []
 shots: list[Shot] = []
 clock = pygame.time.Clock()
@@ -2160,6 +2182,11 @@ joystick_button_rect = joystick_button_sprs[0].get_rect()
 
 
 def add_enemy(address: str, data: Dict[str, Any]) -> None:
+    """
+    Initialize new enemy when receiving one from server
+    :param address: tcp address of new enemy
+    :param data: map of enemy data, including health, name, etc.
+    """
     new_enemy = EnemyPlayer(id_=address)
     new_enemy.health = data["health"]
     new_enemy.name = data["name"]
@@ -2176,7 +2203,10 @@ def add_enemy(address: str, data: Dict[str, Any]) -> None:
     leaderboard.texs[new_enemy.id] = (text2tex(new_enemy.name, 32), None)
 
 
-def render_floor():
+def render_floor() -> None:
+    """
+    renders floor
+    """
     fill_rect(
         Colors.BROWN,
         (
@@ -2188,7 +2218,7 @@ def render_floor():
     )
 
 
-def main(multiplayer):
+def main(multiplayer) -> None:
     """
     The main loop of the game; it renders and updates everything and checks for events
     :param multiplayer: whether the game is multiplayer (for singleplayer debugging purposes)
