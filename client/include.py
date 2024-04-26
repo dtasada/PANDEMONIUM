@@ -80,6 +80,7 @@ class States(Enum):
     PLAY = 3
     PLAY_SETTINGS = 4
     CONTROLS = 5
+    GAME_OVER = 6
 
 
 class Directions(Enum):
